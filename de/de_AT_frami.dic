@@ -73905,6 +73905,7 @@ Rattenplage/Nm
 Rattenplage/m
 Rattensparplan/dSTp
 Rattenzahlungsplan/dSTp
+Rattenvereinbarung/dSTp
 Rattergeräusch/EPSTm
 Rattern/S
 Ratzeburg/Sm
@@ -212030,6 +212031,7 @@ ratenzahlungspläne/Nozm
 ratenzahlungsplan/STozm
 ratenzahlungsvereinbarung/Pozm
 ratenzahlungszuschlag/STpozm
+ratenvereinbarung/Pozm
 ratespiel/EPSTozm
 ratewahrscheinlichkeit/Pozm
 ratgeber/FNSozm
