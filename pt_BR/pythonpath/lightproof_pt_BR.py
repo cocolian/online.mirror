@@ -3527,7 +3527,7 @@ dic = [['(?u)(?<![-\\w–.,\xad])(assim|lhe|lhes|me|não|nos|que|te|vezes|vos) d
  ['(?u)(?<![-\\w–.,\xad])[AaÀà][ ][t][u](?![-\\w–\xad])', 'a ti', 'Você quis dizer:', 'option(LOCALE,"pronome")'],
 # -*- FIM Uso de pronome -*-
 # -*- Cacofonia -*-
- ['(?u)(?<![-\\w–.,\xad])([Pp])or cada(?![-\\w–\xad])', '\\1or', 'Cacofonia. Você quis dizer:', 'not "or cada um" in TEXT and option(LOCALE,"nonmetric")'],
+# ['(?u)(?<![-\\w–.,\xad])([Pp])or cada(?![-\\w–\xad])', '\\1or', 'Cacofonia. Você quis dizer:', 'not "or cada um" in TEXT and option(LOCALE,"nonmetric")'],
 # -*- FIM Cacofonia -*-
 # -*- Emprego do porque, por que -*-
  ['(?u)(?<![-\\w–.,\xad])([Pp])or que([.?!;])(?![-\\w–\xad])', '\\1or quê\\2', 'Você quis dizer:', 'option(LOCALE,"porque")'],
