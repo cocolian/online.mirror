@@ -23,11 +23,6 @@
 int ClientPortNumber = DEFAULT_CLIENT_PORT_NUMBER;
 UnxSocketPath MasterLocation;
 
-// Embed variant string to ensure different build-id for coolforkit-caps vs coolforkit-ns
-#ifdef COOL_FORKIT_VARIANT
-__attribute__((used)) const char* const ForkitVariant = COOL_FORKIT_VARIANT;
-#endif
-
 int main (int argc, char **argv)
 {
     return forkit_main(argc, argv);
