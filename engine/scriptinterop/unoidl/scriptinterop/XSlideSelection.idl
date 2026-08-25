@@ -14,8 +14,18 @@ module scriptinterop {
 interface XSlideSelection : XBase
 {
     com::sun::star::beans::Optional<XPage> getCurrentPage();
+
+    XPageElementRange getPageElementRange();
+
+    XPageRange getPageRange();
+
+    SelectionType getSelectionType();
+
+    XSlideTableCellRange getTableCellRange();
+
+    XTextRange getTextRange();
 };
 
 };
 
-/* vim:set shiftwidth=4 softtabstop=4 expandtab: */
+/* vim:set shiftwidth=4 softtabstop=4 expandtab cinoptions=b1,g0,N-s cinkeys+=0=break: */
