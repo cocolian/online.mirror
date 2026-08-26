@@ -19,6 +19,8 @@ interface XDocument : XBase
 
     sequence<XParagraph> getParagraphs();
 
+    sequence<XFootnote> getFootnotes();
+
     void insertImage([in] sequence<byte> data, [in] ImageOptions opts);
 };
 
