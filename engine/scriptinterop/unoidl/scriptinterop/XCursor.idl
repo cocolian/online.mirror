@@ -1,0 +1,30 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4; fill-column: 100 -*- */
+/*
+ * Copyright the Collabora Office contributors.
+ *
+ * SPDX-License-Identifier: MPL-2.0
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+module scriptinterop {
+
+// Insertion-point cursor over the document, matching GAS's Cursor shape (getElement() gives the
+// paragraph the cursor sits in, getOffset() the character position inside that paragraph,
+// getSurroundingText() the paragraph's text, insertText() inserts at the cursor and leaves it
+// advanced past the inserted characters):
+interface XCursor: XBase {
+    XParagraph getElement();
+
+    long getOffset();
+
+    string getSurroundingText();
+
+    void insertText([in] string text);
+};
+
+};
+
+/* vim:set shiftwidth=4 softtabstop=4 expandtab: */

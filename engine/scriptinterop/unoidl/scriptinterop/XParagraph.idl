@@ -13,6 +13,8 @@ module scriptinterop {
 
 interface XParagraph : XBase
 {
+    ElementType getElementType();
+
     string getText();
 
     sequence<XTextRun> getTextRuns();
