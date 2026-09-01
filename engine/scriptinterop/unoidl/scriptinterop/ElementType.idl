@@ -17,9 +17,12 @@ enum ElementType {
     PARAGRAPH,
     LIST_ITEM,
     TABLE,
+    TABLE_ROW,
+    TABLE_CELL,
     INLINE_IMAGE,
     PAGE_BREAK,
     HORIZONTAL_RULE,
+    BODY_SECTION,
     UNSUPPORTED
 };
 
