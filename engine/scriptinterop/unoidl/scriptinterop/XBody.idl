@@ -16,7 +16,7 @@ interface XBody: XBase {
 
     XParagraph appendParagraph([in] string text);
 
-    sequence<XParagraph> getChildren();
+    sequence<XElement> getChildren();
 
     string getText();
 };
