@@ -22,6 +22,10 @@ interface XDocument : XBase
     sequence<XFootnote> getFootnotes();
 
     void insertImage([in] sequence<byte> data, [in] ImageOptions opts);
+
+    XRangeBuilder newRange();
+
+    void setSelection([in] XSelection selection);
 };
 
 };
