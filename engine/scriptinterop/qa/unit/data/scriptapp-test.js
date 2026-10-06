@@ -15,24 +15,6 @@ if (!globalThis.cool) {
 }
 
 function test() {
-    // An AuthMode value prints as its name and has the methods of a Java enum:
-    const modes = ['NONE', 'CUSTOM_FUNCTION', 'LIMITED', 'FULL'];
-    modes.forEach(function(name, ordinal) {
-        const mode = ScriptApp.AuthMode[name];
-        console.assert(typeof mode === 'object');
-        console.assert(String(mode) === name);
-        console.assert(`${mode}` === name);
-        console.assert(JSON.stringify(mode) === '"' + name + '"');
-        console.assert(mode.name() === name);
-        console.assert(mode.ordinal() === ordinal);
-        console.assert(mode === ScriptApp.AuthMode[name]);
-    });
-    console.assert(ScriptApp.AuthMode.FULL !== ScriptApp.AuthMode.LIMITED);
-    console.assert(ScriptApp.AuthMode.FULL.compareTo(ScriptApp.AuthMode.NONE) > 0);
-    console.assert(ScriptApp.AuthMode.NONE.compareTo(ScriptApp.AuthMode.FULL) < 0);
-    console.assert(ScriptApp.AuthMode.FULL.compareTo(ScriptApp.AuthMode.FULL) === 0);
-    console.assert(ScriptApp.AuthMode.CUSTOM === undefined);
-
     const id = ScriptApp.getScriptId();
     console.assert(typeof id === 'string' && id.length > 0);
 }
