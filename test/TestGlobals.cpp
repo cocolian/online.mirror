@@ -18,6 +18,7 @@
 #include <common/Globals.hpp>
 #include <common/Util.hpp>
 #include <kit/KitGlobals.hpp>
+#include <wsd/WSDGlobals.hpp>
 
 const bool Util::MobileApp = Util::isMobileAppBuild();
 
