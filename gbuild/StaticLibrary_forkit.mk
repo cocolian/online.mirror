@@ -44,13 +44,11 @@ $(eval $(call gb_StaticLibrary_add_cxxflags,forkit, \
     $(ONLINE.FUZZER_CFLAGS) \
 ))
 
-# kit/forkit-main defines main(), so avoid it in fuzzers, which get ther own main().
 $(eval $(call gb_StaticLibrary_add_generated_exception_objects,forkit, \
     kit/ChildSession \
     kit/ForKit \
     kit/Kit \
     kit/KitWebSocket \
-    $(if $(ONLINE.FUZZER_CFLAGS),,kit/forkit-main) \
 ))
 
 # vim: set noet sw=4 ts=4:
