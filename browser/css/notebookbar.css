@@ -1457,7 +1457,7 @@ label.notebookbar.ui-checkbox-label {
 
 
 /* Connection health belongs to the application chrome, never the document canvas. */
-#office-net-wrapper { position: relative; margin-inline: 8px; align-self: center; flex: 0 0 auto; }
+#office-net-wrapper { position: relative; border-inline-start: 1px solid var(--color-toolbar-border); margin-inline: 8px; align-self: center; flex: 0 0 auto; }
 #office-net-status { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 0; border-radius: 4px; font: 12px var(--cool-font); color: var(--color-main-text); background: transparent; white-space: nowrap; cursor: pointer; }
 #office-net-status:hover, #office-net-status:focus-visible { background: var(--color-background-darker); }
 .office-net-dot { width: 7px; height: 7px; border-radius: 50%; background: #737d8b; }
@@ -1465,6 +1465,6 @@ label.notebookbar.ui-checkbox-label {
 #office-net-status[data-level='slow'] .office-net-dot { background: #aa7900; }
 #office-net-status[data-level='poor'] .office-net-dot, #office-net-status[data-level='waiting'] .office-net-dot { background: #c36413; }
 #office-net-status[data-level='offline'] .office-net-dot { background: #c33b36; }
-#office-net-details { position: absolute; inset-inline-end: 0; top: 100%; min-width: 210px; max-width: min(320px, 80vw); padding: 12px; border: 1px solid var(--color-toolbar-border); border-radius: 5px; background: var(--color-main-background); color: var(--color-main-text); white-space: pre-line; font: 12px/1.7 var(--cool-font); box-shadow: 0 4px 16px #0002; z-index: 10000; }
+#office-net-details { position: fixed; min-width: 210px; max-width: min(320px, 80vw); padding: 12px; border: 1px solid var(--color-toolbar-border); border-radius: 5px; background: var(--color-main-background); color: var(--color-main-text); white-space: pre-line; font: 12px/1.7 var(--cool-font); box-shadow: 0 4px 16px #0002; z-index: 10000; }
 @media (max-width: 1100px) { #office-net-status { max-width: 145px; } .office-net-label { overflow: hidden; text-overflow: ellipsis; } }
 @media (max-width: 767px) { #office-net-wrapper { display: none; } }

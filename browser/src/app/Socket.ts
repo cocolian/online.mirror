@@ -92,6 +92,15 @@ class Socket {
 		this._netPaint();
 	}
 
+	public mountConnectionStatus(): void {
+		const wrapper = document.getElementById('office-net-wrapper');
+		const language = document.querySelector('#toolbar-down #languagestatus');
+		if (wrapper && language) {
+			language.after(wrapper);
+			wrapper.hidden = false;
+		}
+	}
+
 	private _netStart(): void {
 		if (this._netTimer !== undefined) window.clearInterval(this._netTimer);
 		this._netPending = undefined;
@@ -99,8 +108,6 @@ class Socket {
 		this._netLevel = 'checking';
 		let button = document.getElementById('office-net-status');
 		if (!button) {
-			const nav = document.querySelector('.main-nav');
-			if (!nav) return;
 			const wrapper = document.createElement('div');
 			wrapper.id = 'office-net-wrapper';
 			button = document.createElement('button');
@@ -120,6 +127,9 @@ class Socket {
 			const toggle = button;
 			button.onclick = () => {
 				this._netPaint();
+				const rect = toggle.getBoundingClientRect();
+				panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 344)) + 'px';
+				panel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
 				panel.hidden = !panel.hidden;
 				toggle.setAttribute('aria-expanded', String(!panel.hidden));
 			};
@@ -130,8 +140,10 @@ class Socket {
 				}
 			};
 			wrapper.append(button, panel);
-			nav.insertBefore(wrapper, document.getElementById('userListHeader'));
+			wrapper.hidden = true;
+			document.body.appendChild(wrapper);
 		}
+		this.mountConnectionStatus();
 		button.dataset.saveState = 'unknown';
 		this._netPaint();
 		this._netTimer = window.setInterval(() => this._netTick(), 5000);

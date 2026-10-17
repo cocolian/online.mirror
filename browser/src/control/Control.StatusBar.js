@@ -335,6 +335,7 @@ class StatusBar extends JSDialog.Toolbar {
 
 		this.builder.build(this.parentContainer, this.model.getSnapshot().children);
 		this.onLanguagesUpdated();
+		app.socket.mountConnectionStatus();
 		JSDialog.MakeStatusPriority(this.parentContainer.querySelector('div'), items);
 		JSDialog.RefreshScrollables();
 
