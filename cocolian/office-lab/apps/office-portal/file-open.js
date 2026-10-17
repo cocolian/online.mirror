@@ -3,7 +3,7 @@
  const editor=document.querySelector('iframe[name=editor]');
  const dialog=document.createElement('dialog');dialog.id='file-picker';
  dialog.setAttribute('aria-labelledby','file-picker-title');
- dialog.innerHTML=`<header><h2 id="file-picker-title">打开文件</h2><button id="close-picker" aria-label="关闭打开文件窗口">✕</button></header><nav role="tablist" aria-label="文件来源"><button role="tab" id="knowledge-tab" aria-controls="knowledge-panel" aria-selected="true">知识库</button><button role="tab" id="upload-tab" aria-controls="upload-panel" aria-selected="false">本地上传</button></nav><section id="knowledge-panel" role="tabpanel" aria-labelledby="knowledge-tab"><input id="knowledge-search" type="search" placeholder="搜索文件名称" aria-label="搜索知识库"><div id="knowledge-files" aria-live="polite"></div></section><section id="upload-panel" role="tabpanel" aria-labelledby="upload-tab" hidden><p>上传后保存至服务器知识库，并在新标签页打开。支持 Word、Excel、PowerPoint 及 OpenDocument 格式，单个文件最大 20 MB。</p><form id="upload-document"><input id="local-document" type="file" accept=".docx,.doc,.odt,.rtf,.txt,.xlsx,.xls,.ods,.pptx,.ppt,.odp" required aria-label="选择本地文档"><button type="submit">上传并打开</button><progress id="upload-progress" hidden aria-label="正在上传"></progress></form></section><p id="file-error" role="alert"></p><footer>在新标签页打开文件，当前文档继续保留。同名上传不会覆盖已有文件。</footer>`;
+ dialog.innerHTML=`<header><h2 id="file-picker-title">打开文件</h2><button id="close-picker" aria-label="关闭打开文件窗口">✕</button></header><nav role="tablist" aria-label="文件来源"><button role="tab" id="knowledge-tab" aria-controls="knowledge-panel" aria-selected="true">知识库</button><button role="tab" id="upload-tab" aria-controls="upload-panel" aria-selected="false">本地上传</button></nav><section id="knowledge-panel" role="tabpanel" aria-labelledby="knowledge-tab"><input id="knowledge-search" type="search" placeholder="搜索文件名称" aria-label="搜索知识库"><div id="knowledge-files" aria-live="polite"></div></section><section id="upload-panel" role="tabpanel" aria-labelledby="upload-tab" hidden><p>上传后保存至服务器知识库，并在新标签页打开。支持 Word、Excel、PowerPoint 及 OpenDocument 格式，单个文件最大 1 GB（1024 MB）。</p><form id="upload-document"><input id="local-document" type="file" accept=".docx,.doc,.odt,.rtf,.txt,.xlsx,.xls,.ods,.pptx,.ppt,.odp" required aria-label="选择本地文档"><button type="submit">上传并打开</button><progress id="upload-progress" hidden aria-label="正在上传"></progress></form></section><p id="file-error" role="alert"></p><footer>在新标签页打开文件，当前文档继续保留。同名上传不会覆盖已有文件。</footer>`;
  document.body.append(dialog);
  const find=id=>dialog.querySelector('#'+id);
  let files=[];
@@ -31,7 +31,7 @@
  dialog.querySelector('nav').onkeydown=e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const upload=find('knowledge-tab').getAttribute('aria-selected')==='true';tab(upload);find(upload?'upload-tab':'knowledge-tab').focus();}};
  find('upload-document').onsubmit=async e=>{
   e.preventDefault();error('');const file=find('local-document').files[0];if(!file)return;
-  if(!file.size||file.size>20*1024*1024){error('请选择非空文件，最大 20 MB');return;}
+  if(!file.size||file.size>1024*1024*1024){error('请选择非空文件，最大 1 GB（1024 MB）');return;}
   const target=window.open('about:blank','_blank');if(target)target.opener=null;
   const button=e.target.querySelector('button');button.disabled=true;find('upload-progress').hidden=false;
   try{
