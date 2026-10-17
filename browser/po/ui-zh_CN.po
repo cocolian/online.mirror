@@ -9551,3 +9551,71 @@ msgstr ""
 #: src/control/Control.JSDialogBuilder.js
 msgid "Hanging Indent"
 msgstr "悬挂缩进"
+
+#: src/app/Socket.ts
+msgid "Checking connection"
+msgstr "正在检测连接"
+
+#: src/app/Socket.ts
+msgid "Connection good"
+msgstr "连接良好"
+
+#: src/app/Socket.ts
+msgid "Connection slow"
+msgstr "响应较慢"
+
+#: src/app/Socket.ts
+msgid "Connection very slow"
+msgstr "响应缓慢"
+
+#: src/app/Socket.ts
+msgid "Waiting for server response"
+msgstr "等待服务端响应"
+
+#: src/app/Socket.ts
+msgid "Connection interrupted, reconnecting"
+msgstr "连接中断，正在重连"
+
+#: src/app/Socket.ts
+msgid "Connection paused"
+msgstr "连接已暂停"
+
+#: src/app/Socket.ts
+msgid "Save status not confirmed"
+msgstr "保存状态待确认"
+
+#: src/app/Socket.ts
+msgid "Changes pending save"
+msgstr "有修改待保存"
+
+#: src/app/Socket.ts
+msgid "Saving document"
+msgstr "正在保存文档"
+
+#: src/app/Socket.ts
+msgid "Document saved"
+msgstr "文档已保存"
+
+#: src/app/Socket.ts
+msgid "Save failed"
+msgstr "保存失败"
+
+#: src/app/Socket.ts
+msgid "Last 30 seconds"
+msgstr "最近 30 秒"
+
+#: src/app/Socket.ts
+msgid "Not enough samples"
+msgstr "采样中"
+
+#: src/app/Socket.ts
+msgid "Stable"
+msgstr "稳定"
+
+#: src/app/Socket.ts
+msgid "Variable"
+msgstr "有波动"
+
+#: src/app/Socket.ts
+msgid "Check network, VPN or proxy settings. Delays can affect typing."
+msgstr "请检查网络、VPN 或代理设置，响应延迟可能影响输入。"

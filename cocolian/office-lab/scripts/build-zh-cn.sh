@@ -15,13 +15,14 @@ import sys,json,hashlib,subprocess
 from pathlib import Path
 import shutil
 build=Path(sys.argv[1]);
-for relative in subprocess.check_output(['git','-C',sys.argv[3],'diff','19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3','--name-only','--','browser']).decode().splitlines():
+for relative in subprocess.check_output(['git','-C',sys.argv[3],'diff','19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3','--name-only','--','browser','wsd']).decode().splitlines():
  src=Path(sys.argv[3])/relative;dest=build/'source'/relative
  if not src.is_file():raise SystemExit('Unsupported removed source: '+relative)
  dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dest)
 browser_diff=subprocess.check_output(['git','-C',sys.argv[3],'diff','19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3','--binary','--','browser']);translation_diff=subprocess.check_output(['git','-C',sys.argv[4],'diff',sys.argv[2],'--binary']);seed=('zh-CN:19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3:'+sys.argv[2]).encode()+browser_diff+translation_diff;revision=hashlib.sha256(seed).hexdigest()[:10]
 (build/'source/dist_git_hash').write_text(revision+'\n')
 record={'repository':'https://gerrit.collaboraoffice.com/translations','branch':'distro/collabora/co-26.04','commit':sys.argv[2],'languages':['en-US','zh-CN'],'ui_revision':revision,'browser_patch_sha256':hashlib.sha256(browser_diff).hexdigest(),'translation_patch_sha256':hashlib.sha256(translation_diff).hexdigest()}
+record['server_patch_sha256']=hashlib.sha256(subprocess.check_output(['git','-C',sys.argv[3],'diff','19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3','--binary','--','wsd'])).hexdigest()
 (build/'zh-cn-build-lock.json').write_text(json.dumps(record,indent=2)+'\n')
 print(json.dumps(record))
 PY

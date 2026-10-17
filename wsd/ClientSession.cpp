@@ -1212,7 +1212,10 @@ bool ClientSession::_handleInput(const char *buffer, int length)
     else if (tokens.equals(0, "ping"))
     {
         std::string count = std::to_string(docBroker->getRenderedTileCount());
-        sendTextFrame("pong rendercount=" + count);
+        // Echo only bounded probe identifiers, keeping the existing debug ping compatible.
+        const std::string probe = tokens.size() > 1 ? std::string(tokens[1]) : std::string();
+        const bool isProbe = probe.size() <= 64 && probe.compare(0, 9, "netprobe=") == 0;
+        sendTextFrame("pong rendercount=" + count + (isProbe ? " " + probe : ""));
         return true;
     }
     else if (tokens.equals(0, "status") || tokens.equals(0, "statusupdate"))

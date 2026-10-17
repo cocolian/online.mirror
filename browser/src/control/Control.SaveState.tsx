@@ -27,6 +27,11 @@ const SAVED_TOOLTIP_DURATION_MS = 3000;
 const USER_SAVE_MATCH_WINDOW_MS = 30000;
 
 class SaveState {
+  private publishConnectionSaveState(state: string): void {
+    const indicator = document.getElementById('office-net-status');
+    if (indicator) indicator.dataset.saveState = state;
+  }
+
   map: any;
   saveEle: HTMLElement;
   // True from the moment a save of modified content starts until the "Saved"
@@ -120,6 +125,7 @@ class SaveState {
 
     // Only do saving animation if any content is modified in document
     if (this.saveEle && this.saveEle.classList.contains('savemodified')) {
+      this.publishConnectionSaveState('saving');
       this.saveRunning = true;
       this.hideSavedTooltip();
       this.saveEle.classList.remove('savemodified');
@@ -139,6 +145,7 @@ class SaveState {
       this.saveRunning &&
       !this.saveEle.classList.contains('savemodified')
     ) {
+      this.publishConnectionSaveState('saved');
       this.saveRunning = false;
       this.saveEle.classList.remove('saving');
       this.saveEle.classList.add('saved');
@@ -162,6 +169,7 @@ class SaveState {
   }
 
   showModifiedStatus(): void {
+    this.publishConnectionSaveState('modified');
     if (!this.saveEle) this.initialize();
     if (this.saveEle) {
       this.clearSaveInProgress();
@@ -170,6 +178,7 @@ class SaveState {
   }
 
   showSaveFailedStatus(): void {
+    this.publishConnectionSaveState('failed');
     if (!this.saveEle) this.initialize();
     if (this.saveEle) {
       this.clearSaveInProgress();
