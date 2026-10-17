@@ -15,3 +15,5 @@
 最新版本 office-ui-v2026.10.17-network 增加标题栏连接状态、编辑 WebSocket 往返探测和独立保存状态，见 docs/connection-health-20261017.md。
 
 最新界面：连接状态已移到底部语言选项旁，详情向上展开。参见 docs/connection-statusbar-20261017.md。
+
+样式控件外观：顶部独立预览卡片、底部名称栏；侧栏统一紧凑预览列表。仅修改 CSS，详见 docs/style-gallery-20261017.md。
