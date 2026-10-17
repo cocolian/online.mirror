@@ -856,7 +856,9 @@ window.L.Control.Notebookbar = window.L.Control.extend({
 
 		for (var i in this.additionalShortcutButtons) {
 			var item = this.additionalShortcutButtons[i];
-			toolitems.push(item);
+			const before = toolitems.findIndex((entry) => entry.id === item.insertBefore);
+			if (before >= 0) toolitems.splice(before, 0, item);
+			else toolitems.push(item);
 		}
 
 		for (var j in toolitems) {
@@ -911,6 +913,7 @@ window.L.Control.Notebookbar = window.L.Control.extend({
 				type: 'toolitem',
 				text: button.label ? button.label : (button.hint ? _(button.hint) : ' '),
 				icon: button.imgurl,
+				insertBefore: button.insertBefore,
 				command: button.unoCommand,
 				accessKey: button.accessKey ? button.accessKey: null,
 				postmessage: button.unoCommand ? undefined : true,
