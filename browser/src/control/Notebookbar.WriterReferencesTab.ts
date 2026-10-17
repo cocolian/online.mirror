@@ -329,7 +329,7 @@ class WriterReferencesTab implements NotebookbarTab {
 									{
 										id: 'references-inset-page-number-field',
 										type: 'toolitem',
-										text: _UNO('.uno:InsertPageNumberField'),
+										text: _UNO('.uno:InsertPageNumberField', 'text'),
 										command: '.uno:InsertPageNumberField',
 										accessibility: {
 											focusBack: true,

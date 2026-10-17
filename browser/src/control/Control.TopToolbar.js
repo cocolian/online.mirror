@@ -167,8 +167,8 @@ class TopToolbar extends JSDialog.Toolbar {
 			{type: 'toolitem',  id: 'strikeout', text: _UNO('.uno:Strikeout'), command: '.uno:Strikeout', accessibility: { focusBack: true, combination: '4' }},
 		];
 		const fontColorGroup = [
-			{type: 'colorlistbox',  id: 'fontcolorwriter:ColorPickerMenu', command: '.uno:FontColor', text: _UNO('.uno:FontColor'), visible: false, lockUno: '.uno:FontColor', icon: 'compact_fontcolor.svg', accessibility: { focusBack: true, combination: 'FC' }},
-			{type: 'colorlistbox',  id: 'fontcolor:ColorPickerMenu', command: '.uno:Color', text: _UNO('.uno:FontColor'), lockUno: '.uno:FontColor', icon: 'compact_fontcolor.svg', accessibility: { focusBack: true, combination: 'FC' }},
+			{type: 'colorlistbox',  id: 'fontcolorwriter:ColorPickerMenu', command: '.uno:FontColor', text: _UNO('.uno:FontColor', 'text'), visible: false, lockUno: '.uno:FontColor', icon: 'compact_fontcolor.svg', accessibility: { focusBack: true, combination: 'FC' }},
+			{type: 'colorlistbox',  id: 'fontcolor:ColorPickerMenu', command: '.uno:Color', text: _UNO('.uno:FontColor', 'text'), lockUno: '.uno:FontColor', icon: 'compact_fontcolor.svg', accessibility: { focusBack: true, combination: 'FC' }},
 			{type: 'colorlistbox',  id: 'backcolor:ColorPickerMenu', command: '.uno:CharBackColor', text: _UNO('.uno:CharBackColor', 'text'), visible: false, lockUno: '.uno:CharBackColor', icon: 'compact_backcolor.svg', accessibility: { focusBack: true, combination: 'HC' }},
 			{type: 'colorlistbox',  id: 'backgroundcolor:ColorPickerMenu', command: '.uno:BackgroundColor', text: _UNO('.uno:BackgroundColor'), visible: false, lockUno: '.uno:BackgroundColor', icon: 'compact_fillcolor.svg', accessibility: { focusBack: true, combination: 'BC' }},
 		];
