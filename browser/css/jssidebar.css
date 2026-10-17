@@ -1013,3 +1013,46 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 	grid-template-columns: repeat(6, 1fr);
 	justify-content: start;
 }
+
+/* Keep real style previews, bounded to a readable, compact list row. */
+.StyleListPanel .ui-treeview-entry {
+ min-height: 34px;
+ margin-block: 3px;
+ border: 1px solid #dedfe2;
+ border-radius: 3px;
+ box-sizing: border-box;
+}
+.StyleListPanel .ui-treeview-cell-text {
+ white-space: nowrap;
+ min-width: 0;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ font-size: 14px;
+ line-height: 28px;
+}
+.StyleListPanel img.ui-treeview-custom-render {
+ width: auto;
+ height: 26px;
+ max-width: none;
+ max-height: 26px;
+ object-fit: contain;
+ object-position: left center;
+ vertical-align: middle;
+}
+.StyleListPanel .ui-treeview-entry.selected {
+ border-color: #6997cf;
+ box-shadow: inset 3px 0 #6997cf;
+}
+.StyleListPanel .ui-treeview-entry:hover {
+ border-color: #a6bedb;
+}
+.StyleListPanel .ui-treeview-entry:focus-visible {
+ outline: 2px solid var(--color-primary);
+ outline-offset: -2px;
+}
+
+.StyleListPanel .ui-treeview-entry.selected,
+.StyleListPanel .ui-treeview-entry.selected div {
+ background-color: #fff !important;
+ color: #111;
+}

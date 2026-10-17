@@ -1468,3 +1468,62 @@ label.notebookbar.ui-checkbox-label {
 #office-net-details { position: fixed; min-width: 210px; max-width: min(320px, 80vw); padding: 12px; border: 1px solid var(--color-toolbar-border); border-radius: 5px; background: var(--color-main-background); color: var(--color-main-text); white-space: pre-line; font: 12px/1.7 var(--cool-font); box-shadow: 0 4px 16px #0002; z-index: 10000; }
 @media (max-width: 1100px) { #office-net-status { max-width: 145px; } .office-net-label { overflow: hidden; text-overflow: ellipsis; } }
 @media (max-width: 767px) { #office-net-wrapper { display: none; } }
+
+/* Style gallery: separate the document preview from its UI caption. */
+@media (min-width: 768px) {
+ .hasnotebookbar #stylesview.notebookbar {
+  grid-auto-columns: 108px;
+  gap: 6px;
+  padding-inline: 4px;
+ }
+ .hasnotebookbar #stylesview.notebookbar .ui-iconview-entry {
+  width: 108px;
+  padding: 0;
+  border: 1px solid var(--color-stylesview-border);
+  border-radius: 4px;
+  background: var(--color-stylesview-background);
+ }
+ .hasnotebookbar #stylesview.notebookbar .ui-iconview-entry > .icon-view-item-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+ }
+ .hasnotebookbar #stylesview.notebookbar img {
+  width: 98px !important;
+  height: 32px !important;
+  margin: 3px auto 0;
+  object-fit: contain;
+ }
+ .hasnotebookbar #stylesview.notebookbar span:not(.ui-iconview-entry-title) {
+  display: block;
+  padding: 5px;
+  height: 32px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+ }
+ .hasnotebookbar #stylesview.notebookbar .ui-iconview-entry-title {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 5px;
+  border-top: 1px solid var(--color-stylesview-border);
+  background: var(--color-background-lighter);
+  color: var(--color-main-text);
+  text-align: center;
+  font: 11px/19px var(--cool-font);
+ }
+ .hasnotebookbar #stylesview.notebookbar .ui-iconview-entry.selected {
+  border-color: #6997cf;
+  box-shadow: inset 0 0 0 1px #b8d2f0;
+ }
+ .hasnotebookbar #stylesview.notebookbar .ui-iconview-entry.selected .ui-iconview-entry-title {
+  background: var(--color-background-darker);
+ }
+ .hasnotebookbar #stylesview.notebookbar .ui-iconview-entry:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+ }
+}
