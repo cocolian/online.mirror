@@ -61,7 +61,7 @@ class Handler(BaseHTTPRequestHandler):
             user=TOKENS.get(q.get('access_token',[''])[0])
             if not user: return self.reply(401)
             with LOCK:
-                if p.path.endswith('/contents'): return self.reply(200,document.read_bytes(),'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+                if p.path.endswith('/contents'): return self.reply(200,document.read_bytes(),mimetypes.guess_type(document.name)[0] or 'application/octet-stream')
                 return self.reply(200,{'BaseFileName':document.name,'OwnerId':'lab','Size':document.stat().st_size,'UserId':user,'UserFriendlyName':user,'Version':str(document.stat().st_mtime_ns),'UserCanWrite':True,'SupportsUpdate':True,'SupportsLocks':True,'SupportsGetLock':True,'UserCanNotWriteRelative':True,'PostMessageOrigin':os.environ.get('PUBLIC_ORIGIN','https://office.cocolian.cn'),'LastModifiedTime':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(document.stat().st_mtime))})
         if p.path=='/' and self.authenticated(q) and q.get('key'):
             return self.reply(303,b'',headers=self.cookie_headers())
