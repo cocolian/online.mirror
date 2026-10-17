@@ -1,0 +1,92 @@
+diff --git a/browser/css/jssidebar.css b/browser/css/jssidebar.css
+index d718296a898..7578ced10c1 100644
+--- a/browser/css/jssidebar.css
++++ b/browser/css/jssidebar.css
+@@ -1056,3 +1056,48 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
+  background-color: #fff !important;
+  color: #111;
+ }
++
++/* Writer navigation: compact icon tabs above the existing search control. */
++.office-writer-navigation .navigation-title { display: none; }
++.office-writer-navigation .navigation-header {
++ height: 44px;
++ padding: 0 8px;
++ background: var(--color-background-lighter);
++ border-bottom: 1px solid var(--color-border);
++ gap: 8px;
++}
++.office-writer-navigation #navigation-options {
++ display: flex;
++ align-self: stretch;
++ flex: 1;
++ gap: 4px;
++ padding: 0;
++ margin: 0;
++ border: 0;
++}
++.office-writer-navigation #navigation-options .tab {
++ display: flex;
++ align-items: center;
++ justify-content: center;
++ width: 48px;
++ min-width: 48px;
++ padding: 0;
++ margin: 3px 0 0;
++ border: 1px solid transparent;
++ border-radius: 4px 4px 0 0;
++ color: var(--color-main-text);
++ background: transparent;
++}
++.office-writer-navigation #navigation-options .tab.selected {
++ background: var(--color-main-background);
++ border-color: var(--color-border);
++ border-bottom-color: var(--color-main-background);
++}
++.office-writer-navigation #navigation-options .tab::after { display: none; }
++.office-writer-navigation #navigation-options .tab:hover { background: var(--color-background-darker); }
++.office-writer-navigation #navigation-options .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
++.office-writer-navigation #navigation-options .tab svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
++.office-writer-navigation .navigation-search-wrapper { padding: 10px 12px; }
++.office-writer-navigation #NavigatorPanel .ui-treeview-entry { border-radius: 4px; min-height: 28px; }
++.office-writer-navigation #NavigatorPanel .ui-treeview-entry:nth-child(even) { background-color: var(--color-background-lighter); }
++.office-writer-navigation #NavigatorPanel .ui-treeview-cell-text { font-size: 13px; line-height: 24px; }
+diff --git a/browser/src/control/Control.NavigatorPanel.ts b/browser/src/control/Control.NavigatorPanel.ts
+index 054dc9349a3..4f79d00f315 100644
+--- a/browser/src/control/Control.NavigatorPanel.ts
++++ b/browser/src/control/Control.NavigatorPanel.ts
+@@ -285,6 +285,34 @@ class NavigatorPanel extends SidebarBase {
+ 			}
+ 		}
+ 
++		if (this.map.isText()) {
++			this.navigationPanel.classList.add('office-writer-navigation');
++			// Keep the existing tab handlers and keyboard navigation; only replace
++			// their presentation and move them beside the close button.
++			const tabs = navContainer.querySelector('#navigation-options');
++			if (tabs) navHeader.insertBefore(tabs, closeNavWrapper);
++			const icons = [
++				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01'],
++				['tab-quick-find', _('Results'), 'M10 3a7 7 0 1 0 0 14a7 7 0 0 0 0-14M15 15l6 6'],
++			];
++			for (const [id, label, path] of icons) {
++				const tab = navHeader.querySelector('#' + id);
++				if (!tab) continue;
++				tab.textContent = '';
++				tab.setAttribute('aria-label', label);
++				tab.setAttribute('data-cooltip', label);
++				const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
++				svg.setAttribute('viewBox', '0 0 24 24');
++				svg.setAttribute('aria-hidden', 'true');
++				svg.setAttribute('focusable', 'false');
++				const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
++				shape.setAttribute('d', path);
++				svg.appendChild(shape);
++				tab.appendChild(svg);
++				window.L.control.attachTooltipEventListener(tab, this.map);
++			}
++		}
++
+ 		if (this.navigationPanel) {
+ 			// Insert navigation container as the first child & navHeader as next-child of navigator-panel
+ 			this.navigationPanel.prepend(navContainer);

@@ -285,6 +285,34 @@ class NavigatorPanel extends SidebarBase {
 			}
 		}
 
+		if (this.map.isText()) {
+			this.navigationPanel.classList.add('office-writer-navigation');
+			// Keep the existing tab handlers and keyboard navigation; only replace
+			// their presentation and move them beside the close button.
+			const tabs = navContainer.querySelector('#navigation-options');
+			if (tabs) navHeader.insertBefore(tabs, closeNavWrapper);
+			const icons = [
+				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01'],
+				['tab-quick-find', _('Results'), 'M10 3a7 7 0 1 0 0 14a7 7 0 0 0 0-14M15 15l6 6'],
+			];
+			for (const [id, label, path] of icons) {
+				const tab = navHeader.querySelector('#' + id);
+				if (!tab) continue;
+				tab.textContent = '';
+				tab.setAttribute('aria-label', label);
+				tab.setAttribute('data-cooltip', label);
+				const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+				svg.setAttribute('viewBox', '0 0 24 24');
+				svg.setAttribute('aria-hidden', 'true');
+				svg.setAttribute('focusable', 'false');
+				const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+				shape.setAttribute('d', path);
+				svg.appendChild(shape);
+				tab.appendChild(svg);
+				window.L.control.attachTooltipEventListener(tab, this.map);
+			}
+		}
+
 		if (this.navigationPanel) {
 			// Insert navigation container as the first child & navHeader as next-child of navigator-panel
 			this.navigationPanel.prepend(navContainer);
