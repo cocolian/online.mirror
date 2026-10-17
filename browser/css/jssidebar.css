@@ -1070,7 +1070,7 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
  display: flex;
  align-self: stretch;
  flex: 1;
- gap: 4px;
+ gap: 0;
  padding: 0;
  margin: 0;
  border: 0;
@@ -1079,8 +1079,8 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
  display: flex;
  align-items: center;
  justify-content: center;
- width: 48px;
- min-width: 48px;
+ width: 60px;
+ min-width: 60px;
  padding: 0;
  margin: 3px 0 0;
  border: 1px solid transparent;
@@ -1096,8 +1096,11 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 .office-writer-navigation #navigation-options .tab::after { display: none; }
 .office-writer-navigation #navigation-options .tab:hover { background: var(--color-background-darker); }
 .office-writer-navigation #navigation-options .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
-.office-writer-navigation #navigation-options .tab svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.office-writer-navigation #navigation-options .tab svg { width: 28px; height: 28px; fill: none; stroke: var(--color-main-text); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .office-writer-navigation .navigation-search-wrapper { padding: 10px 12px; }
 .office-writer-navigation #NavigatorPanel .ui-treeview-entry { border-radius: 4px; min-height: 28px; }
 .office-writer-navigation #NavigatorPanel .ui-treeview-entry:nth-child(even) { background-color: var(--color-background-lighter); }
 .office-writer-navigation #NavigatorPanel .ui-treeview-cell-text { font-size: 13px; line-height: 24px; }
+
+/* Word-style outline/search tabs: search belongs to the results view only. */
+.office-writer-navigation:not(:has(#tab-quick-find.selected)) .navigation-search-wrapper { display: none; }

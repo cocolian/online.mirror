@@ -1,8 +1,8 @@
 diff --git a/browser/css/jssidebar.css b/browser/css/jssidebar.css
-index d718296a898..7578ced10c1 100644
+index d718296a898..8827547b3ea 100644
 --- a/browser/css/jssidebar.css
 +++ b/browser/css/jssidebar.css
-@@ -1056,3 +1056,48 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
+@@ -1056,3 +1056,51 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
   background-color: #fff !important;
   color: #111;
  }
@@ -20,7 +20,7 @@ index d718296a898..7578ced10c1 100644
 + display: flex;
 + align-self: stretch;
 + flex: 1;
-+ gap: 4px;
++ gap: 0;
 + padding: 0;
 + margin: 0;
 + border: 0;
@@ -29,8 +29,8 @@ index d718296a898..7578ced10c1 100644
 + display: flex;
 + align-items: center;
 + justify-content: center;
-+ width: 48px;
-+ min-width: 48px;
++ width: 60px;
++ min-width: 60px;
 + padding: 0;
 + margin: 3px 0 0;
 + border: 1px solid transparent;
@@ -46,13 +46,16 @@ index d718296a898..7578ced10c1 100644
 +.office-writer-navigation #navigation-options .tab::after { display: none; }
 +.office-writer-navigation #navigation-options .tab:hover { background: var(--color-background-darker); }
 +.office-writer-navigation #navigation-options .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
-+.office-writer-navigation #navigation-options .tab svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
++.office-writer-navigation #navigation-options .tab svg { width: 28px; height: 28px; fill: none; stroke: var(--color-main-text); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 +.office-writer-navigation .navigation-search-wrapper { padding: 10px 12px; }
 +.office-writer-navigation #NavigatorPanel .ui-treeview-entry { border-radius: 4px; min-height: 28px; }
 +.office-writer-navigation #NavigatorPanel .ui-treeview-entry:nth-child(even) { background-color: var(--color-background-lighter); }
 +.office-writer-navigation #NavigatorPanel .ui-treeview-cell-text { font-size: 13px; line-height: 24px; }
++
++/* Word-style outline/search tabs: search belongs to the results view only. */
++.office-writer-navigation:not(:has(#tab-quick-find.selected)) .navigation-search-wrapper { display: none; }
 diff --git a/browser/src/control/Control.NavigatorPanel.ts b/browser/src/control/Control.NavigatorPanel.ts
-index 054dc9349a3..4f79d00f315 100644
+index 054dc9349a3..88bd93954da 100644
 --- a/browser/src/control/Control.NavigatorPanel.ts
 +++ b/browser/src/control/Control.NavigatorPanel.ts
 @@ -285,6 +285,34 @@ class NavigatorPanel extends SidebarBase {
@@ -66,7 +69,7 @@ index 054dc9349a3..4f79d00f315 100644
 +			const tabs = navContainer.querySelector('#navigation-options');
 +			if (tabs) navHeader.insertBefore(tabs, closeNavWrapper);
 +			const icons = [
-+				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01'],
++				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 4a1 1 0 1 0 0 2a1 1 0 0 0 0-2M3 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2M3 18a1 1 0 1 0 0 2a1 1 0 0 0 0-2'],
 +				['tab-quick-find', _('Results'), 'M10 3a7 7 0 1 0 0 14a7 7 0 0 0 0-14M15 15l6 6'],
 +			];
 +			for (const [id, label, path] of icons) {
@@ -90,3 +93,15 @@ index 054dc9349a3..4f79d00f315 100644
  		if (this.navigationPanel) {
  			// Insert navigation container as the first child & navHeader as next-child of navigator-panel
  			this.navigationPanel.prepend(navContainer);
+@@ -617,6 +645,11 @@ class NavigatorPanel extends SidebarBase {
+ 			'navigator-search-input',
+ 		) as HTMLInputElement;
+ 		if (!searchInput) return;
++		// The outline tab deliberately has no search field.
++		if (this.map.isText() && !searchInput.checkVisibility()) {
++			(this.navigationPanel.querySelector('#tab-navigator') as HTMLElement)?.focus();
++			return;
++		}
+ 
+ 		app.layoutingService.appendLayoutingTask(() => {
+ 			searchInput.select();
