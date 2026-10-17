@@ -1,0 +1,38 @@
+diff --git a/browser/src/app/ViewLayoutWriter.ts b/browser/src/app/ViewLayoutWriter.ts
+index 1c9561be16d..277f42d26e2 100644
+--- a/browser/src/app/ViewLayoutWriter.ts
++++ b/browser/src/app/ViewLayoutWriter.ts
+@@ -91,7 +91,32 @@ class ViewLayoutWriter extends ViewLayoutBase {
+ 
+ 		// Centre the page horizontally, then shift it left by the (cached) comment
+ 		// margin. Vertical stays a no-op (the document is taller than the viewport).
+-		let centerX = Math.max(0, Math.round((frame.pX - content.pX) / 2));
++		let pageWidth = content.pX;
++		let pageLeft = 0;
++		const pages = app.file.writer.pageRectangleList;
++		const comments = app.sectionContainer.getSectionWithName(
++			app.CSections.CommentList.name,
++		) as cool.CommentSection;
++		// Mixed portrait/landscape documents have a file extent as wide as the
++		// widest page. Centre the visible page, keeping the shared view transform
++		// responsible for tiles, ruler, cursor and pointer coordinates.
++		const centerVisiblePage = pages.length > 0 && (!comments || comments.commentsHiddenOrNotPresent());
++		if (centerVisiblePage) {
++			const probe = (this.scrollProperties.viewY + Math.min(120, frame.pY / 4)) * app.pixelsToTwips;
++			let low = 0;
++			let high = pages.length - 1;
++			while (low < high) {
++				const middle = Math.floor((low + high) / 2);
++				if (pages[middle][1] + pages[middle][3] <= probe) low = middle + 1;
++				else high = middle;
++			}
++			pageWidth = pages[low][2] * app.twipsToPixels;
++			pageLeft = pages[low][0] * app.twipsToPixels;
++		}
++		let centerX = Math.max(0, Math.round((frame.pX - pageWidth) / 2)) - pageLeft;
++		// Discard a landscape page's residual horizontal pan when the visible
++		// portrait page fits; keep panning available for wide pages and comments.
++		if (centerVisiblePage && pageWidth <= frame.pX) centerX += this.scrollProperties.viewX;
+ 
+ 		// Recompute the comment shift only when it may have changed; otherwise
+ 		// reuse the cached value so scrolling never moves the page horizontally.
