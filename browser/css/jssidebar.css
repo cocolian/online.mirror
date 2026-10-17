@@ -1060,7 +1060,7 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 /* Writer navigation: compact icon tabs above the existing search control. */
 .office-writer-navigation .navigation-title { display: none; }
 .office-writer-navigation .navigation-header {
- height: 44px;
+ height: 36px;
  padding: 0 8px;
  background: var(--color-background-lighter);
  border-bottom: 1px solid var(--color-border);
@@ -1079,8 +1079,8 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
  display: flex;
  align-items: center;
  justify-content: center;
- width: 60px;
- min-width: 60px;
+ width: 44px;
+ min-width: 44px;
  padding: 0;
  margin: 3px 0 0;
  border: 1px solid transparent;
@@ -1090,13 +1090,13 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 }
 .office-writer-navigation #navigation-options .tab.selected {
  background: var(--color-main-background);
- border-color: var(--color-border);
+ border-color: color-mix(in srgb, var(--color-border) 65%, var(--color-main-background));
  border-bottom-color: var(--color-main-background);
 }
 .office-writer-navigation #navigation-options .tab::after { display: none; }
 .office-writer-navigation #navigation-options .tab:hover { background: var(--color-background-darker); }
 .office-writer-navigation #navigation-options .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
-.office-writer-navigation #navigation-options .tab svg { width: 28px; height: 28px; fill: none; stroke: var(--color-main-text); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.office-writer-navigation #navigation-options .tab svg { width: 20px; height: 20px; fill: none; stroke: var(--color-main-text); stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .office-writer-navigation .navigation-search-wrapper { padding: 10px 12px; }
 .office-writer-navigation #NavigatorPanel .ui-treeview-entry { border-radius: 4px; min-height: 28px; }
 .office-writer-navigation #NavigatorPanel .ui-treeview-entry:nth-child(even) { background-color: var(--color-background-lighter); }

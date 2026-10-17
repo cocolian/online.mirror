@@ -2,7 +2,7 @@
 import os,json,secrets,subprocess,time,shutil,zipfile
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-root=Path('/home/codex/projects/cocolian-office');out=root/'artifacts/nav-word-20261017';out.mkdir(exist_ok=True);data=out/('data-'+secrets.token_hex(4));data.mkdir();source=Path('/home/codex/projects/cocolian/apps/office-portal');key=secrets.token_urlsafe(32)
+root=Path('/home/codex/projects/cocolian-office');out=root/'artifacts/nav-compact-20261017';out.mkdir(exist_ok=True);data=out/('data-'+secrets.token_hex(4));data.mkdir();source=Path('/home/codex/projects/cocolian/apps/office-portal');key=secrets.token_urlsafe(32)
 for p in source.iterdir():
  if p.is_file():shutil.copy2(p,out/p.name)
 s=(source/'server.py').read_text().replace("Path('/data')","Path(os.environ['SOURCE_TEST_DATA'])").replace('http://collabora:9980','http://127.0.0.1:19980').replace("src=url.path+","src=urllib.parse.urlunsplit((url.scheme,url.netloc,url.path,'',''))+").replace('http://wopi:8080','http://127.0.0.1:18080').replace("('0.0.0.0',8000)","('127.0.0.1',18080)");(out/'host.py').write_text(s);(out/'editor.json').write_text(json.dumps({'language':'zh-CN','ui_mode':'tabbed','use_saved_ui_state':False}))
@@ -29,6 +29,8 @@ try:
    assert tab.get_attribute('aria-label')
    assert tab.locator('svg').count()==1
   assert panel.locator('.navigation-header [role=tab]').count()==2
+  result['icon_metrics']=panel.locator('#tab-navigator').evaluate('''e=>{const s=getComputedStyle(e.querySelector('svg'));return {width:e.getBoundingClientRect().width,iconWidth:s.width,stroke:s.strokeWidth,header:getComputedStyle(e.closest('.navigation-header')).height}}''')
+  assert result['icon_metrics']=={'width':44,'iconWidth':'20px','stroke':'1.25px','header':'36px'},result['icon_metrics']
   assert not f.locator('#navigator-search-input').is_visible()
   f.locator('#tab-quick-find').click();assert f.locator('#tab-quick-find').get_attribute('aria-selected')=='true'
   f.locator('#tab-navigator').click();assert f.locator('#tab-navigator').get_attribute('aria-selected')=='true'

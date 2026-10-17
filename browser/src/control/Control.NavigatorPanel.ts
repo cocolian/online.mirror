@@ -292,7 +292,7 @@ class NavigatorPanel extends SidebarBase {
 			const tabs = navContainer.querySelector('#navigation-options');
 			if (tabs) navHeader.insertBefore(tabs, closeNavWrapper);
 			const icons = [
-				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 4a1 1 0 1 0 0 2a1 1 0 0 0 0-2M3 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2M3 18a1 1 0 1 0 0 2a1 1 0 0 0 0-2'],
+				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 4.25a.75 .75 0 1 0 0 1.5a.75 .75 0 0 0 0-1.5M3 11.25a.75 .75 0 1 0 0 1.5a.75 .75 0 0 0 0-1.5M3 18.25a.75 .75 0 1 0 0 1.5a.75 .75 0 0 0 0-1.5'],
 				['tab-quick-find', _('Results'), 'M10 3a7 7 0 1 0 0 14a7 7 0 0 0 0-14M15 15l6 6'],
 			];
 			for (const [id, label, path] of icons) {
