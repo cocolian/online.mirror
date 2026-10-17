@@ -13,3 +13,5 @@
 该分支为既有在线部署的源码版本记录；没有更改 GitHub 默认分支，也不触发再次部署。后续修改仍先提交源码，再构建新镜像并验证发布。
 
 最新版本 office-ui-v2026.10.17-network 增加标题栏连接状态、编辑 WebSocket 往返探测和独立保存状态，见 docs/connection-health-20261017.md。
+
+最新界面：连接状态已移到底部语言选项旁，详情向上展开。参见 docs/connection-statusbar-20261017.md。
