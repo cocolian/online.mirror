@@ -292,7 +292,7 @@ class NavigatorPanel extends SidebarBase {
 			const tabs = navContainer.querySelector('#navigation-options');
 			if (tabs) navHeader.insertBefore(tabs, closeNavWrapper);
 			const icons = [
-				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01'],
+				['tab-navigator', _('Outline'), 'M8 5h13M8 12h13M8 19h13M3 4a1 1 0 1 0 0 2a1 1 0 0 0 0-2M3 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2M3 18a1 1 0 1 0 0 2a1 1 0 0 0 0-2'],
 				['tab-quick-find', _('Results'), 'M10 3a7 7 0 1 0 0 14a7 7 0 0 0 0-14M15 15l6 6'],
 			];
 			for (const [id, label, path] of icons) {
@@ -645,6 +645,11 @@ class NavigatorPanel extends SidebarBase {
 			'navigator-search-input',
 		) as HTMLInputElement;
 		if (!searchInput) return;
+		// The outline tab deliberately has no search field.
+		if (this.map.isText() && !searchInput.checkVisibility()) {
+			(this.navigationPanel.querySelector('#tab-navigator') as HTMLElement)?.focus();
+			return;
+		}
 
 		app.layoutingService.appendLayoutingTask(() => {
 			searchInput.select();

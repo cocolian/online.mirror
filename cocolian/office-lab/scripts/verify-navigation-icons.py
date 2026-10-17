@@ -2,7 +2,7 @@
 import os,json,secrets,subprocess,time,shutil,zipfile
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-root=Path('/home/codex/projects/cocolian-office');out=root/'artifacts/nav-icons-20261017';out.mkdir(exist_ok=True);data=out/('data-'+secrets.token_hex(4));data.mkdir();source=Path('/home/codex/projects/cocolian/apps/office-portal');key=secrets.token_urlsafe(32)
+root=Path('/home/codex/projects/cocolian-office');out=root/'artifacts/nav-word-20261017';out.mkdir(exist_ok=True);data=out/('data-'+secrets.token_hex(4));data.mkdir();source=Path('/home/codex/projects/cocolian/apps/office-portal');key=secrets.token_urlsafe(32)
 for p in source.iterdir():
  if p.is_file():shutil.copy2(p,out/p.name)
 s=(source/'server.py').read_text().replace("Path('/data')","Path(os.environ['SOURCE_TEST_DATA'])").replace('http://collabora:9980','http://127.0.0.1:19980').replace("src=url.path+","src=urllib.parse.urlunsplit((url.scheme,url.netloc,url.path,'',''))+").replace('http://wopi:8080','http://127.0.0.1:18080').replace("('0.0.0.0',8000)","('127.0.0.1',18080)");(out/'host.py').write_text(s);(out/'editor.json').write_text(json.dumps({'language':'zh-CN','ui_mode':'tabbed','use_saved_ui_state':False}))
@@ -29,15 +29,18 @@ try:
    assert tab.get_attribute('aria-label')
    assert tab.locator('svg').count()==1
   assert panel.locator('.navigation-header [role=tab]').count()==2
+  assert not f.locator('#navigator-search-input').is_visible()
   f.locator('#tab-quick-find').click();assert f.locator('#tab-quick-find').get_attribute('aria-selected')=='true'
   f.locator('#tab-navigator').click();assert f.locator('#tab-navigator').get_attribute('aria-selected')=='true'
   f.locator('#tab-navigator').focus();page.keyboard.press('ArrowRight');page.wait_for_timeout(200)
   result['keyboard_focus']=frame.evaluate('document.activeElement.id')
   f.locator('#tab-navigator').click()
-  search=f.locator('#navigator-search-input');search.fill('Navigation');search.press('Enter');page.wait_for_timeout(1500)
+  f.locator('#tab-quick-find').click()
+  search=f.locator('#navigator-search-input');assert search.is_visible();search.fill('Navigation');search.press('Enter');page.wait_for_timeout(1500)
   result['search_tab_selected']=f.locator('#tab-quick-find').get_attribute('aria-selected')
   page.screenshot(path=str(out/'navigation-search.png'))
   search.fill('');search.press('Enter');f.locator('#tab-navigator').click();page.wait_for_timeout(400)
+  assert not search.is_visible()
   result['outline_text']=panel.locator('#NavigatorPanel').inner_text()
   assert '第一章' in result['outline_text']
   panel.get_by_text('第二章 导航验证',exact=True).dblclick();page.wait_for_timeout(300)
