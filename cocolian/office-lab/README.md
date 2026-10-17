@@ -17,3 +17,5 @@
 最新界面：连接状态已移到底部语言选项旁，详情向上展开。参见 docs/connection-statusbar-20261017.md。
 
 样式控件外观：顶部独立预览卡片、底部名称栏；侧栏统一紧凑预览列表。仅修改 CSS，详见 docs/style-gallery-20261017.md。
+
+打开文件：保存左侧入口支持本地上传与共享知识库，目录为持久卷 /data/knowledge-base。参见 docs/file-open-20261017.md。

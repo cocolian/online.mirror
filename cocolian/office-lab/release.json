@@ -1,8 +1,8 @@
 {
-  "version": "office-ui-v2026.10.17-styles",
+  "version": "office-ui-v2026.10.17-openfiles",
   "upstream_commit": "19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3",
-  "ui_revision": "9546bd8ff2",
-  "collabora_image": "res.cocolian.cn/cocolian/collabora-source@sha256:ef8795215fd0c37a4078c65a2e424b615cbace488d458bdd8b556aabcffe12d4",
-  "portal_image": "res.cocolian.cn/cocolian/office-portal@sha256:9d424bc92b2a0bf0831e5febf32d823ef89177ff87bb78690a7179b784e8eb5c",
+  "ui_revision": "5cc79d0fff",
+  "collabora_image": "res.cocolian.cn/cocolian/collabora-source@sha256:182705124fbb9bae7650b3da2660eb8df593c30f17d1db002f7d9c0fae33f75f",
+  "portal_image": "res.cocolian.cn/cocolian/office-portal@sha256:c0989b993f15d52902108dc3b65b4a895e3e9c54741608556b318209ae3ea137",
   "translations_commit": "17fb3698d5e86169d44076f7a992c572f8f780f1"
 }
