@@ -11,6 +11,132 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
 class Socket {
+
+	private _netTimer: number | undefined;
+	private _netPending: { id: string; sent: number } | undefined;
+	private _netSamples: { time: number; ms: number }[] = [];
+	private _netLevel = 'checking';
+	private _netSequence = 0;
+
+	private _netPaint(): void {
+		const button = document.getElementById('office-net-status');
+		if (!button) return;
+		const labels: { [key: string]: string } = {
+			checking: _('Checking connection'), good: _('Connection good'),
+			slow: _('Connection slow'), poor: _('Connection very slow'),
+			waiting: _('Waiting for server response'), offline: _('Connection interrupted, reconnecting'),
+			paused: _('Connection paused'),
+		};
+		const saves: { [key: string]: string } = {
+			unknown: _('Save status not confirmed'), modified: _('Changes pending save'),
+			saving: _('Saving document'), saved: _('Document saved'), failed: _('Save failed'),
+		};
+		const last = this._netSamples[this._netSamples.length - 1];
+		const active = ['good', 'slow', 'poor'].includes(this._netLevel);
+		const latency = active && last ? ' · ' + Math.round(last.ms) + 'ms' : '';
+		button.dataset.level = this._netLevel;
+		const label = button.querySelector('.office-net-label');
+		if (label) label.textContent = labels[this._netLevel] + latency;
+		this._netSamples = this._netSamples.filter((x) => performance.now() - x.time <= 30000);
+		const values = this._netSamples.map((x) => x.ms);
+		const stable = values.length < 3 ? _('Not enough samples') :
+			Math.max(...values) - Math.min(...values) < 150 ? _('Stable') : _('Variable');
+		const save = this._netLevel === 'offline' || this._netLevel === 'waiting' ?
+			saves.unknown : saves[button.dataset.saveState || 'unknown'];
+		const detail = labels[this._netLevel] + latency + '\n' +
+			_('Last 30 seconds') + ': ' + stable + '\n' + save +
+			(['slow', 'poor', 'waiting'].includes(this._netLevel) ? '\n' +
+			_('Check network, VPN or proxy settings. Delays can affect typing.') : '');
+		button.title = detail;
+		button.setAttribute('aria-label', detail);
+		const panel = document.getElementById('office-net-details');
+		if (panel) panel.textContent = detail;
+	}
+
+	private _netTick(): void {
+		if (document.hidden || app.idleHandler._documentIdle) {
+			this._netPending = undefined;
+			this._netLevel = 'paused';
+			this._netPaint();
+			return;
+		}
+		if (!this.connected() || !this._map._docLoaded) return;
+		const now = performance.now();
+		if (this._netPending && now - this._netPending.sent < 15000) return;
+		if (this._netPending) {
+			this._netLevel = 'waiting';
+			this._netSamples = [];
+			this._netPaint();
+		}
+		const id = Date.now().toString(36) + '-' + (++this._netSequence);
+		this._netPending = { id: id, sent: now };
+		// Health probes must not be queued or suppressed by editing/UI-modal guards.
+		this._doSend('ping netprobe=' + id);
+	}
+
+	private _netPong(text: string): void {
+		const match = /netprobe=([a-z0-9-]+)/.exec(text);
+		if (!match || !this._netPending || match[1] !== this._netPending.id) return;
+		const ms = performance.now() - this._netPending.sent;
+		this._netPending = undefined;
+		if (document.hidden) return;
+		this._netSamples.push({ time: performance.now(), ms: ms });
+		const recent = this._netSamples.slice(-3).map((sample) => sample.ms);
+		if (recent.length === 3) {
+			if (recent.every((value) => value < 150)) this._netLevel = 'good';
+			else if (recent.every((value) => value >= 400)) this._netLevel = 'poor';
+			else if (recent.every((value) => value >= 150)) this._netLevel = 'slow';
+			else if (['checking', 'paused', 'offline', 'waiting'].includes(this._netLevel))
+				this._netLevel = 'slow';
+		} else if (['paused', 'offline', 'waiting'].includes(this._netLevel)) this._netLevel = 'checking';
+		this._netPaint();
+	}
+
+	private _netStart(): void {
+		if (this._netTimer !== undefined) window.clearInterval(this._netTimer);
+		this._netPending = undefined;
+		this._netSamples = [];
+		this._netLevel = 'checking';
+		let button = document.getElementById('office-net-status');
+		if (!button) {
+			const nav = document.querySelector('.main-nav');
+			if (!nav) return;
+			const wrapper = document.createElement('div');
+			wrapper.id = 'office-net-wrapper';
+			button = document.createElement('button');
+			button.id = 'office-net-status';
+			button.setAttribute('type', 'button');
+			button.setAttribute('aria-expanded', 'false');
+			button.setAttribute('aria-controls', 'office-net-details');
+			const dot = document.createElement('span');
+			dot.className = 'office-net-dot';
+			dot.setAttribute('aria-hidden', 'true');
+			const label = document.createElement('span');
+			label.className = 'office-net-label';
+			button.append(dot, label);
+			const panel = document.createElement('div');
+			panel.id = 'office-net-details';
+			panel.hidden = true;
+			const toggle = button;
+			button.onclick = () => {
+				this._netPaint();
+				panel.hidden = !panel.hidden;
+				toggle.setAttribute('aria-expanded', String(!panel.hidden));
+			};
+			button.onkeydown = (event) => {
+				if (event.key === 'Escape') {
+					panel.hidden = true;
+					toggle.setAttribute('aria-expanded', 'false');
+				}
+			};
+			wrapper.append(button, panel);
+			nav.insertBefore(wrapper, document.getElementById('userListHeader'));
+		}
+		button.dataset.saveState = 'unknown';
+		this._netPaint();
+		this._netTimer = window.setInterval(() => this._netTick(), 5000);
+	}
+
 	private ProtocolVersionNumber: string = '0.1';
 	private ReconnectCount: number = 0;
 	private WasShownLimitDialog: boolean = false;
@@ -348,6 +474,8 @@ class Socket {
 		this.socket.onopen = this._onSocketOpen.bind(this);
 		this.socket.onmessage = this._slurpMessage.bind(this);
 		this.socket.binaryType = 'arraybuffer';
+		// global.js may have opened the socket before this handler was attached.
+		if (this.socket.readyState === 1) this._netStart();
 
 		this._connectCount++;
 		this._faultInjection();
@@ -423,6 +551,7 @@ class Socket {
 	}
 
 	private _onSocketOpen(evt: Event): void {
+		this._netStart();
 		window.app.console.debug('_onSocketOpen:');
 		app.idleHandler._serverRecycling = false;
 		app.idleHandler._documentIdle = false;
@@ -520,6 +649,11 @@ class Socket {
 	}
 
 	private _onSocketClose(event?: Partial<CloseEvent>): void {
+		if (this._netTimer !== undefined) window.clearInterval(this._netTimer);
+		this._netPending = undefined;
+		this._netSamples = [];
+		this._netLevel = app.idleHandler._documentIdle ? 'paused' : 'offline';
+		this._netPaint();
 		const reason = event?.reason ?? '';
 		window.app.console.debug(
 			'_onSocketClose: code=' +
@@ -1370,10 +1504,13 @@ class Socket {
 			this._onFontsMissing(textMsg, command);
 		} else if (textMsg.startsWith('info:') && command.errorCmd === 'socket') {
 			this._onInfoMsg(textMsg, command);
-		} else if (textMsg.startsWith('pong ') && this._map._debug.pingOn) {
-			this._map._debug.reportPong(
-				command.rendercount ? command.rendercount : 0,
-			);
+		} else if (textMsg.startsWith('pong ')) {
+			this._netPong(textMsg);
+			if (this._map._debug.pingOn) {
+				this._map._debug.reportPong(
+					command.rendercount ? command.rendercount : 0,
+				);
+			}
 		} else if (textMsg.startsWith('serverloadtimings: ')) {
 			this._onServerLoadTimingsMsg(
 				textMsg.substring('serverloadtimings: '.length),

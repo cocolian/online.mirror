@@ -11,3 +11,5 @@
 开发机原工作区为 /home/codex/projects/cocolian-office，Collabora 位于 src/online.mirror；门户构建工作区为 /home/codex/projects/cocolian。构建脚本保留这些默认位置，可参考脚本中的环境变量调整。此处不包含源码编译缓存、镜像归档、文档数据卷、访问密码、认证文件或 SSH 密钥。
 
 该分支为既有在线部署的源码版本记录；没有更改 GitHub 默认分支，也不触发再次部署。后续修改仍先提交源码，再构建新镜像并验证发布。
+
+最新版本 office-ui-v2026.10.17-network 增加标题栏连接状态、编辑 WebSocket 往返探测和独立保存状态，见 docs/connection-health-20261017.md。
