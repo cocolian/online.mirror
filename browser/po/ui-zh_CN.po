@@ -4323,7 +4323,7 @@ msgstr "在线帮助"
 #: src/control/Control.Menubar.ts:834 src/control/Control.Menubar.ts:1152
 #: src/control/Control.NotebookbarWriter.js:541
 msgid "Show tour"
-msgstr ""
+msgstr "功能导览"
 
 #: src/control/Control.Menubar.ts:455 src/control/Control.Menubar.ts:668
 #: src/control/Control.Menubar.ts:836 src/control/Control.Menubar.ts:1154
@@ -9547,3 +9547,7 @@ msgstr ""
 #, fuzzy
 #~ msgid "Toggle Page Orientation"
 #~ msgstr "文字方向"
+
+#: src/control/Control.JSDialogBuilder.js
+msgid "Hanging Indent"
+msgstr "悬挂缩进"

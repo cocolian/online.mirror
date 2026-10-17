@@ -1407,6 +1407,14 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 
 	// TODO: move to jsdialog/Widget.Toolitem.ts
 	_unoToolButton: function(parentContainer, data, builder, options) {
+		// Resolve this newly moved core command through the browser's locale catalog.
+		if (data.command === '.uno:HangingIndent') {
+			data.text = _('Hanging Indent');
+			if (data.tooltip === 'Hanging Indent')
+				data.tooltip = data.text;
+			if (data.aria && data.aria.label === 'Hanging Indent')
+				data.aria.label = data.text;
+		}
 		var button = null;
 
 		var controls = {};
