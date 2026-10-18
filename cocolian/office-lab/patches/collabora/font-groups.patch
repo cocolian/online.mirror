@@ -1,0 +1,203 @@
+diff --git a/browser/css/jssidebar.css b/browser/css/jssidebar.css
+index 79d01d532ec..143598961e0 100644
+--- a/browser/css/jssidebar.css
++++ b/browser/css/jssidebar.css
+@@ -1125,3 +1125,14 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
+  min-width: 260px;
+  background: var(--color-main-background);
+ }
++
++.office-font-group {
++ padding: 4px 12px;
++ font-size: 11px;
++ line-height: 18px;
++ font-weight: 600;
++ color: var(--color-text-light);
++ background: var(--color-background-lighter);
++ border-top: 1px solid var(--color-border);
++ pointer-events: none;
++}
+diff --git a/browser/src/control/jsdialog/Widget.Combobox.js b/browser/src/control/jsdialog/Widget.Combobox.js
+index e40e9d8ccf1..1bc43e2d49a 100644
+--- a/browser/src/control/jsdialog/Widget.Combobox.js
++++ b/browser/src/control/jsdialog/Widget.Combobox.js
+@@ -26,7 +26,43 @@
+ 
+ /* global JSDialog app _ $ */
+ 
++// Presentation names never replace the canonical name sent to the engine.
++JSDialog.getOfficeFontInfo = function (name) {
++	var labels = {
++		FangSong_GB2312: '仿宋_GB2312', KaiTi_GB2312: '楷体_GB2312',
++		SimHei: '黑体', SimSun: '宋体', NSimSun: '新宋体',
++		'Source Han Serif SC': '思源宋体', 'Source Han Sans SC': '思源黑体',
++		'WenQuanYi Zen Hei': '文泉驿正黑', 'WenQuanYi Zen Hei Mono': '文泉驿等宽正黑',
++		'WenQuanYi Zen Hei Sharp': '文泉驿点阵正黑',
++		C059: 'C059（世纪教科书风格）', P052: 'P052（帕拉蒂诺风格）',
++		Z003: 'Z003（西文书法体）', D050000L: 'D050000L（装饰符号）',
++		'OpenSymbol': 'OpenSymbol（符号）', 'Standard Symbols PS': 'Standard Symbols PS（符号）'
++	};
++	var display = labels[name] || name;
++	var noto = /^Noto (Sans Mono|Sans|Serif) CJK (SC|TC|HK|JP|KR)$/.exec(name);
++	if (noto) display = 'Noto ' + ({ 'Sans Mono': '等宽黑体', Sans: '黑体', Serif: '宋体' })[noto[1]] + ' ' + noto[2];
++	var group = 9;
++	if (/FangSong|仿宋/i.test(name)) group = 0;
++	else if (/KaiTi|楷体/i.test(name)) group = 1;
++	else if (/Mono|等宽/i.test(name)) group = 6;
++	else if (/Source Han Serif|Noto Serif CJK|SimSun|宋体/.test(name)) group = 2;
++	else if (/Source Han Sans|Noto Sans CJK|SimHei|WenQuanYi|黑体|文泉驿/.test(name)) group = 3;
++	else if (/C059|P052|Bookman|Roman|Serif|Century|Palatino/i.test(name)) group = 4;
++	else if (/Sans|Gothic/i.test(name)) group = 5;
++	else if (/Z003|Chancery|Script|Hand/i.test(name)) group = 7;
++	else if (/Symbol|D050000L/i.test(name)) group = 8;
++	var groups = ['仿宋', '楷体', '宋体 / 东亚衬线', '黑体 / 东亚无衬线', '西文衬线', '西文无衬线', '等宽字体', '书法与装饰', '符号字体', '其他字体'];
++	return { display: display, group: group, groupName: groups[group] };
++};
++
+ JSDialog.comboboxEntry = function (parentContainer, data, builder) {
++	var fontInfo = data.comboboxId === 'fontnamecombobox' ? JSDialog.getOfficeFontInfo(data.text) : null;
++	if (fontInfo && (data.class || '').indexOf('office-font-group-start') >= 0) {
++		var heading = window.L.DomUtil.create('div', 'office-font-group', parentContainer);
++		heading.textContent = fontInfo.groupName;
++		heading.dataset.fontGroup = String(fontInfo.group);
++		heading.setAttribute('aria-hidden', 'true');
++	}
+ 	var entry = window.L.DomUtil.create('div', 'ui-combobox-entry ' + builder.options.cssClass, parentContainer);
+ 	entry.id = data.id;
+ 	if (data.class)
+@@ -37,7 +73,12 @@ JSDialog.comboboxEntry = function (parentContainer, data, builder) {
+ 		window.L.DomUtil.addClass(entry, 'ui-combobox-notext');
+ 	entry.setAttribute('role', 'option');
+ 	entry.setAttribute('tabindex', '-1');
+-	entry.setAttribute('data-filter-text', data.text.toLowerCase());
++	entry.setAttribute('data-filter-text', (data.text + ' ' + (fontInfo ? fontInfo.display + ' ' + fontInfo.groupName : '')).toLowerCase());
++	if (fontInfo) {
++		entry.dataset.fontGroup = String(fontInfo.group);
++		entry.setAttribute('aria-label', fontInfo.display);
++		entry.title = data.text;
++	}
+ 
+ 	// A disabled entry is dimmed, announced as disabled, and kept out of
+ 	// keyboard navigation: the disabled attribute is what excludes it from the
+@@ -71,7 +112,7 @@ JSDialog.comboboxEntry = function (parentContainer, data, builder) {
+ 	}
+ 
+ 	var content = window.L.DomUtil.create('span', '', entry);
+-	content.innerText = data.text;
++	content.innerText = fontInfo ? fontInfo.display : data.text;
+ 
+ 	if (data.shortcut) {
+ 		var shortcut = window.L.DomUtil.create('span', 'shortcut', entry);
+@@ -272,7 +313,7 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 
+ 	var content = window.L.DomUtil.create('input', 'ui-combobox-content ' + builder.options.cssClass, container);
+ 	content.id = data.id + '-input-' + builder.options.suffix;
+-	content.value = data.text;
++	content.value = data.id === 'fontnamecombobox' ? JSDialog.getOfficeFontInfo(data.text).display : data.text;
+ 	content.role = 'combobox';
+ 	content.setAttribute('autocomplete', 'off');
+ 	content.setAttribute('aria-autocomplete', 'list');
+@@ -377,17 +418,30 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 	var sortFontEntries = function () {
+ 		if (data.id !== 'fontnamecombobox') return;
+ 		var commonFonts = ['FangSong_GB2312', '仿宋_GB2312', 'KaiTi_GB2312', '楷体_GB2312', 'SimHei', '黑体', 'Source Han Serif SC', '思源宋体', 'Source Han Sans SC', '思源黑体', 'Noto Serif CJK SC', 'Noto Sans CJK SC', 'WenQuanYi Zen Hei', '文泉驿正黑'];
+-		entries.forEach(function(entry, index) { entry.sourcePos = index; });
++		entries.forEach(function(entry, index) {
++			entry.sourcePos = index;
++			entry.fontInfo = JSDialog.getOfficeFontInfo(entry.text);
++			entry.displayText = entry.fontInfo.display;
++		});
+ 		entries.sort(function(a, b) {
+ 			var aRank = commonFonts.indexOf(a.text);
+ 			var bRank = commonFonts.indexOf(b.text);
+ 			if (aRank < 0) aRank = commonFonts.length;
+ 			if (bRank < 0) bRank = commonFonts.length;
+-			return aRank - bRank || a.text.localeCompare(b.text, 'zh-CN', { numeric: true, sensitivity: 'base' });
++			return a.fontInfo.group - b.fontInfo.group || aRank - bRank || a.displayText.localeCompare(b.displayText, 'zh-CN', { numeric: true, sensitivity: 'base' });
++		});
++		entries.forEach(function(entry, index) {
++			entry.class = 'office-font-entry' + (index === 0 || entries[index - 1].fontInfo.group !== entry.fontInfo.group ? ' office-font-group-start' : '');
+ 		});
+ 	};
+ 	sortFontEntries();
+ 
++	var canonicalFontName = function(value) {
++		if (data.id !== 'fontnamecombobox') return value;
++		var match = entries.find(function(entry) { return entry.text === value || entry.displayText === value; });
++		return match ? match.text : value;
++	};
++
+ 	var resetSelection = function () {
+ 		for (var i in entries) {
+ 			entries[i].selected = false;
+@@ -417,12 +471,12 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 		if (data.entrycompletion !== false && event.key.length === 1) {
+ 			const typed = this.value.substring(0, this.selectionStart);
+ 			const match = typed.length > 0 && entries.find(function (entry) {
+-				return entry.text.length > typed.length &&
+-					entry.text.toLowerCase().startsWith(typed.toLowerCase());
++				var label = entry.displayText || entry.text;
++				return label.length > typed.length && label.toLowerCase().startsWith(typed.toLowerCase());
+ 			});
+ 			if (match) {
+-				this.value = match.text;
+-				this.setSelectionRange(typed.length, match.text.length);
++				this.value = match.displayText || match.text;
++				this.setSelectionRange(typed.length, this.value.length);
+ 			}
+ 		}
+ 
+@@ -435,7 +489,7 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 
+ 		const shouldTriggerChange = data.changeOnEnterOnly ? event.key === 'Enter' : true;
+ 		if (shouldTriggerChange) {
+-			builder.callback('combobox', 'change', data, this.value, builder);
++			builder.callback('combobox', 'change', data, canonicalFontName(this.value), builder);
+ 			if (data.focusMapOnEnter && event.key === 'Enter') {
+ 				builder.map.focus();
+ 			}
+@@ -444,11 +498,11 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 		// Return is a distinct commit action, sent in addition to any 'change' above:
+ 		// it marks the current text as explicitly confirmed, not merely typed so far.
+ 		if (event.key === 'Enter')
+-			builder.callback('combobox', 'activate', data, this.value, builder);
++			builder.callback('combobox', 'activate', data, canonicalFontName(this.value), builder);
+ 
+ 		resetSelection();
+ 		for (var i in entries) {
+-			if (entries[i] == this.value || entries[i].text == this.value) {
++			if (entries[i] == this.value || entries[i].text == this.value || entries[i].displayText == this.value) {
+ 				entries[i].selected = true;
+ 				break;
+ 			}
+@@ -536,6 +590,12 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 								window.L.DomUtil.addClass(entry, 'hidden');
+ 							}
+ 						});
++						grid.querySelectorAll('.office-font-group').forEach(function (heading) {
++							var visible = Array.from(allEntries).some(function (entry) {
++								return entry.dataset.fontGroup === heading.dataset.fontGroup && !entry.classList.contains('hidden');
++							});
++							heading.classList.toggle('hidden', !visible);
++						});
+ 					});
+ 
+ 					searchInput.addEventListener('keydown', function (event) {
+@@ -660,7 +720,7 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 		if (pos >= 0 && entries[pos]) {
+ 			entries[pos].selected = true;
+ 			if (document.activeElement !== content)
+-				content.value = entries[pos].text;
++				content.value = entries[pos].displayText || entries[pos].text;
+ 		} else if (pos >= 0)
+ 			console.warn('Cannot find entry with pos: "' + pos + '" in "' + data.id + '"');
+ 		if (typeof container._renderSelectedValue === 'function')
+@@ -677,7 +737,7 @@ JSDialog.combobox = function (parentContainer, data, builder) {
+ 		}
+ 		if (document.activeElement === content)
+ 			return;
+-		content.value = text;
++		content.value = data.id === 'fontnamecombobox' ? JSDialog.getOfficeFontInfo(text).display : text;
+ 	};
+ 
+ 	container.updateEntries = function (newEntries) {
