@@ -1,0 +1,353 @@
+[
+  {
+    "file": "C059-BdIta.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/C059-BdIta.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "60d0ab6a22e4018b1232806d98f4015e04f9a0a569db7a169c40d55e2a9f6252"
+  },
+  {
+    "file": "C059-Bold.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/C059-Bold.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "75dea10068264324522e7b96612083582eee0158eb728fa9c219279890f33e26"
+  },
+  {
+    "file": "C059-Italic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/C059-Italic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "77852deabd3a84f7d0213932239de522410309374c2255ccbd510f01dc7c6e80"
+  },
+  {
+    "file": "C059-Roman.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/C059-Roman.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "e00cc7b88f0cf25ae43f0e48de39d0043fe042b55719a3ac32669ab3369542ec"
+  },
+  {
+    "file": "D050000L.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/D050000L.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "a7bd946b69ae526328f26b5339fb31057dd40950d7b60598f36b2bd06542f105"
+  },
+  {
+    "file": "NimbusMonoPS-Bold.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-Bold.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "f036d05d2168c7f71cb11d31e81d11133f3d09711e24ebde19d08a24842384d5"
+  },
+  {
+    "file": "NimbusMonoPS-BoldItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-BoldItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "a67ed9e364c933c79fc3ce88e17a0265334697c184b065407e754d43cbbf6d0a"
+  },
+  {
+    "file": "NimbusMonoPS-Italic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-Italic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "7f1f85498027e07befadd3c7592518909b9e8c7f96ee5615e0b21be0c399c4b4"
+  },
+  {
+    "file": "NimbusMonoPS-Regular.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusMonoPS-Regular.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "4f225ca8e13acb16f733ce741693105e527d5f7a5443901b9ecc190fca4e149b"
+  },
+  {
+    "file": "NimbusRoman-Bold.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusRoman-Bold.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "e0ad81923bc6d85d5426f796217c87963ca1ae3c65e22c87a25b6c6353de299e"
+  },
+  {
+    "file": "NimbusRoman-BoldItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusRoman-BoldItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "c84bcb17ab4ee54f16dadad6a3b0b2df37a24f9fc812897c4a59eeca785a5dec"
+  },
+  {
+    "file": "NimbusRoman-Italic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusRoman-Italic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "b7c424e6cb79baddfcdcd9a9d87f9fc4fdd06f0e5160066e2b2e47bcd647c7b9"
+  },
+  {
+    "file": "NimbusRoman-Regular.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusRoman-Regular.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "fd41669443616a7ae890c42e53a58f47fa24a940fd1e367acaff665cf5b6e9d8"
+  },
+  {
+    "file": "NimbusSans-Bold.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSans-Bold.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "7f33328e6b4d4cd21b45fa625791928c9407dc702db6780e56b09ca9a3ecaa67"
+  },
+  {
+    "file": "NimbusSans-BoldItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSans-BoldItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "3f47fb34fcb7de09f8cbc9f305191340ddebf7a068419f4bb5f49287dea59b87"
+  },
+  {
+    "file": "NimbusSans-Italic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSans-Italic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "7b0bef5686aa58c0fd0f0d01beeae56664208490e30ca6a25431281c9a0c6402"
+  },
+  {
+    "file": "NimbusSans-Regular.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "7c25be4d78155523080ab85b10277150657ff7dabbcad7037bdd536c9b6d0d08"
+  },
+  {
+    "file": "NimbusSansNarrow-Bold.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Bold.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "6d7cec07f5a9035e208532dab35a51312aef4a7f26eb524dd614c9fcd97c3264"
+  },
+  {
+    "file": "NimbusSansNarrow-BoldOblique.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-BoldOblique.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "3cefbe4a602a08a0400798fc4aba2d48f7b7e05fa6ed54c2009d68adc6eccef9"
+  },
+  {
+    "file": "NimbusSansNarrow-Oblique.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Oblique.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "6fd8dd67ab951f36f66563ef8443bafdf10836e73ebe856f85f4a9c282293585"
+  },
+  {
+    "file": "NimbusSansNarrow-Regular.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/NimbusSansNarrow-Regular.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "0111cf7c05377c4f1685d37bfa8b3edd2033278122f69e0a9803a8514e352b99"
+  },
+  {
+    "file": "P052-Bold.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/P052-Bold.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "ba6503baaf0f9e4e40a69cc4c0e57049fbde313fe183aba8fe823208337a94af"
+  },
+  {
+    "file": "P052-BoldItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/P052-BoldItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "63e15828175e55559ae09c9bdcd09fc0354537657d43109edb6e2a5509f8299f"
+  },
+  {
+    "file": "P052-Italic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/P052-Italic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "1feac6055211cf5c6c812c026e398195070f174064cc4d390f0db01647443b0e"
+  },
+  {
+    "file": "P052-Roman.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/P052-Roman.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "f054a7389d8d0e9f4c5f7b4c21feb7e2b14bec8004a1e92778a78d149524eea9"
+  },
+  {
+    "file": "StandardSymbolsPS.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/StandardSymbolsPS.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "df570efda2df425dbfc004e4e5f77c55ca1b47f8ff28ad60dfad0fccf422b0bd"
+  },
+  {
+    "file": "URWBookman-Demi.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWBookman-Demi.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "ab8b2fe57cbea9783c6179188dc013c76cfc5717c22cf59bbf3016ef2d7d93ee"
+  },
+  {
+    "file": "URWBookman-DemiItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWBookman-DemiItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "4d9dbaae8178ffa2f5d557245d09dc968eeac9eed7e453cc2db4cc6a9aacb44d"
+  },
+  {
+    "file": "URWBookman-Light.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWBookman-Light.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "7b1bc8e6a16cef53785ce03d4848f8971f3ba38cd9e266e4786a50e08bd9235b"
+  },
+  {
+    "file": "URWBookman-LightItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWBookman-LightItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "ed722e6c2996b08e8516d27a7c017972cfabf5d1736b496b6526da78fd17691a"
+  },
+  {
+    "file": "URWGothic-Book.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWGothic-Book.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "04318316cee29950805110c9c8949eea189ef5575132881f4d4d7e03e5299903"
+  },
+  {
+    "file": "URWGothic-BookOblique.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWGothic-BookOblique.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "ec4e947734950fd344918e560bc8ad0c5d8b17d0ab4853988824f13b9f77e53f"
+  },
+  {
+    "file": "URWGothic-Demi.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWGothic-Demi.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae"
+  },
+  {
+    "file": "URWGothic-DemiOblique.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/URWGothic-DemiOblique.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "d57abaa6d40718cfbf735ad50080d0b095e7194e451992e02786a7c0113db35c"
+  },
+  {
+    "file": "Z003-MediumItalic.otf",
+    "source": "/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf",
+    "package": "fonts-urw-base35",
+    "sha256": "a04947e59fc9339ea3c4b34c31fd46764f22af7512afc2c074ce190e79ed7a09"
+  },
+  {
+    "file": "DejaVuSans-Bold.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "package": "fonts-dejavu-core",
+    "sha256": "5c1247acef7f2b8522a31742c76d6adcb5569bacc0be7ceaa4dc39dd252ce895"
+  },
+  {
+    "file": "DejaVuSans.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "package": "fonts-dejavu-core",
+    "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280"
+  },
+  {
+    "file": "DejaVuSansMono-Bold.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+    "package": "fonts-dejavu-mono",
+    "sha256": "3a3c502eeff669a231549e80df9f7c49de109bafe303170409e905d0b31a38fe"
+  },
+  {
+    "file": "DejaVuSansMono-BoldOblique.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-BoldOblique.ttf",
+    "package": "fonts-dejavu-mono",
+    "sha256": "a5251173370e30760e6919711dcd33e149d216ca4814eb74332bda03fcc7e834"
+  },
+  {
+    "file": "DejaVuSansMono-Oblique.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Oblique.ttf",
+    "package": "fonts-dejavu-mono",
+    "sha256": "3d7955616e69721f7edb8e1b7a580f8fbd7d737111c6b54266ddc1d9ef13202f"
+  },
+  {
+    "file": "DejaVuSansMono.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    "package": "fonts-dejavu-mono",
+    "sha256": "c805f9436dbc268644c1d9584f01a601a653e028e08fd74b9b949f6cf8304d88"
+  },
+  {
+    "file": "DejaVuSerif-Bold.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+    "package": "fonts-dejavu-core",
+    "sha256": "847b33e13925f19ff87e4d934d6b3cf7cac35ce16424f6f670e40c2f377cf2df"
+  },
+  {
+    "file": "DejaVuSerif.ttf",
+    "source": "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+    "package": "fonts-dejavu-core",
+    "sha256": "8f2c103bfa3fd5de71f1b92b18f21906b5a26871fb7e19a9a4c9af539c3cc7ab"
+  },
+  {
+    "file": "LiberationMono-Bold.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
+    "package": "fonts-liberation",
+    "sha256": "626655e94dd82f3f42549daf995c921b0915fa8ab1f4b839559e8892ea41d240"
+  },
+  {
+    "file": "LiberationMono-BoldItalic.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationMono-BoldItalic.ttf",
+    "package": "fonts-liberation",
+    "sha256": "15eb161953e3ecc7fc05a3fec8a59e0f4e0a54a4e375736adf8e98d65981f813"
+  },
+  {
+    "file": "LiberationMono-Italic.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationMono-Italic.ttf",
+    "package": "fonts-liberation",
+    "sha256": "a71b2c25c89da05cf0e7c4dbba8d473fdead0b181ae56165217747d2c1f39215"
+  },
+  {
+    "file": "LiberationMono-Regular.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+    "package": "fonts-liberation",
+    "sha256": "395fa5ab8d40c8eba390ced528744ea75a7f69aabf3e68b6f925ca0e39a27370"
+  },
+  {
+    "file": "LiberationSans-Bold.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "package": "fonts-liberation",
+    "sha256": "3973aa5054fb467dd5627245d3dc82e37bf16fe075756156a570455871351582"
+  },
+  {
+    "file": "LiberationSans-BoldItalic.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSans-BoldItalic.ttf",
+    "package": "fonts-liberation",
+    "sha256": "c80fa7f2ffa0e01d4d8dcd6a6d1e43eda665222d1b4db597dde1174c456006cf"
+  },
+  {
+    "file": "LiberationSans-Italic.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf",
+    "package": "fonts-liberation",
+    "sha256": "830c5fa600505fb4c1a271b4271c53c44bae43f492b2a240d0e98a3a7a380121"
+  },
+  {
+    "file": "LiberationSans-Regular.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "package": "fonts-liberation",
+    "sha256": "4659bc0c58c5028dd488ec928d41d9265db43d9b669fc14ca8b0832daca7b144"
+  },
+  {
+    "file": "LiberationSerif-Bold.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+    "package": "fonts-liberation",
+    "sha256": "9e66c25e20868756bf12eb24a520a4552727c9cd108f577f7ae33e3c0110e39c"
+  },
+  {
+    "file": "LiberationSerif-BoldItalic.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSerif-BoldItalic.ttf",
+    "package": "fonts-liberation",
+    "sha256": "379010e87421a883f7bbfa7936d23dfe0257a54ce850819b74556e9f2c615a8a"
+  },
+  {
+    "file": "LiberationSerif-Italic.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf",
+    "package": "fonts-liberation",
+    "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242"
+  },
+  {
+    "file": "LiberationSerif-Regular.ttf",
+    "source": "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+    "package": "fonts-liberation",
+    "sha256": "705903ae1382f0150f115d6f10a30f5b2f3d6ade649c474afe6366c39174fb65"
+  },
+  {
+    "file": "wqy-zenhei.ttc",
+    "source": "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "package": "fonts-wqy-zenhei",
+    "sha256": "79c18ebe7b811951e8311bad7103ebeae8c337ed9988ea69e8a78a66cfe029b9"
+  },
+  {
+    "file": "仿宋_GB2312.ttf",
+    "source": "jzb joyspace_pwa assets/font",
+    "sha256": "fef7cf991b458cabd184b73378918d9d15429010e1d6c804f08d394395c3c3b4"
+  },
+  {
+    "file": "楷体_GB2312.ttf",
+    "source": "jzb joyspace_pwa assets/font",
+    "sha256": "99092cbb0df301625f46509e85854db8685556551742097ab3fbbc2e2ca0778b"
+  },
+  {
+    "file": "黑体常规.ttf",
+    "source": "jzb joyspace_pwa assets/font",
+    "sha256": "aa4560dd8fe5645745fed3ffa301c3ca4d6c03cbd738145b613303961ba733b8"
+  }
+]
