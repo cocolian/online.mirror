@@ -1104,3 +1104,24 @@ span.jsdialog.sidebar.ui-treeview-notexpandable {
 
 /* Word-style outline/search tabs: search belongs to the results view only. */
 .office-writer-navigation:not(:has(#tab-quick-find.selected)) .navigation-search-wrapper { display: none; }
+
+/* Use a uniform readable font instead of oversized server-rendered samples. */
+.ui-combobox-entry.office-font-entry {
+ font-family: var(--font-family);
+ font-size: 13px;
+ line-height: 24px;
+ min-height: 28px;
+ padding: 2px 12px;
+ box-sizing: border-box;
+}
+
+.ui-combobox-entry.office-font-entry > span {
+ padding: 0;
+ border: 0;
+ font: inherit;
+ white-space: nowrap;
+}
+.modalpopup[id$='-dropdown']:has(.office-font-entry) {
+ min-width: 260px;
+ background: var(--color-main-background);
+}

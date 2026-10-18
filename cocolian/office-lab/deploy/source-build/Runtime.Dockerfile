@@ -10,6 +10,7 @@ RUN sed -i 's|deb.debian.org/debian|mirrors.ustc.edu.cn/debian|g' /etc/apt/sourc
  libgssapi-krb5-2 openssl tzdata curl && rm -rf /var/lib/apt/lists/*
 RUN groupadd -g 1001 cool && useradd -u 1001 -g 1001 -d /opt/cool -m cool
 COPY stage/ /
+COPY fonts/ /usr/local/share/fonts/office-fonts/
 RUN mkdir -p /opt/cool/child-roots /opt/cool/cache && \
  coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && \
  touch /var/log/coolwsd.log && \

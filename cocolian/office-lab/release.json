@@ -1,9 +1,9 @@
 {
-  "version": "office-ui-v2026.10.17-fonts-sc",
+  "version": "office-ui-v2026.10.18-fonts",
   "upstream_commit": "19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3",
-  "ui_revision": "7166287acf",
-  "collabora_image": "res.cocolian.cn/cocolian/collabora-source@sha256:68cfa172bbdf21142a8fe5d38efeb2e39075b3dd9c9262710536dd5ad7d746db",
+  "ui_revision": "43dfd78b08",
+  "collabora_image": "res.cocolian.cn/cocolian/collabora-source@sha256:beec541060fc19829672df95a8ab824f1e3b9fc61f101f9e789e9e3da1879570",
   "portal_image": "res.cocolian.cn/cocolian/office-portal@sha256:6783d7dd24aa30a3f18fc20d9085b5aad9e71666e04c7a8d71d18fd0f9aa91c4",
   "translations_commit": "17fb3698d5e86169d44076f7a992c572f8f780f1",
-  "converter_image": "res.cocolian.cn/cocolian/libreoffice-source@sha256:9214f631e17f157856f1cb28867f790aabe0b0affeb82fd779c9753b888fe338"
+  "converter_image": "res.cocolian.cn/cocolian/libreoffice-source@sha256:3826f010d4e25156ae19904a74a5ccbb25d61eec395450c24b6a0fd43cfceffb"
 }

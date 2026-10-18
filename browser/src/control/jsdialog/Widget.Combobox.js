@@ -260,6 +260,10 @@ function _extractText(selectCommandData) {
 }
 
 JSDialog.combobox = function (parentContainer, data, builder) {
+	// Core font previews contain language samples. Plain names keep this list
+	// compact, searchable and consistent without changing the selected font.
+	if (data.id === 'fontnamecombobox')
+		data.customEntryRenderer = false;
 	var container = window.L.DomUtil.create('div', 'ui-combobox ' + builder.options.cssClass, parentContainer);
 	container.id = data.id;
 
@@ -365,10 +369,24 @@ JSDialog.combobox = function (parentContainer, data, builder) {
 				? data.wholeWidthPreview
 					? 'ui-combobox-lineend ui-combobox-lineend-whole'
 					: 'ui-combobox-lineend'
-				: undefined,
+				: data.id === 'fontnamecombobox' ? 'office-font-entry' : undefined,
 			separatorAfter: separatorAfter[parseInt(i)]
 		});
 	}
+
+	var sortFontEntries = function () {
+		if (data.id !== 'fontnamecombobox') return;
+		var commonFonts = ['FangSong_GB2312', '仿宋_GB2312', 'KaiTi_GB2312', '楷体_GB2312', 'SimHei', '黑体', 'Source Han Serif SC', '思源宋体', 'Source Han Sans SC', '思源黑体', 'Noto Serif CJK SC', 'Noto Sans CJK SC', 'WenQuanYi Zen Hei', '文泉驿正黑'];
+		entries.forEach(function(entry, index) { entry.sourcePos = index; });
+		entries.sort(function(a, b) {
+			var aRank = commonFonts.indexOf(a.text);
+			var bRank = commonFonts.indexOf(b.text);
+			if (aRank < 0) aRank = commonFonts.length;
+			if (bRank < 0) bRank = commonFonts.length;
+			return aRank - bRank || a.text.localeCompare(b.text, 'zh-CN', { numeric: true, sensitivity: 'base' });
+		});
+	};
+	sortFontEntries();
 
 	var resetSelection = function () {
 		for (var i in entries) {
@@ -456,8 +474,13 @@ JSDialog.combobox = function (parentContainer, data, builder) {
 		var callback = function(objectType, eventType, object, data) {
 			// send command with correct WindowId (from parent, not dropdown)
 			let result;
+			var callbackData = data;
+			if (comboboxId === 'fontnamecombobox' && eventType === 'selected') {
+				var selectedFont = entries[parseInt(_extractPos(data))];
+				if (selectedFont) callbackData = selectedFont.sourcePos + ';' + _extractText(data);
+			}
 			if (eventType !== 'close')
-				result = parentBuilder.callback(objectType, eventType, object, data, parentBuilder);
+				result = parentBuilder.callback(objectType, eventType, object, callbackData, parentBuilder);
 
 			// close after selection
 			if (eventType === 'selected') {
@@ -662,10 +685,12 @@ JSDialog.combobox = function (parentContainer, data, builder) {
 		for (var i = 0; i < newEntries.length; i++) {
 			entries.push({
 				text: newEntries[i].toString(),
+			class: data.id === 'fontnamecombobox' ? 'office-font-entry' : undefined,
 				selected: false,
 				customRenderer: data.customEntryRenderer
 			});
 		}
+		sortFontEntries();
 		if (JSDialog.GetDropdown(data.id))
 			JSDialog.CloseDropdown(data.id);
 	};
