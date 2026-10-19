@@ -38,6 +38,7 @@ public:
 private:
     cpo::uno::Reference<css::drawing::XShape> mxShape;
     bool m_bHasWPGParent;
+    bool m_bNoTextWrap = false;
 };
 }
 
