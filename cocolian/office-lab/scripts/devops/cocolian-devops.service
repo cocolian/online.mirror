@@ -1,0 +1,12 @@
+[Unit]
+Description=Cocolian GitHub release watcher
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.local/lib/cocolian-devops/watch.py
+Environment=GIT_SSH_COMMAND=/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=15
+TimeoutStartSec=5h
+Nice=10
+CPUQuota=200%
+MemoryMax=10G
+UMask=0077
