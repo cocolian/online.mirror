@@ -139,6 +139,9 @@ def candidate(old,image,name):
  try:
   k('-n','office-lab','create','-f','-',input=json.dumps(pod).encode());created=True
   k('-n','office-lab','wait','--for=condition=Ready','pod/'+podname,'--timeout=240s',timeout=260)
+  if name=='collabora-wordmac':
+   font=k('-n','office-lab','exec',podname,'--','fc-match','FangSong_GB2312')
+   assert 'FangSong_GB2312' in font and 'YaHei' not in font,'Genuine FangSong font not selected'
   ip=json.loads(k('-n','office-lab','get','pod',podname,'-o','json'))['status']['podIP']
   script=Path(__file__).with_name('verify.py').read_bytes()
   k('-n','office-lab','exec','-i','deployment/wopi','-c','wopi','--','python3','-','--candidate',name,ip,input=script,timeout=120)
