@@ -32,4 +32,6 @@ sudo systemctl stop cocolian-devops.timer
 
 安装（仅 build-host）：将 watch.py 复制到上述用户目录，将 `cocolian-devops-system.service` 安装为系统 `cocolian-devops.service`、`cocolian-devops-system.timer` 安装为 `.timer`，准备私有配置后执行 `sudo systemctl daemon-reload && sudo systemctl enable --now cocolian-devops.timer`。不要重复安装草稿用户级服务。
 
-镜像传输：公网反向代理下载大层速度较慢，宿主机安装 `cocolian-registry-tunnel.service`，使用现有宿主机 SSH 身份连接 VM，将 VM 的 `127.0.0.1:15000` 反向转发到现有 registry Service。仅本机回环监听，公网不开放端口，传输受 SSH 加密；该回环端点使用 HTTP，公共 registry.example.invalid 的 TLS 校验保持启用。两端重启后 systemd 自动重连。私有 config.json 设置 registry_endpoint=127.0.0.1:15000；业务镜像始终记录公共域名与不可变摘要。
+镜像传输：公网反向代理下载大层速度较慢，宿主机安装 `cocolian-registry-tunnel.service`，使用现有宿主机 SSH 身份连接 VM，将 VM 的 `127.0.0.1:15000` 反向转发到宿主机回环流式代理，再访问现有 registry Service。仅本机回环监听，公网不开放端口，传输受 SSH 加密；该回环端点使用 HTTP，公共 registry.example.invalid 的 TLS 校验保持启用。两端重启后 systemd 自动重连。私有 config.json 设置 registry_endpoint=127.0.0.1:15000；业务镜像始终记录公共域名与不可变摘要。
+
+宿主机的 `cocolian-registry-proxy.service` 仅监听 127.0.0.1:15001，将仓库返回的绝对上传 Location 地址改回 VM 回环端口，避免上传绕回公网；请求和响应以有界分块转发，支持 Content-Length 与 chunked 上传。不修改 applications 命名空间中的仓库配置。代理与隧道均为宿主机 systemd 开机服务。
