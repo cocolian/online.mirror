@@ -1,9 +1,11 @@
 {
-  "version": "office-ui-v2026.10.18-open-icon",
+  "version": "office-ui-v2026.10.20-main",
   "upstream_commit": "19b4efae7fb8e9eda4a6d88baa959c838d3eb8c3",
   "ui_revision": "958ee9f134",
-  "collabora_image": "res.cocolian.cn/cocolian/collabora-source@sha256:00bf584e236fc581b502adb36ec428a4adc75ad5927eaa7632cf87105ae3f08f",
-  "portal_image": "res.cocolian.cn/cocolian/office-portal@sha256:c4e90a07ac09ae88061a44bda5db4f25348498fdd6678f5fbab903ab0df51792",
+  "collabora_image": "res.cocolian.cn/cocolian/collabora-source@sha256:ac6a88bd6528db3ef3b8c446f070c2e69555df8515e4d02c67d342131b7795b3",
+  "portal_image": "res.cocolian.cn/cocolian/office-portal@sha256:16d4fe74c41a6b50cdcbf8d3efc8e45a09d287ce8878dbd2ce921a3a24a72a7c",
   "translations_commit": "17fb3698d5e86169d44076f7a992c572f8f780f1",
-  "converter_image": "res.cocolian.cn/cocolian/libreoffice-source@sha256:3826f010d4e25156ae19904a74a5ccbb25d61eec395450c24b6a0fd43cfceffb"
+  "converter_image": "res.cocolian.cn/cocolian/libreoffice-source@sha256:66a019293570eafd7cfed2b4af41a232c4444c8ca5230685f2e246fff9e0a189",
+  "source_commit": "053c8491238",
+  "wordmac_image": "res.cocolian.cn/cocolian/collabora-wordmac@sha256:76d70cd3e4ead4d6744c9c2eef335144409b8bcea79c648e38b711f8e9d8de8a"
 }
