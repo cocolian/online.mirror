@@ -104,20 +104,28 @@ def publish(tag,component,out):
  finally:
   archive.unlink(missing_ok=True);oci.unlink(missing_ok=True)
 
-def build_images(paths,heads,old,out,engine,online):
+def select_targets(heads,previous):
+ selected=set()
+ if heads.get('cocolian')!=previous.get('cocolian'):selected.add('wopi')
+ if any(heads.get(n)!=previous.get(n) for n in ('cocolian-office','online.mirror')):
+  selected.update(('collabora','collabora-wordmac','libreoffice'))
+ # A manual --force run with identical heads rebuilds all modules.
+ return {n:c for n,c in TARGETS.items() if n in (selected or set(TARGETS))}
+
+def build_images(paths,heads,old,out,engine,online,targets):
  context=out/'context';context.mkdir();outer=paths['cocolian-office']/'deploy/source-build'
- shutil.copytree(paths['cocolian']/'apps/office-portal',context/'portal',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
- # The portal is syntax checked and its focused tests run before packaging.
- for source in (context/'portal').glob('*.py'):compile(source.read_text(),str(source),'exec')
- tests=list((paths['cocolian']/'apps/office-portal').glob('test_*.py'))
- for test in tests:run([sys.executable,test],cwd=test.parent)
- for name in ('word-mac-fontconfig.xml','editor-aids.css','editor-aids.xcd','source-conversion-service.py'):
-  shutil.copy2(outer/name,context/name)
+ if 'wopi' in targets:
+  shutil.copytree(paths['cocolian']/'apps/office-portal',context/'portal',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+  for source in (context/'portal').glob('*.py'):compile(source.read_text(),str(source),'exec')
+  for test in (paths['cocolian']/'apps/office-portal').glob('test_*.py'):run([sys.executable,test],cwd=test.parent)
+ if set(targets)-{'wopi'}:
+  for name in ('word-mac-fontconfig.xml','editor-aids.css','editor-aids.xcd','source-conversion-service.py'):
+   shutil.copy2(outer/name,context/name)
  if engine:shutil.copytree(CACHE/'engine/instdir',context/'engine',symlinks=True)
  if online:shutil.copytree(CACHE/'stage/usr',context/'usr',symlinks=True)
  tag='auto-'+time.strftime('%Y%m%d%H%M%S')+'-'+heads['online.mirror'][:8]
  images={}
- for deployment,component in TARGETS.items():
+ for deployment,component in targets.items():
   before=old[deployment]['spec']['template']['spec']['containers'][0]['image']
   base=registry_base(before,component,out)
   lines=['ARG BASE','FROM ${BASE}','USER root']
@@ -142,8 +150,8 @@ def build_images(paths,heads,old,out,engine,online):
   images[deployment]=publish(local,component,out)
  return images
 
-def stable_pods(items):
- return {(p['metadata']['namespace'],p['metadata']['name']):(p['metadata']['uid'],[(c['name'],c.get('imageID'),c['ready'],c['restartCount']) for c in p['status'].get('containerStatuses',[])]) for p in items if p['metadata']['namespace']!='office-lab'}
+def stable_pods(items,selected=None):
+ return {(p['metadata']['namespace'],p['metadata']['name']):(p['metadata']['uid'],[(c['name'],c.get('imageID'),c['ready'],c['restartCount']) for c in p['status'].get('containerStatuses',[])]) for p in items if p['metadata']['namespace']!='office-lab' or (selected is not None and p['metadata'].get('labels',{}).get('app') in set(TARGETS)-set(selected))}
 
 def candidate(old,image,name):
  # No app labels: candidate cannot enter any production Service selector.
@@ -211,22 +219,27 @@ def main():
  config=json.loads((HOME/'.config/cocolian-devops/config.json').read_text())
  built=CACHE/'devops-built.json';last=json.loads(built.read_text()) if built.exists() else {'online.mirror':config['engine_baseline']}
  previous=json.loads(os.environ.get('DEVOPS_PREVIOUS','{}'))
+ targets=select_targets(heads,previous)
+ dump(out/'plan.json',{'changed_repositories':[n for n in heads if heads[n]!=previous.get(n)],'deployments':list(targets),'unchanged_deployments':sorted(set(TARGETS)-set(targets))})
  changes=source_changes(paths['online.mirror'],previous.get('online.mirror',config['engine_baseline']),heads['online.mirror'])
  engine=needs_engine(changes);online=needs_online(changes)
  cache_changes=source_changes(paths['online.mirror'],last['online.mirror'],heads['online.mirror'])
  with (CACHE/'devops-build.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
-  if needs_engine(cache_changes) or needs_online(cache_changes):compile_source(paths['online.mirror'],needs_engine(cache_changes),needs_online(cache_changes))
-  dump(built,{'online.mirror':heads['online.mirror']})
-  images=build_images(paths,heads,old,out,engine,online)
+  if set(targets)-{'wopi'} and (needs_engine(cache_changes) or needs_online(cache_changes)):compile_source(paths['online.mirror'],needs_engine(cache_changes),needs_online(cache_changes))
+  if set(targets)-{'wopi'}:dump(built,{'online.mirror':heads['online.mirror']})
+  images=build_images(paths,heads,old,out,engine,online,targets)
  dump(out/'images.json',images)
  def verify():
   script=Path(__file__).with_name('verify.py').read_bytes()
   result=k('-n','office-lab','exec','-i','deployment/wopi','-c','wopi','--','python3','-',input=script,timeout=240)
   dump(out/'checks.json',json.loads(result))
   after=json.loads(k('get','pods','-A','-o','json'));dump(out/'pods-after.json',after)
-  assert stable_pods(before['items'])==stable_pods(after['items']),'Other namespace pods changed during release'
+  assert stable_pods(before['items'],targets)==stable_pods(after['items'],targets),'Unselected modules or other namespace pods changed during release'
+  current={d['metadata']['name']:d for d in json.loads(k('-n','office-lab','get','deployments','-o','json'))['items']}
+  for name in set(TARGETS)-set(targets):
+   assert current[name]['spec']['template']==old[name]['spec']['template'],'Unselected deployment template changed: '+name
  deploy(old,images,out,verify)
- dump(out/'release.json',{'status':'verified','commits':heads,'images':images,'engine_recompiled':engine,'online_recompiled':online,'protected_pods':len(stable_pods(before['items']))})
+ dump(out/'release.json',{'status':'verified','commits':heads,'images':images,'engine_recompiled':engine,'online_recompiled':online,'deployed_modules':list(targets),'unchanged_modules':sorted(set(TARGETS)-set(targets)),'protected_pods':len(stable_pods(before['items'],targets))})
  print('RELEASE VERIFIED',images,flush=True)
 if __name__=='__main__':main()

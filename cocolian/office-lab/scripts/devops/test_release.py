@@ -3,6 +3,13 @@ from pathlib import Path
 from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('release',Path(__file__).with_name('release.py'));r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
 class ReleaseTests(unittest.TestCase):
+ def test_independent_main_changes(self):
+  baseline={n:'old' for n in ('cocolian','cocolian-office','online.mirror')}
+  self.assertEqual(set(r.select_targets(dict(baseline,cocolian='new'),baseline)),{'wopi'})
+  for name in ('cocolian-office','online.mirror'):
+   heads=dict(baseline);heads[name]='new'
+   self.assertEqual(set(r.select_targets(heads,baseline)),{'collabora','collabora-wordmac','libreoffice'})
+  self.assertEqual(set(r.select_targets({n:'new' for n in baseline},baseline)),set(r.TARGETS))
  def test_change_detection(self):
   self.assertTrue(r.needs_engine(['engine/sw/source/core/text/itrform2.cxx']))
   self.assertFalse(r.needs_engine(['cocolian/office-lab/docs/release.md']))
