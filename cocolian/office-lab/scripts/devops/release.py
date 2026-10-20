@@ -22,7 +22,7 @@ def source_changes(repo,previous,current):
  if not previous:return ['engine/','browser/']
  return git(repo,'diff','--name-only',previous,current).splitlines()
 def needs_engine(paths):return any(p.startswith('engine/') for p in paths)
-def needs_online(paths):return any(not p.startswith(('engine/','cocolian/','.github/')) and not p.endswith(('.md','.txt','.png','.pdf')) for p in paths)
+def needs_online(paths):return any(not p.startswith(('engine/','cocolian/','.github/')) and not p.endswith('.md') for p in paths)
 
 def sync_source(repo):
  # Preserve generated files and unchanged mtimes; remove only formerly tracked files.
@@ -127,6 +127,8 @@ def build_images(paths,heads,old,out,engine,online):
     if deployment=='collabora-wordmac':lines += ['COPY word-mac-fontconfig.xml /etc/fonts/word-mac-fontconfig.xml']
     lines += ['RUN fc-cache -f && coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && chown -R 1001:1001 /opt/cool/systemplate']
    lines += ['USER 1001:1001']
+  revision=heads['cocolian'] if deployment=='wopi' else heads['online.mirror']
+  lines += [f'LABEL org.opencontainers.image.revision="{revision}"']
   for name,sha in heads.items():lines += [f'LABEL cn.cocolian.source.{name}="{sha}"']
   recipe=context/(component+'.Dockerfile');recipe.write_text('\n'.join(lines)+'\n')
   local='cocolian/'+component+':'+tag
@@ -191,6 +193,7 @@ def deploy(old,images,out,verify):
 
 def main():
  assert AUTH.is_file() and AUTH.stat().st_mode & 0o077==0,'Registry auth missing or insecure permissions'
+ for test in ('test_release.py','test_registry_proxy.py'):run([sys.executable,Path(__file__).with_name(test)])
  out=Path(os.environ['DEVOPS_RUN']);paths={n:Path(p) for n,p in json.loads(os.environ['DEVOPS_CHECKOUTS']).items()};heads=json.loads(os.environ['DEVOPS_COMMITS'])
  # Reject unexpected namespace overrides; this pipeline never applies arbitrary manifests.
  assert os.environ.get('RELEASE_NAMESPACE','office-lab')=='office-lab'
