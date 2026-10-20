@@ -28,7 +28,11 @@ def sync_source(repo):
  # Preserve generated files and unchanged mtimes; remove only formerly tracked files.
  manifest=CACHE/'devops-source-files.json';source=CACHE/'source'
  names=git(repo,'ls-files','-z').split('\x00');names=[n for n in names if n and not n.startswith(('cocolian/','.github/'))]
- old=json.loads(manifest.read_text()) if manifest.exists() else []
+ if manifest.exists():old=json.loads(manifest.read_text())
+ else:
+  baseline=json.loads((CACHE/'source-lock.json').read_text())['commit']
+  old=git(repo,'ls-tree','-r','--name-only',baseline).splitlines()
+  old=[n for n in old if not n.startswith(('cocolian/','.github/'))]
  for name in set(old)-set(names):
   p=source/name
   if p.is_file() or p.is_symlink():p.unlink()
@@ -41,7 +45,9 @@ def sync_source(repo):
   if src.is_symlink():equal=dst.is_symlink() and os.readlink(src)==os.readlink(dst)
   elif dst.is_file() and not dst.is_symlink() and src.stat().st_size==dst.stat().st_size:
    equal=hashlib.file_digest(src.open('rb'),'sha256').digest()==hashlib.file_digest(dst.open('rb'),'sha256').digest()
-  if equal:continue
+  if equal:
+   if not src.is_symlink():os.chmod(dst,src.stat().st_mode & 0o777)
+   continue
   dst.parent.mkdir(parents=True,exist_ok=True)
   if dst.is_symlink() or (src.is_symlink() and dst.exists()):dst.unlink()
   if src.is_symlink():dst.symlink_to(os.readlink(src))
