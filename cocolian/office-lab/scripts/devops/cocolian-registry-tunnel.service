@@ -1,0 +1,11 @@
+[Unit]
+Description=Private SSH transport from codex-dev loopback to existing registry
+Wants=network-online.target
+After=network-online.target
+[Service]
+User=shamphone
+ExecStart=/usr/bin/ssh -NT -i /home/shamphone/.ssh/paymentrpc_rsa -o IdentitiesOnly=yes -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R 127.0.0.1:15000:10.43.173.55:80 codex@192.168.124.10
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target

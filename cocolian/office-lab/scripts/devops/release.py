@@ -64,13 +64,23 @@ def compile_source(repo,engine,online):
       '-v',str(CACHE)+':/workspace','-v',str(HOME/'projects/cocolian-office/artifacts/render-fidelity-20261019/qa-fonts')+':/usr/local/share/fonts/fidelity-test:ro',
       BUILDER,'bash','-lc','\n'.join(commands)],timeout=18000)
 
+def registry_transport():
+ config=json.loads((HOME/'.config/cocolian-devops/config.json').read_text())
+ endpoint=config.get('registry_endpoint','res.cocolian.cn')
+ assert endpoint in ('res.cocolian.cn','127.0.0.1:15000'),'Unexpected registry destination'
+ # TLS is bypassed only inside the authenticated SSH loopback tunnel.
+ return endpoint,(['--tls-verify=false'] if endpoint=='127.0.0.1:15000' else []),(['--src-tls-verify=false'] if endpoint=='127.0.0.1:15000' else []),(['--dest-tls-verify=false'] if endpoint=='127.0.0.1:15000' else [])
+
 def registry_base(image,component,out):
  assert image.startswith('res.cocolian.cn/cocolian/') and '@sha256:' in image
  tag='cocolian/devops-base-'+component+':'+image.split(':')[-1][:16]
  if subprocess.run(['docker','image','inspect',tag],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:
   archive=out/(component+'-base.tar')
-  run(['skopeo','copy','--authfile',AUTH,'docker://'+image,'docker-archive:'+str(archive)+':'+tag],timeout=900)
-  run(['docker','load','-i',archive],timeout=900);archive.unlink()
+  endpoint,_,src,_=registry_transport()
+  try:
+   run(['skopeo','copy','--authfile',AUTH,*src,'docker://'+image.replace('res.cocolian.cn',endpoint,1),'docker-archive:'+str(archive)+':'+tag],timeout=900)
+   run(['docker','load','-i',archive],timeout=900)
+  finally:archive.unlink(missing_ok=True)
  return tag
 
 def publish(tag,component,out):
@@ -78,10 +88,11 @@ def publish(tag,component,out):
  try:
   run(['docker','save','-o',archive,tag],timeout=900)
   run(['skopeo','copy','docker-archive:'+str(archive),'oci-archive:'+str(oci)],timeout=900)
-  destination='docker://res.cocolian.cn/cocolian/'+component+':'+tag.split(':')[-1]
+  endpoint,inspect_tls,_,dest_tls=registry_transport()
+  destination='docker://'+endpoint+'/cocolian/'+component+':'+tag.split(':')[-1]
   expected=run(['skopeo','inspect','--format','{{.Digest}}','oci-archive:'+str(oci)])
-  run(['skopeo','copy','--preserve-digests','--authfile',AUTH,'oci-archive:'+str(oci),destination],timeout=1200)
-  actual=run(['skopeo','inspect','--authfile',AUTH,'--format','{{.Digest}}',destination])
+  run(['skopeo','copy','--preserve-digests','--authfile',AUTH,*dest_tls,'oci-archive:'+str(oci),destination],timeout=1200)
+  actual=run(['skopeo','inspect','--authfile',AUTH,*inspect_tls,'--format','{{.Digest}}',destination])
   assert expected==actual,'Published digest mismatch'
   return 'res.cocolian.cn/cocolian/'+component+'@'+actual
  finally:
