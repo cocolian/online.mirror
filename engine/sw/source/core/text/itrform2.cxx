@@ -2330,8 +2330,13 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
         m_pCurr->SetAscent( nAsc );
         m_pInf->GetParaPortion()->SetFixLineHeight();
 
-        // we ignore any line spacing options except from ...
-        if ( ! IsParaLine() && pSpace &&
+        // Word table cells already use the document grid as their line pitch.
+        // Applying proportional spacing to the snapped height again stretches
+        // a 1.5-line table to 150% of Word's height and changes page breaks.
+        // Keep the existing proportional behavior for body text and ODF grids.
+        const bool bWordTableGrid
+            = m_pFrame->IsInTab() && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS);
+        if ( !bWordTableGrid && !IsParaLine() && pSpace &&
              SvxInterLineSpaceRule::Prop == pSpace->GetInterLineSpaceRule() )
         {
             sal_uLong nTmp = pSpace->GetPropLineSpace();
