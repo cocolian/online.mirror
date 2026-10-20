@@ -30,6 +30,9 @@
 #include <swselectionlist.hxx>
 #include <sortedobjs.hxx>
 #include <editeng/adjustitem.hxx>
+#include <editeng/fhgtitem.hxx>
+#include <charatr.hxx>
+#include <fmtautofmt.hxx>
 #include <editeng/lspcitem.hxx>
 #include <editeng/lrspitem.hxx>
 #include <frmatr.hxx>
@@ -168,6 +171,22 @@ void SwTextMargin::CtorInitTextMargin( SwTextFrame *pNewFrame, SwTextSizeInfo *p
     const SwTextNode *const pNode = m_pFrame->GetTextNodeForParaProps();
 
     auto stMetrics = GetFnt()->GetFontUnitMetrics();
+    // Character-unit indentation uses the paragraph's font size, not the
+    // iterator's default font before the first character has been sought.
+    if (pNode->GetDoc().getIDocumentSettingAccess().get(
+            DocumentSettingId::MS_WORD_COMP_GRID_METRICS))
+    {
+        stMetrics.m_dEmTwips = pNode->GetSwAttrSet().GetSize().GetHeight();
+        stMetrics.m_dIcTwips = pNode->GetSwAttrSet().GetCJKSize().GetHeight();
+        const auto pMark = pNode->GetAttr(RES_PARATR_LIST_AUTOFMT).GetStyleHandle();
+        if (pMark)
+        {
+            if (const auto* pHeight = pMark->GetItemIfSet(RES_CHRATR_FONTSIZE))
+                stMetrics.m_dEmTwips = pHeight->GetHeight();
+            if (const auto* pHeight = pMark->GetItemIfSet(RES_CHRATR_CJK_FONTSIZE))
+                stMetrics.m_dIcTwips = pHeight->GetHeight();
+        }
+    }
 
     SvxFirstLineIndentItem const& rFirstLine(pNode->GetSwAttrSet().GetFirstLineIndent());
     SvxTextLeftMarginItem const& rTextLeftMargin(pNode->GetSwAttrSet().GetTextLeftMargin());

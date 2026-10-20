@@ -10,6 +10,7 @@
 #include <swmodeltestbase.hxx>
 
 #include <com/sun/star/text/XPageCursor.hpp>
+#include <com/sun/star/text/SizeType.hpp>
 #include <com/sun/star/text/XTextFrame.hpp>
 #include <com/sun/star/text/XTextSectionsSupplier.hpp>
 #include <com/sun/star/text/XTextTable.hpp>
@@ -33,6 +34,7 @@
 #include <txtfrm.hxx>
 #include <view.hxx>
 #include <IDocumentLayoutAccess.hxx>
+#include <IDocumentSettingAccess.hxx>
 #include <frameformats.hxx>
 #include <unotextrange.hxx>
 #include <fmtanchr.hxx>
@@ -1790,6 +1792,29 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf167583)
 
     CPPUNIT_ASSERT_GREATER(sal_Int32(3400), nHeight);
     CPPUNIT_ASSERT_LESS(sal_Int32(3500), nHeight);
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordImportTypography)
+{
+    createSwDoc("word-import-typography.docx");
+    CPPUNIT_ASSERT(getProperty<bool>(getShape(1), u"TextAutoGrowWidth"_ustr));
+    uno::Reference<beans::XPropertySet> xShape(getShape(1), uno::UNO_QUERY_THROW);
+    uno::Reference<beans::XPropertySet> xFrame(
+        xShape->getPropertyValue(u"TextBoxContent"_ustr), uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT_EQUAL(text::SizeType::VARIABLE, getProperty<sal_Int16>(xFrame, u"WidthType"_ustr));
+    xShape->setPropertyValue(u"TextAutoGrowWidth"_ustr, uno::Any(false));
+    CPPUNIT_ASSERT_EQUAL(text::SizeType::MIN, getProperty<sal_Int16>(xFrame, u"WidthType"_ustr));
+    xShape->setPropertyValue(u"TextAutoGrowWidth"_ustr, uno::Any(true));
+    xShape->setPropertyValue(u"TextWordWrap"_ustr, uno::Any(true));
+    CPPUNIT_ASSERT_EQUAL(text::SizeType::FIX, getProperty<sal_Int16>(xFrame, u"WidthType"_ustr));
+    xShape->setPropertyValue(u"TextWordWrap"_ustr, uno::Any(false));
+    CPPUNIT_ASSERT_EQUAL(text::SizeType::VARIABLE, getProperty<sal_Int16>(xFrame, u"WidthType"_ustr));
+    SwWrtShell* pShell = getSwDocShell()->GetWrtShell();
+    pShell->SttEndDoc(true);
+    // 1440 twips page margin + two characters at the 16pt paragraph mark size.
+    auto pXmlDoc = parseLayoutDump();
+    const auto nPageLeft = getXPath(pXmlDoc, "/root/page[1]/infos/bounds", "left").toInt32();
+    CPPUNIT_ASSERT_EQUAL(tools::Long(2080), pShell->GetCharRect().Left() - nPageLeft);
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordTableGridProportional)
