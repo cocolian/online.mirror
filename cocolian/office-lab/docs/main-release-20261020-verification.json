@@ -1,0 +1,10 @@
+{
+  "source_commit": "053c8491238",
+  "images": {
+    "collabora": "res.cocolian.cn/cocolian/collabora-source@sha256:ac6a88bd6528db3ef3b8c446f070c2e69555df8515e4d02c67d342131b7795b3",
+    "collabora-wordmac": "res.cocolian.cn/cocolian/collabora-wordmac@sha256:76d70cd3e4ead4d6744c9c2eef335144409b8bcea79c648e38b711f8e9d8de8a",
+    "libreoffice": "res.cocolian.cn/cocolian/libreoffice-source@sha256:66a019293570eafd7cfed2b4af41a232c4444c8ca5230685f2e246fff9e0a189"
+  },
+  "protected_pods_unchanged": 10,
+  "status": "verified"
+}
