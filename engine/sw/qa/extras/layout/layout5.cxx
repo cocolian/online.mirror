@@ -1792,6 +1792,17 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf167583)
     CPPUNIT_ASSERT_LESS(sal_Int32(3500), nHeight);
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordTableGridProportional)
+{
+    createSwDoc("word-table-grid-proportional.docx");
+    auto pXmlDoc = parseLayoutDump();
+    // Three table lines must use the 312-twip grid, without another 150% factor.
+    // Before the fix, this was 1248 rather than 936.
+    assertXPath(pXmlDoc, "/root/page[1]/body/tab/row/cell/txt/infos/bounds", "height", u"936");
+    // The same proportional paragraph outside the table keeps normal spacing.
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt/infos/bounds", "height", u"1248");
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf166652)
 {
     createSwDoc("line-spacing-80percent.fodt");

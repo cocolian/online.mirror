@@ -1999,7 +1999,17 @@ SwTwips SwFlowFrame::CalcAddLowerSpaceAsLastInTableCell(
                 nAdditionalLowerSpace += _pAttrs->GetULSpace().GetLower();
             }
 
-            if (rIDSA.get(DocumentSettingId::ADD_PARA_LINE_SPACING_TO_TABLE_CELLS))
+            // Word's table grid already supplies the complete line pitch.
+            // Do not add proportional leading again after the last paragraph:
+            // it otherwise adds a spurious gap to every row in a grid table.
+            const bool bWordTableGrid
+                = pFrame && pFrame->IsTextFrame() && pFrame->IsInTab()
+                  && pFrame->GetAttrSet()->GetParaGrid().GetValue()
+                  && GetGridItem(pFrame->FindPageFrame())
+                  && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+                  && rIDSA.get(DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT);
+            if (rIDSA.get(DocumentSettingId::ADD_PARA_LINE_SPACING_TO_TABLE_CELLS)
+                && !bWordTableGrid)
             {
                 nAdditionalLowerSpace += _pAttrs->CalcLineSpacing();
             }
