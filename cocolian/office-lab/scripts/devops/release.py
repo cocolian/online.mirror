@@ -121,18 +121,18 @@ def build_images(paths,heads,old,out,engine,online):
   before=old[deployment]['spec']['template']['spec']['containers'][0]['image']
   base=registry_base(before,component,out)
   lines=['ARG BASE','FROM ${BASE}','USER root']
-  if deployment=='wopi':lines += ['COPY portal/ /app/','USER 1000:1000']
+  if deployment=='wopi':lines += ['COPY portal/ /app/','RUN chmod -R a+rX /app','USER 1000:1000']
   else:
    if engine:lines += ['COPY engine/ /opt/collaboraoffice/']
-   if deployment=='libreoffice':lines += ['COPY source-conversion-service.py /usr/local/bin/source-conversion-service.py']
+   if deployment=='libreoffice':lines += ['COPY --chmod=755 source-conversion-service.py /usr/local/bin/source-conversion-service.py']
    else:
     if online:lines += ['COPY usr/ /usr/']
-    lines += ['COPY editor-aids.css /usr/share/coolwsd/browser/dist/editor-aids-20261020.css',
-     'COPY editor-aids.xcd /opt/collaboraoffice/share/registry/cocolian-editor-aids.xcd',
+    lines += ['COPY --chmod=644 editor-aids.css /usr/share/coolwsd/browser/dist/editor-aids-20261020.css',
+     'COPY --chmod=644 editor-aids.xcd /opt/collaboraoffice/share/registry/cocolian-editor-aids.xcd',
      '''RUN if ! grep -q 'editor-aids-20261020.css' /usr/share/coolwsd/browser/dist/cool.html; then sed -i 's|</head>|<link rel="stylesheet" href="%SERVICE_ROOT%/browser/%VERSION%/editor-aids-20261020.css"></head>|' /usr/share/coolwsd/browser/dist/cool.html; fi''']
-    if deployment=='collabora-wordmac':lines += ['COPY word-mac-fontconfig.xml /etc/fonts/word-mac-fontconfig.xml']
-    lines += ['RUN fc-cache -f && coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && chown -R 1001:1001 /opt/cool/systemplate']
-   lines += ['USER 1001:1001']
+    if deployment=='collabora-wordmac':lines += ['COPY --chmod=644 word-mac-fontconfig.xml /etc/fonts/word-mac-fontconfig.xml']
+    lines += ['RUN chmod -R a+rX /opt/collaboraoffice /usr/share/coolwsd && fc-cache -f && coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && chown -R 1001:1001 /opt/cool/systemplate']
+   lines += ['RUN chmod -R a+rX /opt/collaboraoffice','USER 1001:1001']
   revision=heads['cocolian'] if deployment=='wopi' else heads['online.mirror']
   lines += [f'LABEL org.opencontainers.image.revision="{revision}"']
   for name,sha in heads.items():lines += [f'LABEL cn.cocolian.source.{name}="{sha}"']
