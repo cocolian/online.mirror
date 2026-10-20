@@ -202,7 +202,9 @@ void SwTextBoxHelper::create(SwFrameFormat* pShape, SdrObject* pObject, bool bCo
     // tdf#162075 shape word wrap to frame width type on shape creation.
     bool bTextWordwrap = xShapePropertySet->getPropertyValue(UNO_NAME_TEXT_WORDWRAP).get<bool>();
     syncProperty(pShape, RES_FRM_SIZE, MID_FRMSIZE_WIDTH_TYPE,
-                 cpo::uno::Any(bTextWordwrap ? text::SizeType::FIX : text::SizeType::MIN), pObject);
+                 cpo::uno::Any(bTextWordwrap ? text::SizeType::FIX
+                     : xShapePropertySet->getPropertyValue(u"TextAutoGrowWidth"_ustr).get<bool>()
+                           ? text::SizeType::VARIABLE : text::SizeType::MIN), pObject);
     syncProperty(pShape, RES_TEXT_VERT_ADJUST, 0,
                  xShapePropertySet->getPropertyValue(UNO_NAME_TEXT_VERT_ADJUST), pObject);
     text::WritingMode eMode;
@@ -683,6 +685,20 @@ void SwTextBoxHelper::syncProperty(SwFrameFormat* pShape, std::u16string_view rP
         syncProperty(pShape, RES_TEXT_VERT_ADJUST, 0, rValue, pObj);
     else if (rPropertyName == UNO_NAME_TEXT_AUTOGROWHEIGHT)
         syncProperty(pShape, RES_FRM_SIZE, MID_FRMSIZE_IS_AUTO_HEIGHT, rValue, pObj);
+    else if (rPropertyName == u"TextAutoGrowWidth")
+    {
+        bool bAutoWidth = false;
+        SdrObject* pObject = pObj ? pObj : pShape->FindRealSdrObject();
+        uno::Reference<beans::XPropertySet> xProps(
+            pObject ? pObject->getUnoShape() : nullptr, uno::UNO_QUERY);
+        if ((rValue >>= bAutoWidth) && xProps)
+        {
+            const bool bWrap = xProps->getPropertyValue(UNO_NAME_TEXT_WORDWRAP).get<bool>();
+            syncProperty(pShape, RES_FRM_SIZE, MID_FRMSIZE_WIDTH_TYPE,
+                         cpo::uno::Any(bWrap ? text::SizeType::FIX
+                             : bAutoWidth ? text::SizeType::VARIABLE : text::SizeType::MIN), pObj);
+        }
+    }
     else if (rPropertyName == UNO_NAME_TEXT_LEFTDIST)
         syncProperty(pShape, RES_BOX, LEFT_BORDER_DISTANCE, rValue, pObj);
     else if (rPropertyName == UNO_NAME_TEXT_RIGHTDIST)
@@ -712,9 +728,14 @@ void SwTextBoxHelper::syncProperty(SwFrameFormat* pShape, std::u16string_view rP
         bool bTextWordwrap{};
         if (rValue >>= bTextWordwrap)
         {
+            SdrObject* pObject = pObj ? pObj : pShape->FindRealSdrObject();
+            uno::Reference<beans::XPropertySet> xProps(
+                pObject ? pObject->getUnoShape() : nullptr, uno::UNO_QUERY);
+            const bool bAutoWidth = xProps
+                && xProps->getPropertyValue(u"TextAutoGrowWidth"_ustr).get<bool>();
             syncProperty(pShape, RES_FRM_SIZE, MID_FRMSIZE_WIDTH_TYPE,
-                         cpo::uno::Any(bTextWordwrap ? text::SizeType::FIX : text::SizeType::MIN),
-                         pObj);
+                         cpo::uno::Any(bTextWordwrap ? text::SizeType::FIX
+                             : bAutoWidth ? text::SizeType::VARIABLE : text::SizeType::MIN), pObj);
         }
     }
     else
@@ -1262,7 +1283,9 @@ void SwTextBoxHelper::updateTextBoxMargin(SdrObject* pObj)
                  cpo::uno::Any(bIsAutoGrow), pObj);
 
     syncProperty(pParentFormat, RES_FRM_SIZE, MID_FRMSIZE_WIDTH_TYPE,
-                 cpo::uno::Any(bIsAutoWrap ? text::SizeType::FIX : text::SizeType::MIN), pObj);
+                 cpo::uno::Any(bIsAutoWrap ? text::SizeType::FIX
+                     : xPropertySet->getPropertyValue(u"TextAutoGrowWidth"_ustr).get<bool>()
+                           ? text::SizeType::VARIABLE : text::SizeType::MIN), pObj);
 
     changeAnchor(pParentFormat, pObj);
     DoTextBoxZOrderCorrection(pParentFormat, pObj);

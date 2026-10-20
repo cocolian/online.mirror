@@ -40,6 +40,7 @@
 #include <com/sun/star/geometry/IntegerRectangle2D.hpp>
 #include <com/sun/star/lang/XServiceInfo.hpp>
 #include <com/sun/star/text/XText.hpp>
+#include <com/sun/star/text/SizeType.hpp>
 #include <com/sun/star/text/XTextCursor.hpp>
 #include <com/sun/star/text/WritingMode.hpp>
 #include <com/sun/star/text/WritingMode2.hpp>
@@ -795,6 +796,7 @@ oox::core::ContextHandlerRef WpsContext::onCreateContext(sal_Int32 nElementToken
                     }
                 }
 
+                m_bNoTextWrap = rAttribs.getToken(XML_wrap, XML_square) == XML_none;
                 if (xPropertySetInfo && xPropertySetInfo->hasPropertyByName(u"TextWordWrap"_ustr))
                 {
                     auto nWrappingType = rAttribs.getToken(XML_wrap, XML_square);
@@ -852,9 +854,16 @@ oox::core::ContextHandlerRef WpsContext::onCreateContext(sal_Int32 nElementToken
             if (xPropertySet.is())
             {
                 if (xServiceInfo->supportsService(u"com.sun.star.text.TextFrame"_ustr))
+                {
                     xPropertySet->setPropertyValue(
                         u"FrameIsAutomaticHeight"_ustr,
                         cpo::uno::Any(getBaseToken(nElementToken) == XML_spAutoFit));
+                    // An unwrapped, autofit Word textbox fits both dimensions.
+                    // Keeping the imported extent shifts centered page-number boxes.
+                    if (m_bNoTextWrap && getBaseToken(nElementToken) == XML_spAutoFit)
+                        xPropertySet->setPropertyValue(u"WidthType"_ustr,
+                                                      cpo::uno::Any(text::SizeType::VARIABLE));
+                }
                 else
                 {
                     auto xPropertySetInfo = xPropertySet->getPropertySetInfo();
@@ -864,6 +873,10 @@ oox::core::ContextHandlerRef WpsContext::onCreateContext(sal_Int32 nElementToken
                         xPropertySet->setPropertyValue(
                             u"TextAutoGrowHeight"_ustr,
                             cpo::uno::Any(getBaseToken(nElementToken) == XML_spAutoFit));
+                        if (m_bNoTextWrap && getBaseToken(nElementToken) == XML_spAutoFit
+                            && xPropertySetInfo->hasPropertyByName(u"TextAutoGrowWidth"_ustr))
+                            xPropertySet->setPropertyValue(u"TextAutoGrowWidth"_ustr,
+                                                          cpo::uno::Any(true));
                     }
                     else
                         SAL_WARN("oox", "Property: TextAutoGrowHeight not supported");
