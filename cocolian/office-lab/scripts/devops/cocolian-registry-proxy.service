@@ -1,0 +1,12 @@
+[Unit]
+Description=Loopback streaming adapter for existing Registry upload addresses
+After=network-online.target
+[Service]
+User=shamphone
+ExecStart=/usr/bin/python3 -u /home/shamphone/.local/lib/cocolian-devops/registry_proxy.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+UMask=0077
+[Install]
+WantedBy=multi-user.target
