@@ -7,6 +7,7 @@ class ReleaseTests(unittest.TestCase):
   self.assertTrue(r.needs_engine(['engine/sw/source/core/text/itrform2.cxx']))
   self.assertFalse(r.needs_engine(['cocolian/office-lab/docs/release.md']))
   self.assertTrue(r.needs_online(['browser/src/control/Control.Toolbar.js']))
+  self.assertTrue(r.needs_online(['browser/images/arrow.png']))
   self.assertFalse(r.needs_online(['engine/sw/a.cxx','cocolian/office-lab/scripts/devops/watch.py']))
  def test_failure_restores_templates(self):
   template={'spec':{'containers':[{'image':'old','imagePullPolicy':'IfNotPresent'}]}}
