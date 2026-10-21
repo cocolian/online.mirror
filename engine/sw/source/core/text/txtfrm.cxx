@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
 #include <config_wasm_strip.h>
 
 #include <hintids.hxx>
@@ -3994,6 +3995,38 @@ tools::Long SwTextFrame::GetLineSpace( const bool _bNoPropLineSpace ) const
             }
 
             nRet = GetHeightOfLastLine();
+            if (sw::UseWordMacMetrics() && GetAttrSet()->GetParaGrid().GetValue()
+                && GetDoc().getIDocumentSettingAccess().get(
+                    DocumentSettingId::MS_WORD_COMP_GRID_METRICS))
+            {
+                if (const auto* pGrid = GetGridItem(FindPageFrame()))
+                {
+                    const SwTwips nPitch = pGrid->GetBaseHeight() + pGrid->GetRubyHeight();
+                    if (HasPara())
+                    {
+                        const SwLineLayout* pLine = GetPara();
+                        while (pLine->GetNext())
+                            pLine = pLine->GetNext();
+                        nRet = pLine->Height();
+                    }
+                    else if (GetText().isEmpty())
+                    {
+                        nRet = EmptyHeight();
+                        nRet = sw::WordMacGridHeight(nRet, getRootFrame()->GetCurrShell()->GetRefDev());
+                        if (nPitch > 0)
+                            nRet = ((nRet + nPitch - 1) / nPitch) * nPitch;
+                    }
+                    // Word adds proportional leading only to single-grid-row
+                    // body lines. A larger font already occupies a full multiple
+                    // of the grid pitch, including its inter-paragraph advance.
+                    if (nRet > nPitch)
+                    {
+                        nRet = 0;
+                        break;
+                    }
+                    nRet = nPitch;
+                }
+            }
 
             tools::Long nTmp = nRet;
             nTmp *= rSpace.GetPropLineSpace();

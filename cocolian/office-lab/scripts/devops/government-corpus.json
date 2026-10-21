@@ -1,0 +1,84 @@
+{
+  "status": "not_accepted",
+  "reference": "Mac Word local Best for printing PDF export",
+  "word_version": "16.114",
+  "date": "2026-10-22",
+  "documents": [
+    {
+      "id": "mot-application",
+      "title": "交通运输部项目申报书",
+      "url": "https://xxgk.mot.gov.cn/2020/jigou/kjs/202509/P020250928630142443556.docx",
+      "bytes": 24713,
+      "sha256": "08303d50ca839ea9c884f869b7da3fe4e0cd5a46be70f12a3a749706910a01dd",
+      "word_reference_pages": 5
+    },
+    {
+      "id": "mot-outline",
+      "title": "交通运输部研究工作大纲",
+      "url": "https://xxgk.mot.gov.cn/2020/jigou/kjs/202509/P020250928630142612376.docx",
+      "bytes": 18571,
+      "sha256": "7c8afcc06cf629f2a10e0c84f181dce08d77ef8b8a2d5e4e62e5182f69b7d2c9",
+      "word_reference_pages": 2
+    },
+    {
+      "id": "mot-summary",
+      "title": "交通运输部项目汇总表",
+      "url": "https://xxgk.mot.gov.cn/2020/jigou/kjs/202509/P020250928630144204451.docx",
+      "bytes": 16246,
+      "sha256": "5c75ff766955ded0b749d2ff40b378a39b1b3145e983c5fdd2cc56009ea0ca74",
+      "word_reference_pages": 1
+    },
+    {
+      "id": "ndrc-application",
+      "title": "国家发展改革委课题申报书",
+      "url": "https://www.ndrc.gov.cn/xwdt/tzgg/202604/P020260416362132179691.docx",
+      "bytes": 28717,
+      "sha256": "9808ca7420b12b4edf7ef2f833c8292721fdbfa7a731fbdcb752d90025d3b53d",
+      "word_reference_pages": 7
+    },
+    {
+      "id": "jining-format",
+      "title": "济宁市公文印制版式明白纸",
+      "url": "https://www.jining.gov.cn/oldxxgk/jkq/2017/1223/20171223012345734.docx",
+      "bytes": 15014,
+      "sha256": "2be80512452666d7e6e169d32a827e324e4bdd9c3dcae6b8de9345bcdc0b6aba",
+      "word_reference_pages": 4
+    },
+    {
+      "id": "beijing-case",
+      "title": "北京市智慧农业案例模板",
+      "url": "https://www.beijing.gov.cn/zhengce/zhengcefagui/202305/W020230509555019973464.docx",
+      "bytes": 17458,
+      "sha256": "5dde19b1bcf4ed0539b9f2eea7bfc946ec50a6281a117f02b9e8d1ee624f6869",
+      "word_reference_pages": 3
+    }
+  ],
+  "matrix_line_pitch_pt": {
+    "S10.5-100": 15.6,
+    "S10.5-150": 23.28,
+    "S10.5-200": 31.2,
+    "S12-100": 15.6,
+    "S12-150": 23.28,
+    "S12-200": 31.2,
+    "S14-100": 31.2,
+    "S14-150": 31.2,
+    "S14-200": 31.2,
+    "S16-100": 31.2,
+    "S16-150": 31.2,
+    "S16-200": 31.2,
+    "S18-100": 31.2,
+    "S18-150": 31.2,
+    "S18-200": 31.2,
+    "S22-100": 31.2,
+    "S22-150": 31.2,
+    "S22-200": 31.2,
+    "S24-100": 31.2,
+    "S24-150": 31.2,
+    "S24-200": 31.2
+  },
+  "remaining": [
+    "MOT application remains 6 pages versus Word 5",
+    "Fixed line spacing and paragraph placement differ in Jining document",
+    "Beijing document has equal page count but different text placement"
+  ]
+}

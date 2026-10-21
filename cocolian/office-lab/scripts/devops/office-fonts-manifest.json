@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "private_directory": "~/.local/share/cocolian-devops/fonts/office",
+  "fonts": [
+    {
+      "file": "Calibri.ttf",
+      "sha256": "ea801e1f869b55464339058b1d4263d07cc074a18e20aa3ee1d07901423dee53"
+    },
+    {
+      "file": "Calibrib.ttf",
+      "sha256": "ac1cf97565de97cdc322228d875dc18c1131656c5138173e2c6d8ac7a37aa7f2"
+    },
+    {
+      "file": "Calibrii.ttf",
+      "sha256": "38e28b619448710314a298dd66305a3b8f494a854f19d40aa18b9872e61911fe"
+    },
+    {
+      "file": "Calibriz.ttf",
+      "sha256": "77117338878fefc82770d27303bcca90e900f2ef59a0a87d294b7744ec158b5b"
+    },
+    {
+      "file": "Deng.ttf",
+      "sha256": "b975b088200b56452b0cba317b0735ea457ee0eaac3b92ed927b6f0ec20d7568"
+    },
+    {
+      "file": "Dengb.ttf",
+      "sha256": "be80e1246047a6489a2573c6426519c7cfe0d08c1669dd81c43bb67d39482a19"
+    },
+    {
+      "file": "Dengl.ttf",
+      "sha256": "a950894abb1ceb1be0d9460b26e5a6167cafc3fc3330eab7f6b21db8b96cd080"
+    },
+    {
+      "file": "Fangsong.ttf",
+      "sha256": "d6d75adf4be24d51bbf08f7208359bfe7bdf6ec70806bbb9873412ba4e696f75"
+    },
+    {
+      "file": "Kaiti.ttf",
+      "sha256": "483c7cdec7874dcc6c39d278c367c512a1b909b34d2776fd72c2a941fc3cfd2e"
+    },
+    {
+      "file": "STZHONGS.ttf",
+      "sha256": "be40ef56c9b9aefcf042c7602d673a46c06017a27d21ce020886e7acf24b18c3"
+    },
+    {
+      "file": "SimHei.ttf",
+      "sha256": "ef70e6bba293c9d30bdeb0dba2dd6019cceacbfddab3fb0c550ff14d9127c813"
+    },
+    {
+      "file": "Simsun.ttc",
+      "sha256": "05068fa1acae212120dcc7e98c884b174a6eca252a636b4b64030235473ec27e"
+    },
+    {
+      "file": "msyh.ttc",
+      "sha256": "3084f1f88369af6bf9989c909024164d953d1e38d08734f05f28ef24b2f9d577"
+    },
+    {
+      "file": "msyhbd.ttc",
+      "sha256": "519309b7ab0479c4dc3ace5e291de5a8702175be5586e165bc810267bd4619a5"
+    },
+    {
+      "file": "msyhl.ttc",
+      "sha256": "f25f39a6d56ec6d1b356254dd776219d71b7e6f3584b3ec1b83aab0ceb08881a"
+    },
+    {
+      "file": "times.ttf",
+      "sha256": "e77f429f5cde743c30216c2d5917706d09ddd938990f4f5ae98bfd4b5c7d0495"
+    },
+    {
+      "file": "timesbd.ttf",
+      "sha256": "3750f5d563d062ed8c4e2a0516da3374b8fbcdedee0608e107efd97ded80bcae"
+    },
+    {
+      "file": "timesbi.ttf",
+      "sha256": "baad72fc175225bd00e60ce280841131ba8a170be3646901d38a9855ff1bdabc"
+    },
+    {
+      "file": "timesi.ttf",
+      "sha256": "f957cbaf4af5b52260462b486dd10a01507184dc39cdbbb3364e428b800b37e6"
+    },
+    {
+      "file": "仿宋_GB2312.ttf",
+      "sha256": "fef7cf991b458cabd184b73378918d9d15429010e1d6c804f08d394395c3c3b4"
+    },
+    {
+      "file": "楷体_GB2312.ttf",
+      "sha256": "99092cbb0df301625f46509e85854db8685556551742097ab3fbbc2e2ca0778b"
+    }
+  ]
+}

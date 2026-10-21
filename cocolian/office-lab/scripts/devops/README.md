@@ -45,3 +45,29 @@ sudo systemctl stop cocolian-devops.timer
 镜像传输：公网反向代理下载大层速度较慢，宿主机安装 `cocolian-registry-tunnel.service`，使用现有宿主机 SSH 身份连接 VM，将 VM 的 `127.0.0.1:15000` 反向转发到宿主机回环流式代理，再访问现有 registry Service。仅本机回环监听，公网不开放端口，传输受 SSH 加密；该回环端点使用 HTTP，公共 res.cocolian.cn 的 TLS 校验保持启用。两端重启后 systemd 自动重连。私有 config.json 设置 registry_endpoint=127.0.0.1:15000；业务镜像始终记录公共域名与不可变摘要。
 
 宿主机的 `cocolian-registry-proxy.service` 仅监听 127.0.0.1:15001，将仓库返回的绝对上传 Location 地址改回 VM 回环端口，避免上传绕回公网；请求和响应以有界分块转发，支持 Content-Length 与 chunked 上传。不修改 applications 命名空间中的仓库配置。代理与隧道均为宿主机 systemd 开机服务。
+
+### Mac Word rendering profile
+
+Renderer releases install the private font pack pinned by
+`office-fonts-manifest.json` from
+`~/.local/share/cocolian-devops/fonts/office`. Font binaries are never stored in
+Git. A missing file or a mismatched SHA256 stops the build before image creation.
+All three renderers receive the same fonts and fontconfig profile. Candidate
+pods must select native FangSong_GB2312, KaiTi_GB2312, SimSun, Microsoft YaHei,
+FangSong, STZhongsong and Times New Roman before deployment.
+
+`COCOLIAN_WORD_MAC_METRICS=1` enables the Mac Word profile. It excludes the 127%
+Windows CJK enlargement when choosing grid multiples, preserves ordinary
+non-grid font metrics, and uses the measured Mac Word behavior for
+proportional spacing on multiple grid rows. Without this variable, the existing
+Windows Word metrics remain active. The scoped `testWordBodyGridProportional`
+regression exercises the Mac profile without changing the rest of the test
+process. Renderer builds also retain the existing typography, table grid and
+ODF compatibility tests.
+
+`government-corpus.json` records the six government download URLs, immutable
+input hashes, actual Mac Word reference page counts, and the measured 21-case
+line-pitch matrix. This corpus is **not accepted** yet: equal page counts do not
+prove equal pagination or visual layout. Keep this repair off main until the
+remaining table tail, fixed-spacing, and paragraph-position differences pass
+visual review against the saved Word PDFs.
