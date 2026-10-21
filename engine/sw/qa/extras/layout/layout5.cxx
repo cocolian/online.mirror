@@ -8,6 +8,7 @@
  */
 
 #include <swmodeltestbase.hxx>
+#include <osl/process.h>
 
 #include <com/sun/star/text/XPageCursor.hpp>
 #include <com/sun/star/text/SizeType.hpp>
@@ -1826,6 +1827,30 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordTableGridProportional)
     assertXPath(pXmlDoc, "/root/page[1]/body/tab/row/cell/txt/infos/bounds", "height", u"936");
     // The same proportional paragraph outside the table keeps normal spacing.
     assertXPath(pXmlDoc, "/root/page[1]/body/txt/infos/bounds", "height", u"1248");
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordBodyGridProportional)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    const OUString aValue = u"1"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    osl_setEnvironment(aName.pData, aValue.pData);
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    createSwDoc("word-body-grid-proportional.docx");
+    auto pXmlDoc = parseLayoutDump();
+    // 18pt text occupies two 312-twip grid rows. Mac Word retains
+    // that 31.2pt pitch even with explicit 150% line spacing.
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[1]/infos/bounds", "height", u"1872");
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[2]/infos/bounds", "height", u"1872");
+    // Empty paragraphs use the same grid multiple, without extra leading.
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[3]/infos/bounds", "height", u"624");
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[4]/infos/bounds", "height", u"624");
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf166652)

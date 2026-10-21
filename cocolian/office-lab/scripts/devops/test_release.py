@@ -16,6 +16,17 @@ class ReleaseTests(unittest.TestCase):
   self.assertTrue(r.needs_online(['browser/src/control/Control.Toolbar.js']))
   self.assertTrue(r.needs_online(['browser/images/arrow.png']))
   self.assertFalse(r.needs_online(['engine/sw/a.cxx','cocolian/office-lab/scripts/devops/watch.py']))
+ def test_private_font_hash_gate(self):
+  import hashlib
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);source=root/'private';source.mkdir();(source/'font.ttf').write_bytes(b'approved font')
+   manifest={'fonts':[{'file':'font.ttf','sha256':hashlib.sha256(b'approved font').hexdigest()}]}
+   self.assertEqual(r.stage_office_fonts(root/'valid',source,manifest),1)
+   (source/'font.ttf').write_bytes(b'changed font')
+   with self.assertRaisesRegex(RuntimeError,'hash mismatch'):r.stage_office_fonts(root/'changed',source,manifest)
+   (source/'font.ttf').unlink()
+   with self.assertRaisesRegex(RuntimeError,'missing'):r.stage_office_fonts(root/'missing',source,manifest)
+
  def test_failure_restores_templates(self):
   template={'spec':{'containers':[{'image':'old','imagePullPolicy':'IfNotPresent'}]}}
   old={name:{'spec':{'template':copy.deepcopy(template)}} for name in ('one','two')}
