@@ -1838,7 +1838,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordTableGridProportional)
 // Generate minimal regression input in a temporary ZIP. No DOCX samples or
 // downloaded government documents are stored in the source repository.
 static void makeWordMacPackage(utl::TempFileNamed& rFile, bool bBodyGrid,
-                               bool bExplicitParagraphDefaults)
+                               bool bExplicitParagraphDefaults, bool bManualPageBreak = false)
 {
     auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
         ZIP_STORAGE_FORMAT_STRING, rFile.GetURL(), embed::ElementModes::READWRITE);
@@ -1874,6 +1874,8 @@ static void makeWordMacPackage(utl::TempFileNamed& rFile, bool bBodyGrid,
         ? R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="36"/></w:rPr><w:t>First line</w:t><w:br/><w:t>Second line</w:t><w:br/><w:t>Third line</w:t></w:r>)xml"_ostr
         : R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="32"/></w:rPr><w:t>Paragraph defaults</w:t></w:r>)xml"_ostr;
     OString aParagraph = "<w:p>"_ostr + aProperties + aRun + "</w:p>"_ostr;
+    if (bManualPageBreak)
+        aParagraph += R"xml(<w:p><w:pPr><w:pageBreakBefore w:val="0"/><w:spacing w:line="600" w:lineRule="exact"/></w:pPr><w:r><w:br w:type="page"/></w:r><w:r><w:t>Second page</w:t></w:r></w:p>)xml"_ostr;
     if (bBodyGrid)
         aParagraph = aParagraph + aParagraph + "<w:p>"_ostr + aProperties
             + "</w:p><w:p>"_ostr + aProperties + "</w:p>"_ostr;
@@ -1884,6 +1886,18 @@ static void makeWordMacPackage(utl::TempFileNamed& rFile, bool bBodyGrid,
         R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
     uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
     uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordManualPageBreakOverridesParagraphDefault)
+{
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, false, true, true);
+    loadFromURL(aFile.GetURL());
+    // pageBreakBefore=false controls the paragraph's automatic break, not
+    // an explicit page break inside a run. Word places this text on page 2.
+    CPPUNIT_ASSERT_EQUAL(2, getPages());
+    assertXPathContent(parseLayoutDump(), "/root/page[2]/body/txt[1]", u"Second page");
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordBodyGridProportional)
