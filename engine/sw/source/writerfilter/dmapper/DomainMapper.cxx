@@ -4918,6 +4918,10 @@ void DomainMapper::lcl_utext(const sal_Unicode *const data_, size_t len)
                         }
                     }
                     m_pImpl->GetTopContext()->Insert(PROP_BREAK_TYPE, cpo::uno::Any(style::BreakType_PAGE_BEFORE));
+                    // An explicit run break must also override pageBreakBefore=false
+                    // in the paragraph context; merging that context otherwise loses it.
+                    m_pImpl->GetTopContextOfType(CONTEXT_PARAGRAPH)->Insert(
+                        PROP_BREAK_TYPE, cpo::uno::Any(style::BreakType_PAGE_BEFORE));
                 }
                 else if (m_pImpl->isBreakDeferred(COLUMN_BREAK))
                 {
