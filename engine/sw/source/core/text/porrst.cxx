@@ -500,6 +500,19 @@ bool SwTextFrame::FormatEmpty()
                 nHeight = sw::WordMacGridHeight(nHeight, getRootFrame()->GetCurrShell()->GetRefDev(),
                     GetDoc().getIDocumentSettingAccess().get(DocumentSettingId::ADD_EXT_LEADING));
                 nHeight = ((nHeight + nPitch - 1) / nPitch) * nPitch;
+                if (IsInTab() && !GetNext() && nHeight == nPitch
+                    && GetDoc().getIDocumentSettingAccess().get(
+                        DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT))
+                {
+                    const SvxLineSpacingItem& rSpace = aSet.GetLineSpacing();
+                    if (rSpace.GetLineSpaceRule() == SvxLineSpaceRule::Auto
+                        && rSpace.GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop)
+                    {
+                        // There is no following paragraph to carry the line gap.
+                        // Word includes it in an empty paragraph at the cell end.
+                        nHeight = nHeight * std::max<sal_uInt16>(100, rSpace.GetPropLineSpace()) / 100;
+                    }
+                }
             }
             else
                 nHeight = nPitch;

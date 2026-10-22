@@ -2332,6 +2332,19 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             }
         }
 
+        const bool bMacTableProportionalGrid = sw::UseWordMacMetrics()
+            && m_pFrame->IsInTab() && nAmpRatio == 1
+            && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+            && pSpace && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
+            && pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop;
+        if (bMacTableProportionalGrid)
+        {
+            // Table cells include proportional leading in the first line too.
+            // Center the glyph in that full pitch, instead of adding a gap above
+            // later lines and leaving the first line at the unscaled grid pitch.
+            nLineHeight = nLineHeight * std::max<sal_uInt16>(100, pSpace->GetPropLineSpace()) / 100;
+        }
+
         const SwTwips nAsc = m_pCurr->GetAscent() +
                       ( bRubyTop ?
                        ( nLineHeight - m_pCurr->Height() + nRubyHeight ) / 2 :
@@ -2341,14 +2354,13 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
         m_pCurr->SetAscent( nAsc );
         m_pInf->GetParaPortion()->SetFixLineHeight();
 
-        // Word table cells already use the document grid as their line pitch.
-        // Applying proportional spacing to the snapped height again stretches
-        // a 1.5-line table to 150% of Word's height and changes page breaks.
-        // Word body text spanning multiple grid rows also ignores proportional
-        // leading; single-grid-row body text and ODF retain their spacing.
+        // Mac Word ignores proportional leading only when text spans multiple
+        // grid rows. Text fitting one row retains its multiplier in both body
+        // paragraphs and table cells. Keep the legacy table rule off-profile.
         const bool bWordTableGrid
-            = (m_pFrame->IsInTab() || (sw::UseWordMacMetrics() && nAmpRatio > 1))
-              && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS);
+            = bMacTableProportionalGrid
+              || ((sw::UseWordMacMetrics() ? nAmpRatio > 1 : m_pFrame->IsInTab())
+                  && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS));
         if ( !bWordTableGrid && !IsParaLine() && pSpace &&
              SvxInterLineSpaceRule::Prop == pSpace->GetInterLineSpaceRule() )
         {

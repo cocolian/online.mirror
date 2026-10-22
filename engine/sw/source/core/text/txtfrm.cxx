@@ -4001,6 +4001,15 @@ tools::Long SwTextFrame::GetLineSpace( const bool _bNoPropLineSpace ) const
             {
                 if (const auto* pGrid = GetGridItem(FindPageFrame()))
                 {
+                    if (IsInTab() && GetText().isEmpty() && !GetNext()
+                        && rSpace.GetLineSpaceRule() == SvxLineSpaceRule::Auto
+                        && GetDoc().getIDocumentSettingAccess().get(
+                            DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT))
+                    {
+                        // FormatEmpty already includes the cell's trailing gap.
+                        nRet = 0;
+                        break;
+                    }
                     const SwTwips nPitch = pGrid->GetBaseHeight() + pGrid->GetRubyHeight();
                     if (HasPara())
                     {

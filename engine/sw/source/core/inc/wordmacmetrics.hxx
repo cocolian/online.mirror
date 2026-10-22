@@ -21,16 +21,26 @@ inline bool UseWordMacMetrics()
 // Actual Mac Word PDF exports of both genuine GB2312 fonts use a
 // nominal 1.3-em single-line pitch (21 sizes/spacing combinations each).
 // Other fonts retain the existing font-table metrics.
+inline bool IsWordMacGbFont(const vcl::Font& rFont)
+{
+    const OUString& rFamily = rFont.GetFamilyName();
+    return rFamily.equalsIgnoreAsciiCase(u"FangSong_GB2312")
+        || rFamily.equalsIgnoreAsciiCase(u"KaiTi_GB2312")
+        || rFamily == u"仿宋_GB2312" || rFamily == u"楷体_GB2312";
+}
 inline tools::Long WordMacGbFontHeight(const OutputDevice& rDev)
 {
-    if (!UseWordMacMetrics())
+    return UseWordMacMetrics() && IsWordMacGbFont(rDev.GetFont())
+        ? rDev.GetFont().GetFontSize().Height() * 130 / 100 : 0;
+}
+inline double WordMacGbBoldAdvance(const vcl::Font& rFont)
+{
+    if (!UseWordMacMetrics() || !IsWordMacGbFont(rFont)
+        || rFont.GetWeight() < WEIGHT_SEMIBOLD)
         return 0;
-    const OUString& rFamily = rDev.GetFont().GetFamilyName();
-    if (rFamily.equalsIgnoreAsciiCase(u"FangSong_GB2312")
-        || rFamily.equalsIgnoreAsciiCase(u"KaiTi_GB2312")
-        || rFamily == u"仿宋_GB2312" || rFamily == u"楷体_GB2312")
-        return rDev.GetFont().GetFontSize().Height() * 130 / 100;
-    return 0;
+    // Mac Word synthetic bold adds 40/2048 em to visible GB2312 glyphs.
+    // Seven sizes, both font families: 12pt -> 12.234pt CJK advance.
+    return rFont.GetFontSize().Height() * 5.0 / 256;
 }
 inline tools::Long WordMacGridHeight(tools::Long nHeight, const OutputDevice& rDev,
                                      bool bAddExternalLeading)

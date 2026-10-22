@@ -61,6 +61,7 @@
 #include <o3tl/hash_combine.hxx>
 #include <cstdint>
 #include <memory>
+#include <unicode/uchar.h>
 #include "justify.hxx"
 #include <svtools/colorcfg.hxx>
 #include <basegfx/color/bcolortools.hxx>
@@ -274,7 +275,7 @@ static void lcl_calcLinePos( const CalcLinePosData &rData,
 // coverage for certain specific CJK code pages, even when that font isn't used for CJK
 // text. Apply this scale when necessary.
 static sal_uInt16 lcl_ApplyCjkHeightAdjustment(sal_uInt16 nBase, const SwViewShell* pSh,
-                                               const OutputDevice& rDev)
+                                               const OutputDevice& rDev, bool bAscent = false)
 {
     if (!pSh || !pSh->getIDocumentSettingAccess().get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS))
     {
@@ -292,7 +293,13 @@ static sal_uInt16 lcl_ApplyCjkHeightAdjustment(sal_uInt16 nBase, const SwViewShe
             const tools::Long nMacHeight = sw::WordMacGbFontHeight(rDev);
             const tools::Long nRawHeight = rDev.GetTextHeight();
             if (nMacHeight > 0 && nRawHeight > 0)
+            {
+                // Mac Word centers the added line leading around the glyph.
+                // Scaling the ascent as well would put GB2312 baselines too low.
+                if (bAscent)
+                    return nBase + (nMacHeight - nRawHeight) / 2;
                 return (nBase * nMacHeight) / nRawHeight;
+            }
             return (nBase * 127) / 100;
         }
     }
@@ -329,7 +336,7 @@ sal_uInt16 SwFntObj::GetFontAscent( const SwViewShell *pSh, const OutputDevice& 
         nRet = m_nPrtAscent;
     }
 
-    nRet = lcl_ApplyCjkHeightAdjustment(nRet, pSh, rRefDev);
+    nRet = lcl_ApplyCjkHeightAdjustment(nRet, pSh, rRefDev, true);
 
 #if !defined(MACOSX) // #i89844# extleading is below the line for Mac
     // TODO: move extleading below the line for all platforms too
@@ -819,6 +826,23 @@ static void GetTextArray(const SwDrawTextInfo& rExtraInf, const OutputDevice& rD
         (void)rDevice.GetTextArray(rStr, &rDXAry, nIndex, nLen, bCaret, layoutCache, pLayoutCache, &oBounds);
     }
 
+    const double nBoldAdvance = sw::WordMacGbBoldAdvance(rDevice.GetFont());
+    if (nBoldAdvance > 0)
+    {
+        double nPrevious = 0;
+        double nExtra = 0;
+        for (size_t i = 0; i < rDXAry.size(); ++i)
+        {
+            const double nOriginal = rDXAry[i];
+            // Count a shaped cluster once. Spaces have no emboldened outline
+            // and retain their original advance, as in the Mac Word export.
+            if (nOriginal != nPrevious && !u_isUWhiteSpace(rStr[nIndex + static_cast<sal_Int32>(i)]))
+                nExtra += nBoldAdvance;
+            rDXAry[i] += nExtra;
+            nPrevious = nOriginal;
+        }
+    }
+
     if (oBounds.has_value())
     {
         if (nMaxAscent)
@@ -937,7 +961,8 @@ void SwFntObj::DrawText( SwDrawTextInfo &rInf )
 
     // bDirectPrint indicates that we can enter the branch which calls
     // the DrawText functions instead of calling the DrawTextArray functions
-    const bool bDirectPrint = bPrt || bBrowse;
+    const bool bDirectPrint = (bPrt || bBrowse)
+        && sw::WordMacGbBoldAdvance(m_aFont) == 0;
 
     // Condition for output font / refdev font adjustment
     const bool bUseScrFont =
@@ -2277,6 +2302,15 @@ TextFrameIndex SwFont::GetTextBreak(SwDrawTextInfo const & rInf, tools::Long nTe
                              sal_Int32(nTmpLen), rInf.GetLayoutContext(), nullptr, nullptr, false,
                              rInf.GetVclCache());
             }
+        }
+
+        if (sw::WordMacGbBoldAdvance(GetActualFont()) > 0 && aKernArray.empty())
+        {
+            // Use the same fractional advances for line breaking as for
+            // measurement, painting and cursor positioning.
+            GetTextArray(rInf, rInf.GetOut(), *pTmpText, aKernArray,
+                         sal_Int32(nTmpIdx), sal_Int32(nTmpLen), rInf.GetLayoutContext(),
+                         nullptr, nullptr, false, rInf.GetVclCache());
         }
 
         if( rInf.GetHyphPos() ) {
