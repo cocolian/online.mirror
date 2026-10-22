@@ -25,11 +25,12 @@ class ReleaseTests(unittest.TestCase):
    os.utime(repo/'changed.cxx',(1,1))
    (cache/'source/changed.cxx').write_text('old source')
    (cache/'devops-source-files.json').write_text('["changed.cxx"]')
-   before=time.time()
+   object_time=time.time()-60
+   os.utime(cache/'source/changed.cxx',(object_time,object_time))
    with patch.object(r,'CACHE',cache),patch.object(r,'git',return_value='changed.cxx\x00'):
     r.sync_source(repo)
    self.assertEqual((cache/'source/changed.cxx').read_text(),'new source')
-   self.assertGreaterEqual((cache/'source/changed.cxx').stat().st_mtime,before)
+   self.assertGreater((cache/'source/changed.cxx').stat().st_mtime,object_time)
 
  def test_private_font_hash_gate(self):
   import hashlib
