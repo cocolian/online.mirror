@@ -44,14 +44,18 @@ def sync_source(repo):
   equal=False
   if src.is_symlink():equal=dst.is_symlink() and os.readlink(src)==os.readlink(dst)
   elif dst.is_file() and not dst.is_symlink() and src.stat().st_size==dst.stat().st_size:
-   equal=hashlib.file_digest(src.open('rb'),'sha256').digest()==hashlib.file_digest(dst.open('rb'),'sha256').digest()
+   with src.open('rb') as source_stream,dst.open('rb') as target_stream:
+    equal=hashlib.file_digest(source_stream,'sha256').digest()==hashlib.file_digest(target_stream,'sha256').digest()
   if equal:
    if not src.is_symlink():os.chmod(dst,src.stat().st_mode & 0o777)
    continue
   dst.parent.mkdir(parents=True,exist_ok=True)
   if dst.is_symlink() or (src.is_symlink() and dst.exists()):dst.unlink()
   if src.is_symlink():dst.symlink_to(os.readlink(src))
-  else:shutil.copy2(src,dst)
+  else:
+   shutil.copy2(src,dst)
+   # Checkout timestamps may predate cached objects. Changed inputs must rebuild.
+   os.utime(dst,None)
   copied+=1
  dump(manifest,names);print('Tracked source files synchronized:',copied,flush=True)
 
@@ -64,7 +68,7 @@ def compile_source(repo,engine,online):
  commands=['set -euo pipefail','export CCACHE_DIR=/workspace/cache/ccache','export CCACHE_MAXSIZE=8G']
  if engine:
   commands += ['cd /workspace/engine','make -j3 build',
-   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordImportTypography testWordTableGridProportional testTdf144450 testTdf167583"']
+   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"']
  if online:commands += ['cd /workspace/source','make -j3','DESTDIR=/workspace/stage make install']
  run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus','3','--memory','12g','--user','1000:1000',
       '-v',str(CACHE)+':/workspace','-v',str(HOME/'projects/cocolian-office/artifacts/render-fidelity-20261019/qa-fonts')+':/usr/local/share/fonts/fidelity-test:ro',
@@ -112,6 +116,21 @@ def select_targets(heads,previous):
  # A manual --force run with identical heads rebuilds all modules.
  return {n:c for n,c in TARGETS.items() if n in (selected or set(TARGETS))}
 
+def stage_office_fonts(destination,source=None,manifest=None):
+ # Font binaries stay in private server storage; Git pins only their hashes.
+ source=source or HOME/'.local/share/cocolian-devops/fonts/office'
+ manifest=manifest or json.loads(Path(__file__).with_name('office-fonts-manifest.json').read_text())
+ destination.mkdir()
+ for item in manifest['fonts']:
+  name=item['file']
+  if Path(name).name!=name:raise RuntimeError('Invalid font filename')
+  font=source/name
+  if not font.is_file():raise RuntimeError('Private Office font missing: '+name)
+  with font.open('rb') as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
+  if actual!=item['sha256']:raise RuntimeError('Private Office font hash mismatch: '+name)
+  shutil.copy2(font,destination/name)
+ return len(manifest['fonts'])
+
 def build_images(paths,heads,old,out,engine,online,targets):
  context=out/'context';context.mkdir();outer=paths['cocolian-office']/'deploy/source-build'
  if 'wopi' in targets:
@@ -119,6 +138,7 @@ def build_images(paths,heads,old,out,engine,online,targets):
   for source in (context/'portal').glob('*.py'):compile(source.read_text(),str(source),'exec')
   for test in (paths['cocolian']/'apps/office-portal').glob('test_*.py'):run([sys.executable,test],cwd=test.parent)
  if set(targets)-{'wopi'}:
+  stage_office_fonts(context/'office-fonts')
   for name in ('word-mac-fontconfig.xml','editor-aids.css','editor-aids.xcd','source-conversion-service.py'):
    shutil.copy2(outer/name,context/name)
  if engine:shutil.copytree(CACHE/'engine/instdir',context/'engine',symlinks=True)
@@ -131,6 +151,10 @@ def build_images(paths,heads,old,out,engine,online,targets):
   lines=['ARG BASE','FROM ${BASE}','USER root']
   if deployment=='wopi':lines += ['COPY portal/ /app/','RUN chmod -R a+rX /app','USER 1000:1000']
   else:
+   lines += ['COPY --chmod=644 office-fonts/ /usr/local/share/fonts/word-mac/',
+    'COPY --chmod=644 word-mac-fontconfig.xml /etc/fonts/word-mac-fontconfig.xml',
+    'ENV FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml COCOLIAN_WORD_MAC_METRICS=1',
+    'RUN chmod -R a+rX /usr/local/share/fonts/word-mac && fc-cache -f']
    if engine:lines += ['COPY engine/ /opt/collaboraoffice/']
    if deployment=='libreoffice':lines += ['COPY --chmod=755 source-conversion-service.py /usr/local/bin/source-conversion-service.py']
    else:
@@ -138,7 +162,6 @@ def build_images(paths,heads,old,out,engine,online,targets):
     lines += ['COPY --chmod=644 editor-aids.css /usr/share/coolwsd/browser/dist/editor-aids-20261020.css',
      'COPY --chmod=644 editor-aids.xcd /opt/collaboraoffice/share/registry/cocolian-editor-aids.xcd',
      '''RUN if ! grep -q 'editor-aids-20261020.css' /usr/share/coolwsd/browser/dist/cool.html; then sed -i 's|</head>|<link rel="stylesheet" href="%SERVICE_ROOT%/browser/%VERSION%/editor-aids-20261020.css"></head>|' /usr/share/coolwsd/browser/dist/cool.html; fi''']
-    if deployment=='collabora-wordmac':lines += ['COPY --chmod=644 word-mac-fontconfig.xml /etc/fonts/word-mac-fontconfig.xml']
     lines += ['RUN chmod -R a+rX /opt/collaboraoffice /usr/share/coolwsd && fc-cache -f && coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && chown -R 1001:1001 /opt/cool/systemplate']
    lines += ['RUN chmod -R a+rX /opt/collaboraoffice','USER 1001:1001']
   revision=heads['cocolian'] if deployment=='wopi' else heads['online.mirror']
@@ -166,9 +189,10 @@ def candidate(old,image,name):
  try:
   k('-n','office-lab','create','-f','-',input=json.dumps(pod).encode());created=True
   k('-n','office-lab','wait','--for=condition=Ready','pod/'+podname,'--timeout=240s',timeout=260)
-  if name=='collabora-wordmac':
-   font=k('-n','office-lab','exec',podname,'--','fc-match','FangSong_GB2312')
-   assert 'FangSong_GB2312' in font and 'YaHei' not in font,'Genuine FangSong font not selected'
+  if name!='wopi':
+   for family in ('FangSong_GB2312','KaiTi_GB2312','SimSun','Microsoft YaHei','FangSong','STZhongsong','Times New Roman'):
+    matched=k('-n','office-lab','exec',podname,'--','fc-match','-f','%{family[0]}',family)
+    assert matched==family,'Unexpected font substitution: '+family+' -> '+matched
   ip=json.loads(k('-n','office-lab','get','pod',podname,'-o','json'))['status']['podIP']
   script=Path(__file__).with_name('verify.py').read_bytes()
   k('-n','office-lab','exec','-i','deployment/wopi','-c','wopi','--','python3','-','--candidate',name,ip,input=script,timeout=120)

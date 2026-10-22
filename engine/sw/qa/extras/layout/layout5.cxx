@@ -8,6 +8,7 @@
  */
 
 #include <swmodeltestbase.hxx>
+#include <osl/process.h>
 
 #include <com/sun/star/text/XPageCursor.hpp>
 #include <com/sun/star/text/SizeType.hpp>
@@ -20,6 +21,11 @@
 #include <com/sun/star/view/XViewSettingsSupplier.hpp>
 
 #include <comphelper/kit.hxx>
+#include <comphelper/storagehelper.hxx>
+#include <com/sun/star/embed/XTransactedObject.hpp>
+#include <com/sun/star/embed/XStorage.hpp>
+#include <com/sun/star/io/XStream.hpp>
+#include <com/sun/star/io/XOutputStream.hpp>
 #include <comphelper/scopeguard.hxx>
 #include <unotools/syslocaleoptions.hxx>
 #include <editeng/unolingu.hxx>
@@ -1826,6 +1832,114 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordTableGridProportional)
     assertXPath(pXmlDoc, "/root/page[1]/body/tab/row/cell/txt/infos/bounds", "height", u"936");
     // The same proportional paragraph outside the table keeps normal spacing.
     assertXPath(pXmlDoc, "/root/page[1]/body/txt/infos/bounds", "height", u"1248");
+}
+
+
+// Generate minimal regression input in a temporary ZIP. No DOCX samples or
+// downloaded government documents are stored in the source repository.
+static void makeWordMacPackage(utl::TempFileNamed& rFile, bool bBodyGrid,
+                               bool bExplicitParagraphDefaults)
+{
+    auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+        ZIP_STORAGE_FORMAT_STRING, rFile.GetURL(), embed::ElementModes::READWRITE);
+    auto write = [](const uno::Reference<embed::XStorage>& xStorage,
+                    const OUString& rName, const OString& rContent) {
+        auto xStream = xStorage->openStreamElement(rName, embed::ElementModes::WRITE);
+        auto xOutput = xStream->getOutputStream();
+        xOutput->writeBytes(uno::Sequence<sal_Int8>(
+            reinterpret_cast<const sal_Int8*>(rContent.getStr()), rContent.getLength()));
+        xOutput->closeOutput();
+    };
+    write(xRoot, u"[Content_Types].xml"_ustr,
+        R"xml(<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>)xml"_ostr);
+    auto xRels = xRoot->openStorageElement(u"_rels"_ustr, embed::ElementModes::WRITE);
+    write(xRels, u".rels"_ustr,
+        R"xml(<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>)xml"_ostr);
+    uno::Reference<embed::XTransactedObject>(xRels, uno::UNO_QUERY_THROW)->commit();
+    auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+    auto xWordRels = xWord->openStorageElement(u"_rels"_ustr, embed::ElementModes::WRITE);
+    write(xWordRels, u"document.xml.rels"_ustr,
+        R"xml(<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>)xml"_ostr);
+    uno::Reference<embed::XTransactedObject>(xWordRels, uno::UNO_QUERY_THROW)->commit();
+    OString aDefaults = bExplicitParagraphDefaults
+        ? R"xml(<w:pPrDefault><w:pPr><w:spacing w:after="0"/></w:pPr></w:pPrDefault>)xml"_ostr
+        : OString();
+    write(xWord, u"styles.xml"_ustr,
+        R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif" w:hAnsi="Liberation Serif" w:cs="Liberation Serif"/></w:rPr></w:rPrDefault>)xml"_ostr
+        + aDefaults + R"xml(</w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>)xml"_ostr);
+    OString aProperties = bBodyGrid
+        ? R"xml(<w:pPr><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:snapToGrid/><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="36"/></w:rPr></w:pPr>)xml"_ostr
+        : R"xml(<w:pPr><w:spacing w:line="600" w:lineRule="exact"/></w:pPr>)xml"_ostr;
+    OString aRun = bBodyGrid
+        ? R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="36"/></w:rPr><w:t>First line</w:t><w:br/><w:t>Second line</w:t><w:br/><w:t>Third line</w:t></w:r>)xml"_ostr
+        : R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="32"/></w:rPr><w:t>Paragraph defaults</w:t></w:r>)xml"_ostr;
+    OString aParagraph = "<w:p>"_ostr + aProperties + aRun + "</w:p>"_ostr;
+    if (bBodyGrid)
+        aParagraph = aParagraph + aParagraph + "<w:p>"_ostr + aProperties
+            + "</w:p><w:p>"_ostr + aProperties + "</w:p>"_ostr;
+    write(xWord, u"document.xml"_ustr,
+        R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>)xml"_ostr
+        + aParagraph + R"xml(<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+    write(xWord, u"settings.xml"_ustr,
+        R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+    uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+    uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordBodyGridProportional)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    const OUString aValue = u"1"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    osl_setEnvironment(aName.pData, aValue.pData);
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, true, true);
+    loadFromURL(aFile.GetURL());
+    auto pXmlDoc = parseLayoutDump();
+    // 18pt text occupies two 312-twip grid rows. Mac Word retains
+    // that 31.2pt pitch even with explicit 150% line spacing.
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[1]/infos/bounds", "height", u"1872");
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[2]/infos/bounds", "height", u"1872");
+    // Empty paragraphs use the same grid multiple, without extra leading.
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[3]/infos/bounds", "height", u"624");
+    assertXPath(pXmlDoc, "/root/page[1]/body/txt[4]/infos/bounds", "height", u"624");
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacMissingParagraphDefaults)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, false, false);
+    const OUString aOff = u"0"_ustr;
+    osl_setEnvironment(aName.pData, aOff.pData);
+    loadFromURL(aFile.GetURL());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), getProperty<sal_Int32>(getParagraph(1), u"ParaBottomMargin"_ustr));
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    loadFromURL(aFile.GetURL());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(282), getProperty<sal_Int32>(getParagraph(1), u"ParaBottomMargin"_ustr));
+    utl::TempFileNamed aExplicitFile;
+    aExplicitFile.EnableKillingFile();
+    makeWordMacPackage(aExplicitFile, false, true);
+    loadFromURL(aExplicitFile.GetURL());
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), getProperty<sal_Int32>(getParagraph(1), u"ParaBottomMargin"_ustr));
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf166652)

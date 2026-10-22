@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
 #include <editeng/lspcitem.hxx>
 #include <editeng/adjustitem.hxx>
 #include <editeng/escapementitem.hxx>
@@ -490,8 +491,19 @@ bool SwTextFrame::FormatEmpty()
             IsInDocBody() )
     {
         SwTextGridItem const*const pGrid(GetGridItem(FindPageFrame()));
-        if ( pGrid )
-            nHeight = pGrid->GetBaseHeight() + pGrid->GetRubyHeight();
+        if (pGrid)
+        {
+            const SwTwips nPitch = pGrid->GetBaseHeight() + pGrid->GetRubyHeight();
+            if (sw::UseWordMacMetrics() && nPitch > 0 && GetDoc().getIDocumentSettingAccess().get(
+                    DocumentSettingId::MS_WORD_COMP_GRID_METRICS))
+            {
+                nHeight = sw::WordMacGridHeight(nHeight, getRootFrame()->GetCurrShell()->GetRefDev(),
+                    GetDoc().getIDocumentSettingAccess().get(DocumentSettingId::ADD_EXT_LEADING));
+                nHeight = ((nHeight + nPitch - 1) / nPitch) * nPitch;
+            }
+            else
+                nHeight = nPitch;
+        }
     }
 
     SwRectFnSet aRectFnSet(*this);
