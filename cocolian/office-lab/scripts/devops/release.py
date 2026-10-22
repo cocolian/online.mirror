@@ -59,7 +59,7 @@ def sync_source(repo):
   copied+=1
  dump(manifest,names);print('Tracked source files synchronized:',copied,flush=True)
 
-def compile_source(repo,engine,online):
+def compile_source(repo,engine,online,office_config):
  # This cache is shared with manual builds: never run two make processes in it.
  processes=run(['ps','-eo','comm,args'])
  if any(line.split(None,1)[0] in ('make','gmake','ninja') for line in processes.splitlines() if line.split()):
@@ -68,11 +68,24 @@ def compile_source(repo,engine,online):
  commands=['set -euo pipefail','export CCACHE_DIR=/workspace/cache/ccache','export CCACHE_MAXSIZE=8G']
  if engine:
   commands += ['cd /workspace/engine','make -j3 build',
-   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"']
+   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
+   'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log']
  if online:commands += ['cd /workspace/source','make -j3','DESTDIR=/workspace/stage make install']
  run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus','3','--memory','12g','--user','1000:1000',
       '-v',str(CACHE)+':/workspace','-v',str(HOME/'projects/cocolian-office/artifacts/render-fidelity-20261019/qa-fonts')+':/usr/local/share/fonts/fidelity-test:ro',
       BUILDER,'bash','-lc','\n'.join(commands)],timeout=18000)
+
+ if engine:
+  # Only this real-font test allows fonts outside the bundled QA set. The
+  # private font hashes are also gated before image creation and deployment.
+  run(['docker','run','--rm','--name','cocolian-devops-gb-font-test','--network','none',
+       '--cpus','3','--memory','12g','--user','1000:1000','-v',str(CACHE)+':/workspace',
+       '-v',str(HOME/'.local/share/cocolian-devops/fonts/office')+':/usr/local/share/fonts/word-mac:ro',
+       '-v',str(office_config/'deploy/source-build/word-mac-fontconfig.xml')+':/etc/fonts/word-mac-fontconfig.xml:ro',
+       '-e','FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml','-e','NON_APPLICATION_FONT_USE=allow',
+       '-e','CCACHE_DIR=/workspace/cache/ccache',BUILDER,'bash','-lc',
+       'cd /workspace/engine && make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacGbBoldTableWrap" '
+       '&& cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-gb-font-tests.log'],timeout=1200)
 
 def registry_transport():
  config=json.loads((HOME/'.config/cocolian-devops/config.json').read_text())
@@ -250,7 +263,7 @@ def main():
  cache_changes=source_changes(paths['online.mirror'],last['online.mirror'],heads['online.mirror'])
  with (CACHE/'devops-build.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
-  if set(targets)-{'wopi'} and (needs_engine(cache_changes) or needs_online(cache_changes)):compile_source(paths['online.mirror'],needs_engine(cache_changes),needs_online(cache_changes))
+  if set(targets)-{'wopi'} and (needs_engine(cache_changes) or needs_online(cache_changes)):compile_source(paths['online.mirror'],needs_engine(cache_changes),needs_online(cache_changes),paths['cocolian-office'])
   if set(targets)-{'wopi'}:dump(built,{'online.mirror':heads['online.mirror']})
   images=build_images(paths,heads,old,out,engine,online,targets)
  dump(out/'images.json',images)

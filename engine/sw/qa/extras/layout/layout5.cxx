@@ -1838,7 +1838,8 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordTableGridProportional)
 // Generate minimal regression input in a temporary ZIP. No DOCX samples or
 // downloaded government documents are stored in the source repository.
 static void makeWordMacPackage(utl::TempFileNamed& rFile, bool bBodyGrid,
-                               bool bExplicitParagraphDefaults, bool bManualPageBreak = false)
+                               bool bExplicitParagraphDefaults, bool bManualPageBreak = false,
+                               bool bSmallGridTable = false, bool bNarrowBoldTable = false)
 {
     auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
         ZIP_STORAGE_FORMAT_STRING, rFile.GetURL(), embed::ElementModes::READWRITE);
@@ -1873,17 +1874,27 @@ static void makeWordMacPackage(utl::TempFileNamed& rFile, bool bBodyGrid,
     OString aRun = bBodyGrid
         ? R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="36"/></w:rPr><w:t>First line</w:t><w:br/><w:t>Second line</w:t><w:br/><w:t>Third line</w:t></w:r>)xml"_ostr
         : R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:eastAsia="Liberation Serif"/><w:sz w:val="32"/></w:rPr><w:t>Paragraph defaults</w:t></w:r>)xml"_ostr;
+    if (bSmallGridTable)
+    {
+        aProperties = aProperties.replaceAll("w:val=\"36\""_ostr, "w:val=\"24\""_ostr);
+        aRun = aRun.replaceAll("w:val=\"36\""_ostr, "w:val=\"24\""_ostr);
+    }
     OString aParagraph = "<w:p>"_ostr + aProperties + aRun + "</w:p>"_ostr;
     if (bManualPageBreak)
         aParagraph += R"xml(<w:p><w:pPr><w:pageBreakBefore w:val="0"/><w:spacing w:line="600" w:lineRule="exact"/></w:pPr><w:r><w:br w:type="page"/></w:r><w:r><w:t>Second page</w:t></w:r></w:p>)xml"_ostr;
-    if (bBodyGrid)
+    if (bBodyGrid && !bSmallGridTable)
         aParagraph = aParagraph + aParagraph + "<w:p>"_ostr + aProperties
             + "</w:p><w:p>"_ostr + aProperties + "</w:p>"_ostr;
+    if (bSmallGridTable)
+        aParagraph = R"xml(<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="9026"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="9026" w:type="dxa"/></w:tcPr>)xml"_ostr
+            + aParagraph + "<w:p>"_ostr + aProperties + "</w:p></w:tc></w:tr></w:tbl>"_ostr;
+    if (bNarrowBoldTable)
+        aParagraph = R"xml(<w:tbl><w:tblPr><w:tblW w:w="698" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="698"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="698" w:type="dxa"/><w:tcBorders><w:left w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="FangSong_GB2312" w:hAnsi="FangSong_GB2312" w:eastAsia="FangSong_GB2312"/><w:sz w:val="24"/><w:b/></w:rPr><w:t>架构维度</w:t></w:r></w:p></w:tc></w:tr></w:tbl>)xml"_ostr;
     write(xWord, u"document.xml"_ustr,
         R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>)xml"_ostr
         + aParagraph + R"xml(<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
     write(xWord, u"settings.xml"_ustr,
-        R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+        R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:adjustLineHeightInTable/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
     uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
     uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
 }
@@ -1898,6 +1909,59 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordManualPageBreakOverridesParagraphD
     // an explicit page break inside a run. Word places this text on page 2.
     CPPUNIT_ASSERT_EQUAL(2, getPages());
     assertXPathContent(parseLayoutDump(), "/root/page[2]/body/txt[1]", u"Second page");
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacGbBoldTableWrap)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, false, true, false, false, true);
+    const OUString aOff = u"0"_ustr;
+    osl_setEnvironment(aName.pData, aOff.pData);
+    loadFromURL(aFile.GetURL());
+    assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout", 2);
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    loadFromURL(aFile.GetURL());
+    // Genuine 12pt GB2312 synthetic bold advances by 12.234pt in Mac Word.
+    // Two characters no longer fit the 24.1pt cell edit area.
+    assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout", 4);
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacSmallTableGridProportional)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, true, true, false, true);
+    const OUString aOff = u"0"_ustr;
+    osl_setEnvironment(aName.pData, aOff.pData);
+    loadFromURL(aFile.GetURL());
+    assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt[1]/infos/bounds", "height", u"936");
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    loadFromURL(aFile.GetURL());
+    // Mac Word applies 150% spacing to text fitting one grid row, even in
+    // tables: all three lines occupy 468 twips, including the first line.
+    assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt[1]/infos/bounds", "height", u"1404");
+    assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt[2]/infos/bounds", "height", u"468");
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordBodyGridProportional)
