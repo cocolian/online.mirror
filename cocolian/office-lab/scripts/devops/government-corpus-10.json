@@ -1,0 +1,471 @@
+{
+  "status": "not_accepted",
+  "reference": "Microsoft Word 16.114 local Best for printing PDF export",
+  "date": "2026-10-22",
+  "word_reference_pages": 90,
+  "documents": [
+    {
+      "id": "commerce-1",
+      "title": "现代商贸流通体系试点城市实施方案编制提纲.docx",
+      "source_page": "https://ltfzs.mofcom.gov.cn/zcfg/art/2024/art_cc468fe18eb745eb98c799005e36ab5c.html",
+      "url": "https://ltfzs.mofcom.gov.cn/cms_files/oldfile//ltfzs/202404/20240429092312813.docx",
+      "bytes": 27146,
+      "sha256": "e3cf243b5a8a582f91e97a61f0c98e925ba3fbd427c0821980ae43a216be82d0",
+      "candidate_pages": 10,
+      "word_pages": 10,
+      "original_unchanged": true
+    },
+    {
+      "id": "wuhan-manager-1",
+      "title": "武汉市技术经理人事务所备案申报书.docx",
+      "source_page": "https://kjj.wuhan.gov.cn/wmfw/fwsx/cxptrdygl/sbsyb_18407/202511/t20251117_2679026.shtml",
+      "url": "https://kjj.wuhan.gov.cn/wmfw/fwsx/cxptrdygl/sbsyb_18407/202511/P020251117583196153538.docx",
+      "bytes": 36768,
+      "sha256": "c3ab14f3ac0e3e4a80b10184b7872a8b5cf2af674a18a290f78ef23a44a525b9",
+      "candidate_pages": 7,
+      "word_pages": 8,
+      "original_unchanged": true
+    },
+    {
+      "id": "sz-major-1",
+      "title": "附件1：2025年度深圳市承接国家重大科技项目申请指南.docx",
+      "source_page": "https://stic.sz.gov.cn/xxgk/tzgg/content/post_11411929.html",
+      "url": "https://stic.sz.gov.cn/attachment/1/1464/1464681/11411929.docx",
+      "bytes": 33849,
+      "sha256": "1d32ac86790fe1b801fe90e04acf78fa0c62cc9203d3b513a2c49041f589a9ed",
+      "candidate_pages": 11,
+      "word_pages": 11,
+      "original_unchanged": true
+    },
+    {
+      "id": "shanwei-1",
+      "title": "1.汕尾市人工智能赋能交通运输高质量发展实施方案（征求意见稿）.docx",
+      "source_page": "https://www.shanwei.gov.cn/swjtysj/zwgk/tzgg/content/post_1260764.html",
+      "url": "http://www.shanwei.gov.cn/attachment/0/86/86113/1260764.docx",
+      "bytes": 31392,
+      "sha256": "67ff7d2213ad3de13b66ad4b6fee54928f42771ff9a72d295e91baf574fe754b",
+      "candidate_pages": 5,
+      "word_pages": 5,
+      "original_unchanged": true
+    },
+    {
+      "id": "shanwei-2",
+      "title": "2.重点实施的“人工智能+交通运输”应用场景清单.docx",
+      "source_page": "https://www.shanwei.gov.cn/swjtysj/zwgk/tzgg/content/post_1260764.html",
+      "url": "http://www.shanwei.gov.cn/attachment/0/86/86114/1260764.docx",
+      "bytes": 31929,
+      "sha256": "4d21ed054d3135f5c1cd6e93c1741bf699170c16336c30f326b599486939b16e",
+      "candidate_pages": 4,
+      "word_pages": 3,
+      "original_unchanged": true
+    },
+    {
+      "id": "wuhan-tech-1",
+      "title": "湖北省高新技术企业申报材料样式（2025）.docx",
+      "source_page": "https://www.wuhan.gov.cn/ztzl/ztfw/gxjsqysb/index.shtml",
+      "url": "https://www.wuhan.gov.cn/material/2024/image/gxjsqysb/湖北省高新技术企业申报材料样式（2025年）.docx",
+      "bytes": 44764,
+      "sha256": "22978f5e73bd2daf1eaa9bb2d097ac40a4b542a5512bd99abfb0b08179f166ff",
+      "candidate_pages": 26,
+      "word_pages": 24,
+      "original_unchanged": true
+    },
+    {
+      "id": "donghu-1",
+      "title": "附件1-2025年工业节能与绿色低碳转型项目申报指南.docx",
+      "source_page": "https://www.wehdz.gov.cn/2022/ggxw_68627/tz_68628/202506/t20250616_2595709.shtml",
+      "url": "https://www.wehdz.gov.cn/2022/ggxw_68627/tz_68628/202506/P020250616372993738302.docx",
+      "bytes": 20981,
+      "sha256": "c04c029689c703612acef19942427374a5b84aea97435b630ee15e6468f3881a",
+      "candidate_pages": 4,
+      "word_pages": 4,
+      "original_unchanged": true
+    },
+    {
+      "id": "fuzhou-1",
+      "title": "福州市服务业扩大开放综合试点工作实施方案（征求意见稿）.docx",
+      "source_page": "https://www.fuzhou.gov.cn/zwgk/tzgg/202605/t20260514_5322335.htm",
+      "url": "https://www.fuzhou.gov.cn/zwgk/tzgg/202605/P020260514643827169771.docx",
+      "bytes": 32718,
+      "sha256": "4ede0e133b5f8fcf1ce551e21a944798045ae79e164b5085189ad338fb2d106f",
+      "candidate_pages": 11,
+      "word_pages": 11,
+      "original_unchanged": true
+    },
+    {
+      "id": "sz-match-1",
+      "title": "附件1：2025年度深圳市国家和广东省科技计划项目配套申请指南.docx",
+      "source_page": "https://stic.sz.gov.cn/xxgk/zdly/sbzn/content/post_11717281.html",
+      "url": "https://stic.sz.gov.cn/attachment/1/1450/1450905/11717281.docx",
+      "bytes": 26375,
+      "sha256": "cb47ff26ab263fa75b9844cbed18b5ea01a6a44ad7f8aace59bed072b3479f38",
+      "candidate_pages": 7,
+      "word_pages": 7,
+      "original_unchanged": true
+    },
+    {
+      "id": "huaibei-1",
+      "title": "淮北市教育科学研究项目课题申请书（2025年制）.docx",
+      "source_page": "https://hbjy.huaibei.gov.cn/xwzx/tzgg/57893911.html",
+      "url": "https://hbjy.huaibei.gov.cn/group3/M00/04/D7/CqETMmfrl6CAG1i4AABzEiZ4yo848.docx",
+      "bytes": 29458,
+      "sha256": "f1438649e454c1c5a0eeefc3661f3f622479271cbe8bf78b11a3ea28197c99a7",
+      "candidate_pages": 8,
+      "word_pages": 7,
+      "original_unchanged": true
+    }
+  ],
+  "font_fallback_evidence": {
+    "文星仿宋": "Microsoft YaHei",
+    "文星标宋": "Microsoft YaHei",
+    "文星楷体": "Microsoft YaHei",
+    "文星黑体": "Microsoft YaHei",
+    "CESI宋体-GB2312": "Microsoft YaHei",
+    "方正书宋_GBK": "Microsoft YaHei"
+  },
+  "private_font_pack_files": 26,
+  "candidate_deployed": false,
+  "matrix_verification": {
+    "grid": {
+      "cases": 21,
+      "max_difference_pt": 0.12,
+      "measurements": {
+        "S10.5-100": {
+          "word_pt": 15.6,
+          "candidate_pt": 15.6,
+          "difference_pt": 0.0
+        },
+        "S10.5-150": {
+          "word_pt": 23.28,
+          "candidate_pt": 23.4,
+          "difference_pt": 0.12
+        },
+        "S10.5-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S12-100": {
+          "word_pt": 15.6,
+          "candidate_pt": 15.6,
+          "difference_pt": 0.0
+        },
+        "S12-150": {
+          "word_pt": 23.28,
+          "candidate_pt": 23.4,
+          "difference_pt": 0.12
+        },
+        "S12-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S14-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S14-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S14-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S16-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S16-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S16-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S18-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S18-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S18-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S22-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S22-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S22-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S24-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S24-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S24-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        }
+      }
+    },
+    "nongrid-fangsong": {
+      "cases": 21,
+      "max_difference_pt": 0.24,
+      "measurements": {
+        "S10.5-100": {
+          "word_pt": 13.44,
+          "candidate_pt": 13.65,
+          "difference_pt": 0.21
+        },
+        "S10.5-150": {
+          "word_pt": 20.64,
+          "candidate_pt": 20.45,
+          "difference_pt": 0.19
+        },
+        "S10.5-200": {
+          "word_pt": 27.12,
+          "candidate_pt": 27.3,
+          "difference_pt": 0.18
+        },
+        "S12-100": {
+          "word_pt": 15.6,
+          "candidate_pt": 15.6,
+          "difference_pt": 0.0
+        },
+        "S12-150": {
+          "word_pt": 23.52,
+          "candidate_pt": 23.4,
+          "difference_pt": 0.12
+        },
+        "S12-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S14-100": {
+          "word_pt": 18.24,
+          "candidate_pt": 18.2,
+          "difference_pt": 0.04
+        },
+        "S14-150": {
+          "word_pt": 27.12,
+          "candidate_pt": 27.3,
+          "difference_pt": 0.18
+        },
+        "S14-200": {
+          "word_pt": 36.48,
+          "candidate_pt": 36.4,
+          "difference_pt": 0.08
+        },
+        "S16-100": {
+          "word_pt": 20.88,
+          "candidate_pt": 20.8,
+          "difference_pt": 0.08
+        },
+        "S16-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S16-200": {
+          "word_pt": 41.52,
+          "candidate_pt": 41.6,
+          "difference_pt": 0.08
+        },
+        "S18-100": {
+          "word_pt": 23.28,
+          "candidate_pt": 23.4,
+          "difference_pt": 0.12
+        },
+        "S18-150": {
+          "word_pt": 35.04,
+          "candidate_pt": 35.1,
+          "difference_pt": 0.06
+        },
+        "S18-200": {
+          "word_pt": 46.56,
+          "candidate_pt": 46.8,
+          "difference_pt": 0.24
+        },
+        "S22-100": {
+          "word_pt": 28.56,
+          "candidate_pt": 28.6,
+          "difference_pt": 0.04
+        },
+        "S22-150": {
+          "word_pt": 42.72,
+          "candidate_pt": 42.9,
+          "difference_pt": 0.18
+        },
+        "S22-200": {
+          "word_pt": 57.12,
+          "candidate_pt": 57.2,
+          "difference_pt": 0.08
+        },
+        "S24-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S24-150": {
+          "word_pt": 46.8,
+          "candidate_pt": 46.8,
+          "difference_pt": 0.0
+        },
+        "S24-200": {
+          "word_pt": 62.4,
+          "candidate_pt": 62.4,
+          "difference_pt": 0.0
+        }
+      }
+    },
+    "nongrid-kaiti": {
+      "cases": 21,
+      "max_difference_pt": 0.24,
+      "measurements": {
+        "S10.5-100": {
+          "word_pt": 13.44,
+          "candidate_pt": 13.65,
+          "difference_pt": 0.21
+        },
+        "S10.5-150": {
+          "word_pt": 20.64,
+          "candidate_pt": 20.45,
+          "difference_pt": 0.19
+        },
+        "S10.5-200": {
+          "word_pt": 27.12,
+          "candidate_pt": 27.3,
+          "difference_pt": 0.18
+        },
+        "S12-100": {
+          "word_pt": 15.6,
+          "candidate_pt": 15.6,
+          "difference_pt": 0.0
+        },
+        "S12-150": {
+          "word_pt": 23.52,
+          "candidate_pt": 23.4,
+          "difference_pt": 0.12
+        },
+        "S12-200": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S14-100": {
+          "word_pt": 18.24,
+          "candidate_pt": 18.2,
+          "difference_pt": 0.04
+        },
+        "S14-150": {
+          "word_pt": 27.12,
+          "candidate_pt": 27.3,
+          "difference_pt": 0.18
+        },
+        "S14-200": {
+          "word_pt": 36.48,
+          "candidate_pt": 36.4,
+          "difference_pt": 0.08
+        },
+        "S16-100": {
+          "word_pt": 20.88,
+          "candidate_pt": 20.8,
+          "difference_pt": 0.08
+        },
+        "S16-150": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S16-200": {
+          "word_pt": 41.52,
+          "candidate_pt": 41.6,
+          "difference_pt": 0.08
+        },
+        "S18-100": {
+          "word_pt": 23.28,
+          "candidate_pt": 23.4,
+          "difference_pt": 0.12
+        },
+        "S18-150": {
+          "word_pt": 35.04,
+          "candidate_pt": 35.1,
+          "difference_pt": 0.06
+        },
+        "S18-200": {
+          "word_pt": 46.56,
+          "candidate_pt": 46.8,
+          "difference_pt": 0.24
+        },
+        "S22-100": {
+          "word_pt": 28.56,
+          "candidate_pt": 28.6,
+          "difference_pt": 0.04
+        },
+        "S22-150": {
+          "word_pt": 42.72,
+          "candidate_pt": 42.9,
+          "difference_pt": 0.18
+        },
+        "S22-200": {
+          "word_pt": 57.12,
+          "candidate_pt": 57.2,
+          "difference_pt": 0.08
+        },
+        "S24-100": {
+          "word_pt": 31.2,
+          "candidate_pt": 31.2,
+          "difference_pt": 0.0
+        },
+        "S24-150": {
+          "word_pt": 46.8,
+          "candidate_pt": 46.8,
+          "difference_pt": 0.0
+        },
+        "S24-200": {
+          "word_pt": 62.4,
+          "candidate_pt": 62.4,
+          "difference_pt": 0.0
+        }
+      }
+    }
+  },
+  "engine_tests_passed": 6,
+  "pipeline_tests_passed": 5,
+  "remaining": [
+    "cross-page merged table placement",
+    "trailing pages containing only footers",
+    "line wrapping and paragraph locations",
+    "page-number decorations"
+  ]
+}

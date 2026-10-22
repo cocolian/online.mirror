@@ -18,6 +18,7 @@
  */
 
 #include <sal/config.h>
+#include <wordmacmetrics.hxx>
 
 #include <config_vclplug.h>
 
@@ -288,6 +289,10 @@ static sal_uInt16 lcl_ApplyCjkHeightAdjustment(sal_uInt16 nBase, const SwViewShe
             || stCaps.oCodePageRange->test(vcl::CodePageCoverage::CP949)
             || stCaps.oCodePageRange->test(vcl::CodePageCoverage::CP950))
         {
+            const tools::Long nMacHeight = sw::WordMacGbFontHeight(rDev);
+            const tools::Long nRawHeight = rDev.GetTextHeight();
+            if (nMacHeight > 0 && nRawHeight > 0)
+                return (nBase * nMacHeight) / nRawHeight;
             return (nBase * 127) / 100;
         }
     }
@@ -381,6 +386,11 @@ sal_uInt16 SwFntObj::GetFontHeight( const SwViewShell* pSh, const OutputDevice& 
 
 sal_uInt16 SwFntObj::GetFontLeading( const SwViewShell *pSh, const OutputDevice& rOut )
 {
+    // The measured Mac GB2312 pitch already includes its inter-line leading.
+    // Adding Writer's separately guessed leading would count it twice.
+    if (pSh && pSh->getIDocumentSettingAccess().get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+        && sw::WordMacGbFontHeight(rOut) > 0)
+        return 0;
     sal_uInt16 nRet = 0;
 
     if ( pSh )
