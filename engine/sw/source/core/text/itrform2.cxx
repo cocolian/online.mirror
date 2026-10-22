@@ -2293,7 +2293,8 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
                    >= nGridContentHeight)
         {
             GetInfo().GetFont()->ChgPhysFnt(GetInfo().GetVsh(), *GetInfo().GetOut());
-            nGridContentHeight = sw::WordMacGridHeight(nGridContentHeight, *GetInfo().GetOut());
+            nGridContentHeight = sw::WordMacGridHeight(nGridContentHeight, *GetInfo().GetOut(),
+                rIDSA.get(DocumentSettingId::ADD_EXT_LEADING));
         }
         const auto nAmpRatio = (nGridContentHeight + nLineHeight - 1) / nLineHeight;
         nLineHeight *= nAmpRatio;

@@ -4012,7 +4012,8 @@ tools::Long SwTextFrame::GetLineSpace( const bool _bNoPropLineSpace ) const
                     else if (GetText().isEmpty())
                     {
                         nRet = EmptyHeight();
-                        nRet = sw::WordMacGridHeight(nRet, getRootFrame()->GetCurrShell()->GetRefDev());
+                        nRet = sw::WordMacGridHeight(nRet, getRootFrame()->GetCurrShell()->GetRefDev(),
+                            GetDoc().getIDocumentSettingAccess().get(DocumentSettingId::ADD_EXT_LEADING));
                         if (nPitch > 0)
                             nRet = ((nRet + nPitch - 1) / nPitch) * nPitch;
                     }

@@ -51,6 +51,26 @@
       "sha256": "05068fa1acae212120dcc7e98c884b174a6eca252a636b4b64030235473ec27e"
     },
     {
+      "file": "Wingdings 2.ttf",
+      "sha256": "e79883cf908a14a4103dd98632316527f21c7ccf02554962f7f60e5e097204f4"
+    },
+    {
+      "file": "arial.ttf",
+      "sha256": "15663c7e8495594c6136eb51b11983eb8f5bbcdd07bb2c327e0d1e83415b0f06"
+    },
+    {
+      "file": "arialbd.ttf",
+      "sha256": "b018b20bd6392de9ad3c5f0a1dcd23ad1fdf94227652fd92541521c32d8e5fc1"
+    },
+    {
+      "file": "arialbi.ttf",
+      "sha256": "399f00fe9cca7136639df72e976914c3713cbb321374e52def9ab5a10815904e"
+    },
+    {
+      "file": "ariali.ttf",
+      "sha256": "541466c87057d2f665fe190ec1e8011c82326ef9aaae0c318244db88b1ee63f5"
+    },
+    {
       "file": "msyh.ttc",
       "sha256": "3084f1f88369af6bf9989c909024164d953d1e38d08734f05f28ef24b2f9d577"
     },

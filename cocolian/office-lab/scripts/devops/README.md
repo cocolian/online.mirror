@@ -78,3 +78,12 @@ settings and PDF exports of the Jining and Beijing government samples.
 `testWordMacMissingParagraphDefaults` checks disabled, enabled, and explicit-zero
 behavior using font-independent synthetic fixtures. Government originals are
 never normalized or rewritten as part of rendering.
+
+The GB2312 Mac profile uses a measured 1.3-em ordinary line pitch and avoids
+adding external leading twice. Grid-row selection retains external leading,
+including the 14pt two-row boundary. `government-corpus-10.json` records ten
+additional unmodified government DOCX sources with 90 actual Word reference
+pages. The independent PDF matrix covers 21 grid cases and 42 non-grid GB2312
+cases (FangSong and KaiTi). Maximum pitch differences are 0.12pt and 0.24pt.
+This does not constitute full rendering acceptance: table pagination, final
+empty paragraphs, line wrapping, and footer formatting still differ.

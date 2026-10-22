@@ -497,7 +497,8 @@ bool SwTextFrame::FormatEmpty()
             if (sw::UseWordMacMetrics() && nPitch > 0 && GetDoc().getIDocumentSettingAccess().get(
                     DocumentSettingId::MS_WORD_COMP_GRID_METRICS))
             {
-                nHeight = sw::WordMacGridHeight(nHeight, getRootFrame()->GetCurrShell()->GetRefDev());
+                nHeight = sw::WordMacGridHeight(nHeight, getRootFrame()->GetCurrShell()->GetRefDev(),
+                    GetDoc().getIDocumentSettingAccess().get(DocumentSettingId::ADD_EXT_LEADING));
                 nHeight = ((nHeight + nPitch - 1) / nPitch) * nPitch;
             }
             else
