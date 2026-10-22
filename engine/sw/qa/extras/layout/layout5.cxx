@@ -1853,6 +1853,29 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordBodyGridProportional)
     assertXPath(pXmlDoc, "/root/page[1]/body/txt[4]/infos/bounds", "height", u"624");
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacMissingParagraphDefaults)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    const OUString aOff = u"0"_ustr;
+    osl_setEnvironment(aName.pData, aOff.pData);
+    createSwDoc("word-fixed-grid-probe.docx");
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), getProperty<sal_Int32>(getParagraph(1), u"ParaBottomMargin"_ustr));
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    createSwDoc("word-fixed-grid-probe.docx");
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(282), getProperty<sal_Int32>(getParagraph(1), u"ParaBottomMargin"_ustr));
+    createSwDoc("word-fixed-grid-probe-explicit-zero.docx");
+    CPPUNIT_ASSERT_EQUAL(sal_Int32(0), getProperty<sal_Int32>(getParagraph(1), u"ParaBottomMargin"_ustr));
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf166652)
 {
     createSwDoc("line-spacing-80percent.fodt");

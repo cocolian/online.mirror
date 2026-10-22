@@ -78,7 +78,17 @@
   },
   "remaining": [
     "MOT application remains 6 pages versus Word 5",
-    "Fixed line spacing and paragraph placement differ in Jining document",
-    "Beijing document has equal page count but different text placement"
-  ]
+    "Jining paragraph offsets improved; line wrapping and small baseline offsets remain",
+    "Beijing non-grid body pitch 33.8pt versus Word 31.2pt; paragraph spills to next page"
+  ],
+  "missing_paragraph_defaults": {
+    "word_after_pt": 8,
+    "candidate_after_pt": 8,
+    "scope": "Mac profile, absent pPrDefault only; explicit values retained",
+    "test_cases": [
+      "profile disabled",
+      "profile enabled",
+      "explicit zero"
+    ]
+  }
 }
