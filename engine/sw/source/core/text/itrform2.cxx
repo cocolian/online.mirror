@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
 #include <hintids.hxx>
 
 #include <algorithm>
@@ -2285,7 +2286,17 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
         const bool bRubyTop = ! pGrid->GetRubyTextBelow();
 
         nLineHeight = nGridWidth + nRubyHeight;
-        const auto nAmpRatio = (m_pCurr->Height() + nLineHeight - 1) / nLineHeight;
+        SwTwips nGridContentHeight = m_pCurr->Height();
+        if (sw::UseWordMacMetrics()
+            && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+            && GetInfo().GetFont()->GetHeight(GetInfo().GetVsh(), *GetInfo().GetOut())
+                   >= nGridContentHeight)
+        {
+            GetInfo().GetFont()->ChgPhysFnt(GetInfo().GetVsh(), *GetInfo().GetOut());
+            nGridContentHeight = sw::WordMacGridHeight(nGridContentHeight, *GetInfo().GetOut(),
+                rIDSA.get(DocumentSettingId::ADD_EXT_LEADING));
+        }
+        const auto nAmpRatio = (nGridContentHeight + nLineHeight - 1) / nLineHeight;
         nLineHeight *= nAmpRatio;
 
         // tdf#164871: Handle all types of line spacing in grid layout.
@@ -2333,9 +2344,11 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
         // Word table cells already use the document grid as their line pitch.
         // Applying proportional spacing to the snapped height again stretches
         // a 1.5-line table to 150% of Word's height and changes page breaks.
-        // Keep the existing proportional behavior for body text and ODF grids.
+        // Word body text spanning multiple grid rows also ignores proportional
+        // leading; single-grid-row body text and ODF retain their spacing.
         const bool bWordTableGrid
-            = m_pFrame->IsInTab() && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS);
+            = (m_pFrame->IsInTab() || (sw::UseWordMacMetrics() && nAmpRatio > 1))
+              && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS);
         if ( !bWordTableGrid && !IsParaLine() && pSpace &&
              SvxInterLineSpaceRule::Prop == pSpace->GetInterLineSpaceRule() )
         {

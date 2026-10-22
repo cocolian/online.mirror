@@ -14,7 +14,7 @@
 
 源码归属：门户使用 cocolian/main；渲染引擎、coolwsd 和 browser 使用 online.mirror/main；字体配置、编辑辅助标记和转换适配器使用 cocolian-office/main。这里明确采用引擎 main，不使用外层旧的 submodule 提交号；每次运行的 commits.json 锁定三个实际提交。其他 SDK/office-core 子模块不参与现有服务构建。
 
-流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行四个布局回归测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 registry.example.invalid → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
+流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行六个布局回归测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 registry.example.invalid → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
 
 只修改 office-lab 中本次选定模块的镜像，保留 gateway 配置、Secret、文档 PVC、字体及既有运行参数。不会自动应用仓库中的任意 Kubernetes YAML 或修改命名空间/入口配置。新建另一套服务需要单独维护部署模板。失败不更新 last_success；部署后失败自动恢复本次已修改的 Deployment 模板；存在并发修改时停止覆盖并记录待人工处理原因。候选 Pod 为本流程临时资源，验收后删除；仅删除本次创建的 UUID 命名测试文件，不修改业务文档。不会删除历史镜像/PVC，导出中间 tar 在推送后删除。
 
@@ -45,3 +45,45 @@ sudo systemctl stop cocolian-devops.timer
 镜像传输：公网反向代理下载大层速度较慢，宿主机安装 `cocolian-registry-tunnel.service`，使用现有宿主机 SSH 身份连接 VM，将 VM 的 `127.0.0.1:15000` 反向转发到宿主机回环流式代理，再访问现有 registry Service。仅本机回环监听，公网不开放端口，传输受 SSH 加密；该回环端点使用 HTTP，公共 registry.example.invalid 的 TLS 校验保持启用。两端重启后 systemd 自动重连。私有 config.json 设置 registry_endpoint=127.0.0.1:15000；业务镜像始终记录公共域名与不可变摘要。
 
 宿主机的 `cocolian-registry-proxy.service` 仅监听 127.0.0.1:15001，将仓库返回的绝对上传 Location 地址改回 VM 回环端口，避免上传绕回公网；请求和响应以有界分块转发，支持 Content-Length 与 chunked 上传。不修改 applications 命名空间中的仓库配置。代理与隧道均为宿主机 systemd 开机服务。
+
+### Mac Word rendering profile
+
+Renderer releases install the private font pack pinned by
+`office-fonts-manifest.json` from
+`~/.local/share/cocolian-devops/fonts/office`. Font binaries are never stored in
+Git. A missing file or a mismatched SHA256 stops the build before image creation.
+All three renderers receive the same fonts and fontconfig profile. Candidate
+pods must select native FangSong_GB2312, KaiTi_GB2312, SimSun, Microsoft YaHei,
+FangSong, STZhongsong and Times New Roman before deployment.
+
+`COCOLIAN_WORD_MAC_METRICS=1` enables the Mac Word profile. It excludes the 127%
+Windows CJK enlargement when choosing grid multiples, preserves ordinary
+non-grid font metrics, and uses the measured Mac Word behavior for
+proportional spacing on multiple grid rows. Without this variable, the existing
+Windows Word metrics remain active. The scoped `testWordBodyGridProportional`
+regression exercises the Mac profile without changing the rest of the test
+process. Renderer builds also retain the existing typography, table grid and
+ODF compatibility tests.
+
+`government-corpus.json` records the six government download URLs, immutable
+input hashes, actual Mac Word reference page counts, and the measured 21-case
+line-pitch matrix. This corpus is **not accepted** yet: equal page counts do not
+prove equal pagination or visual layout. Keep this repair off main until the
+remaining table tail, non-grid line-height, and line-wrapping differences pass
+visual review against the saved Word PDFs.
+
+The Mac profile supplies an eight-point Normal-template paragraph after-gap
+when the DOCX omits `pPrDefault`. This was confirmed in Mac Word paragraph
+settings and PDF exports of the Jining and Beijing government samples.
+`testWordMacMissingParagraphDefaults` checks disabled, enabled, and explicit-zero
+behavior using font-independent synthetic fixtures. Government originals are
+never normalized or rewritten as part of rendering.
+
+The GB2312 Mac profile uses a measured 1.3-em ordinary line pitch and avoids
+adding external leading twice. Grid-row selection retains external leading,
+including the 14pt two-row boundary. `government-corpus-10.json` records ten
+additional unmodified government DOCX sources with 90 actual Word reference
+pages. The independent PDF matrix covers 21 grid cases and 42 non-grid GB2312
+cases (FangSong and KaiTi). Maximum pitch differences are 0.12pt and 0.24pt.
+This does not constitute full rendering acceptance: table pagination, final
+empty paragraphs, line wrapping, and footer formatting still differ.

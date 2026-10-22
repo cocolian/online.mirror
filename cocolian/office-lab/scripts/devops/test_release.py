@@ -16,6 +16,32 @@ class ReleaseTests(unittest.TestCase):
   self.assertTrue(r.needs_online(['browser/src/control/Control.Toolbar.js']))
   self.assertTrue(r.needs_online(['browser/images/arrow.png']))
   self.assertFalse(r.needs_online(['engine/sw/a.cxx','cocolian/office-lab/scripts/devops/watch.py']))
+ def test_old_checkout_timestamp_rebuilds_changed_source(self):
+  import os,time
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);repo=root/'repo';cache=root/'cache'
+   repo.mkdir();(cache/'source').mkdir(parents=True)
+   (repo/'changed.cxx').write_text('new source')
+   os.utime(repo/'changed.cxx',(1,1))
+   (cache/'source/changed.cxx').write_text('old source')
+   (cache/'devops-source-files.json').write_text('["changed.cxx"]')
+   before=time.time()
+   with patch.object(r,'CACHE',cache),patch.object(r,'git',return_value='changed.cxx\x00'):
+    r.sync_source(repo)
+   self.assertEqual((cache/'source/changed.cxx').read_text(),'new source')
+   self.assertGreaterEqual((cache/'source/changed.cxx').stat().st_mtime,before)
+
+ def test_private_font_hash_gate(self):
+  import hashlib
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);source=root/'private';source.mkdir();(source/'font.ttf').write_bytes(b'approved font')
+   manifest={'fonts':[{'file':'font.ttf','sha256':hashlib.sha256(b'approved font').hexdigest()}]}
+   self.assertEqual(r.stage_office_fonts(root/'valid',source,manifest),1)
+   (source/'font.ttf').write_bytes(b'changed font')
+   with self.assertRaisesRegex(RuntimeError,'hash mismatch'):r.stage_office_fonts(root/'changed',source,manifest)
+   (source/'font.ttf').unlink()
+   with self.assertRaisesRegex(RuntimeError,'missing'):r.stage_office_fonts(root/'missing',source,manifest)
+
  def test_failure_restores_templates(self):
   template={'spec':{'containers':[{'image':'old','imagePullPolicy':'IfNotPresent'}]}}
   old={name:{'spec':{'template':copy.deepcopy(template)}} for name in ('one','two')}
