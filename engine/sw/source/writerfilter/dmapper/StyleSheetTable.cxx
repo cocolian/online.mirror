@@ -61,6 +61,7 @@
 #include <unosett.hxx>
 #include <unotextbodyhf.hxx>
 #include <SwXTextDefaults.hxx>
+#include <wordmacmetrics.hxx>
 
 using namespace ::com::sun::star;
 using namespace ::cpo;
@@ -1083,6 +1084,15 @@ OUString StyleSheetTable::CloneTOCStyle(FontTablePtr const& rFontTable, StyleShe
 
 void StyleSheetTable::ApplyStyleSheets( const FontTablePtr& rFontTable )
 {
+    // Mac Word supplies its Normal-template paragraph spacing when the file
+    // omits pPrDefault entirely. Explicit document and style values still win.
+    // Public Jining stationery and an isolated two-line paragraph probe both
+    // export with an eight-point paragraph gap in Mac Word.
+    if (sw::UseWordMacMetrics() && m_bIsNewDoc && !m_bHasImportedDefaultParaProps)
+    {
+        SetDefaultParaProps(PROP_PARA_BOTTOM_MARGIN, cpo::uno::Any(sal_Int32(282)));
+        applyDefaults(true);
+    }
     return ApplyStyleSheetsImpl(rFontTable, m_aStyleSheetEntries);
 }
 

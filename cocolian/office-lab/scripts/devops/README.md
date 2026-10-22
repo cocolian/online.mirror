@@ -14,7 +14,7 @@
 
 源码归属：门户使用 cocolian/main；渲染引擎、coolwsd 和 browser 使用 online.mirror/main；字体配置、编辑辅助标记和转换适配器使用 cocolian-office/main。这里明确采用引擎 main，不使用外层旧的 submodule 提交号；每次运行的 commits.json 锁定三个实际提交。其他 SDK/office-core 子模块不参与现有服务构建。
 
-流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行四个布局回归测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 res.cocolian.cn → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
+流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行六个布局回归测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 res.cocolian.cn → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
 
 只修改 office-lab 中本次选定模块的镜像，保留 gateway 配置、Secret、文档 PVC、字体及既有运行参数。不会自动应用仓库中的任意 Kubernetes YAML 或修改命名空间/入口配置。新建另一套服务需要单独维护部署模板。失败不更新 last_success；部署后失败自动恢复本次已修改的 Deployment 模板；存在并发修改时停止覆盖并记录待人工处理原因。候选 Pod 为本流程临时资源，验收后删除；仅删除本次创建的 UUID 命名测试文件，不修改业务文档。不会删除历史镜像/PVC，导出中间 tar 在推送后删除。
 
@@ -69,5 +69,12 @@ ODF compatibility tests.
 input hashes, actual Mac Word reference page counts, and the measured 21-case
 line-pitch matrix. This corpus is **not accepted** yet: equal page counts do not
 prove equal pagination or visual layout. Keep this repair off main until the
-remaining table tail, fixed-spacing, and paragraph-position differences pass
+remaining table tail, non-grid line-height, and line-wrapping differences pass
 visual review against the saved Word PDFs.
+
+The Mac profile supplies an eight-point Normal-template paragraph after-gap
+when the DOCX omits `pPrDefault`. This was confirmed in Mac Word paragraph
+settings and PDF exports of the Jining and Beijing government samples.
+`testWordMacMissingParagraphDefaults` checks disabled, enabled, and explicit-zero
+behavior using font-independent synthetic fixtures. Government originals are
+never normalized or rewritten as part of rendering.
