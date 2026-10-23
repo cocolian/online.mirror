@@ -17,6 +17,10 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
+#include <pagedesc.hxx>
+#include <tgrditem.hxx>
+#include <editeng/lspcitem.hxx>
 #include <sal/config.h>
 
 #include <string_view>
@@ -1335,7 +1339,8 @@ void SwScriptInfo::InitScriptInfoHidden(const SwTextNode& rNode,
 
 namespace
 {
-i18nutil::ScriptHintProvider lcl_FindScriptTypeHintSpans(const SwTextNode& rNode)
+i18nutil::ScriptHintProvider lcl_FindScriptTypeHintSpans(const SwTextNode& rNode,
+                                                    bool bAdjustAutomaticPunctuation)
 {
     i18nutil::ScriptHintProvider stProvider;
 
@@ -1365,6 +1370,34 @@ i18nutil::ScriptHintProvider lcl_FindScriptTypeHintSpans(const SwTextNode& rNode
         }
     }
 
+    if (bAdjustAutomaticPunctuation && sw::UseWordMacMetrics() && !rNode.GetText().isEmpty())
+    {
+        // In Word's default font hint, ambiguous Western quotes and em dashes
+        // use the Latin font even next to Chinese text. Explicit Asian/complex
+        // hints still take precedence.
+        i18nutil::ScriptHintProvider aMacHints;
+        stProvider.Start();
+        sal_Int32 nStart = 0;
+        auto ePrevious = i18nutil::ScriptHintType::Automatic;
+        const OUString& rText = rNode.GetText();
+        for (sal_Int32 i = 0; i < rText.getLength(); ++i)
+        {
+            stProvider.AdvanceTo(i);
+            auto eHint = stProvider.Peek();
+            const sal_Unicode c = rText[i];
+            if (eHint == i18nutil::ScriptHintType::Automatic
+                && (c == 0x2018 || c == 0x2019 || c == 0x201C || c == 0x201D || c == 0x2014))
+                eHint = i18nutil::ScriptHintType::Latin;
+            if (i && eHint != ePrevious)
+            {
+                aMacHints.AddHint(ePrevious, nStart, i);
+                nStart = i;
+            }
+            ePrevious = eHint;
+        }
+        aMacHints.AddHint(ePrevious, nStart, rText.getLength());
+        return aMacHints;
+    }
     return stProvider;
 }
 }
@@ -1394,9 +1427,22 @@ void SwScriptInfo::InitScriptInfo(const SwTextNode& rNode,
     sal_Int16 nScript = i18n::ScriptType::LATIN;
 
     // compression type
-    const CharCompressType aCompEnum = rNode.getIDocumentSettingAccess()->getCharacterCompressionType();
+    CharCompressType aCompEnum = rNode.getIDocumentSettingAccess()->getCharacterCompressionType();
 
     auto const& rParaItems((pMerged ? *pMerged->pParaPropsNode : rNode).GetSwAttrSet());
+    // Word disables punctuation compression for paragraphs aligned to the document
+    // character grid when doNotUseEastAsianBreakRules is set. A lines-only
+    // grid retains punctuation compression (verified by actual Mac Word PDFs).
+    if (sw::UseWordMacMetrics()
+        && rNode.getIDocumentSettingAccess()->get(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID)
+        && rParaItems.GetParaGrid().GetValue()
+        && rParaItems.GetLineSpacing().GetLineSpaceRule() == SvxLineSpaceRule::Auto)
+    {
+        const SwPageDesc* pPageDesc = rNode.FindPageDesc();
+        if (pPageDesc && pPageDesc->GetMaster().GetTextGrid().GetGridType() == SwTextGrid::LinesAndChars)
+            aCompEnum = CharCompressType::NONE;
+    }
+
     // justification type
     m_bAdjustBlock = (SvxAdjust::Block == rParaItems.GetAdjust().GetAdjust());
 
@@ -1472,7 +1518,7 @@ void SwScriptInfo::InitScriptInfo(const SwTextNode& rNode,
             m_CompressionChanges.end());
 
     // Construct the script change scanner and advance it to the change range
-    auto stScriptHints = lcl_FindScriptTypeHintSpans(rNode);
+    auto stScriptHints = lcl_FindScriptTypeHintSpans(rNode, !pMerged);
     auto pDirScanner = i18nutil::MakeDirectionChangeScanner(rText, m_nDefaultDir);
     auto pScriptScanner = i18nutil::MakeScriptChangeScanner(
         rText, SvtLanguageOptions::GetI18NScriptTypeOfLanguage(GetAppLanguage()), *pDirScanner,
@@ -2006,7 +2052,9 @@ tools::Long SwScriptInfo::Compress(KernArray& rKernArray, TextFrameIndex nIdx, T
                 double nMove = 0;
                 if( SwScriptInfo::KANA != nType )
                 {
-                    nLast /= 24000;
+                    // Mac Word's measured full-width punctuation can contract by
+                    // half an em (the 200pt GB2312/YaHei probe fits 13 glyphs).
+                    nLast /= sw::UseWordMacMetrics() ? 20000 : 24000;
                     if( pPoint && SwScriptInfo::SPECIAL_LEFT == nType )
                     {
                         if( nI )

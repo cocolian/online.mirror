@@ -14,7 +14,7 @@
 
 源码归属：门户使用 cocolian/main；渲染引擎、coolwsd 和 browser 使用 online.mirror/main；字体配置、编辑辅助标记和转换适配器使用 cocolian-office/main。这里明确采用引擎 main，不使用外层旧的 submodule 提交号；每次运行的 commits.json 锁定三个实际提交。其他 SDK/office-core 子模块不参与现有服务构建。
 
-流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行八个布局回归测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 registry.example.invalid → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
+流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行 22 个严格字体布局测试和 14 个私有字体测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 registry.example.invalid → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
 
 只修改 office-lab 中本次选定模块的镜像，保留 gateway 配置、Secret、文档 PVC、字体及既有运行参数。不会自动应用仓库中的任意 Kubernetes YAML 或修改命名空间/入口配置。新建另一套服务需要单独维护部署模板。失败不更新 last_success；部署后失败自动恢复本次已修改的 Deployment 模板；存在并发修改时停止覆盖并记录待人工处理原因。候选 Pod 为本流程临时资源，验收后删除；仅删除本次创建的 UUID 命名测试文件，不修改业务文档。不会删除历史镜像/PVC，导出中间 tar 在推送后删除。
 
@@ -57,8 +57,8 @@ pods must select native FangSong_GB2312, KaiTi_GB2312, SimSun, Microsoft YaHei,
 FangSong, STZhongsong and Times New Roman before deployment.
 
 `COCOLIAN_WORD_MAC_METRICS=1` enables the Mac Word profile. It excludes the 127%
-Windows CJK enlargement when choosing grid multiples, preserves ordinary
-non-grid font metrics, and uses the measured Mac Word behavior for
+Windows CJK enlargement when choosing grid multiples, uses measured native-font
+non-grid metrics where enabled, and uses the measured Mac Word behavior for
 proportional spacing on multiple grid rows. Without this variable, the existing
 Windows Word metrics remain active. The scoped `testWordBodyGridProportional`
 regression exercises the Mac profile without changing the rest of the test
@@ -68,9 +68,9 @@ ODF compatibility tests.
 `government-corpus.json` records the six government download URLs, immutable
 input hashes, actual Mac Word reference page counts, and the measured 21-case
 line-pitch matrix. This corpus is **not accepted** yet: equal page counts do not
-prove equal pagination or visual layout. Keep this repair off main until the
-remaining table tail, non-grid line-height, and line-wrapping differences pass
-visual review against the saved Word PDFs.
+prove equal pagination or visual layout. The renderer fixes are independently tested; full corpus acceptance remains separate
+from releasing those repairs. Residual differences must stay visible in private
+validation reports instead of being inferred away from equal page counts.
 
 The Mac profile supplies an eight-point Normal-template paragraph after-gap
 when the DOCX omits `pPrDefault`. This was confirmed in Mac Word paragraph
@@ -99,6 +99,66 @@ and the Mac profile against a generated 12pt, 150% table paragraph.
 Real GB2312 synthetic bold is tested separately with the private pinned fonts:
 `testWordMacGbBoldTableWrap` requires four lines in a narrow 12pt bold cell,
 matching the Mac Word export; the default profile retains its two-line layout.
-Only this test allows non-application fonts. The eight bundled-font regression
+The twelve private-font tests allow non-application fonts via the make command line. The 21 bundled-font regression
 cases remain strict. Advance arrays retain fractional precision and exclude
 whitespace from the measured 40/2048-em bold expansion.
+
+Missing theme parts use the observed current Chinese Mac Word defaults in the optional Mac profile (Aptos/Aptos Display and DengXian/DengXian Light). Empty paragraph style references retain the normal style so that direct spacing is applied. Both cases generate their DOCX input at test runtime. Private runtime fonts remain outside Git.
+Explicit DOCX punctuation compression is imported into CharacterCompressionType in the Mac profile and covered by a generated regression package.
+The native-font punctuation regression follows a Mac Word PDF probe at seven cell widths in both GB2312 and YaHei, including the half-em boundary at 200pt.
+Automatic Latin/CJK and digit/CJK spacing uses the 1/4-em gaps measured in Mac Word, rather than the legacy 1/5-em gaps. A generated 35pt GB2312 cell checks the changed wrap boundary.
+
+The Mac profile respects doNotUseEastAsianBreakRules for automatic paragraphs aligned to a character-and-line grid. A lines-only grid retains punctuation compression. Both the compression option and this compatibility flag survive DOCX save/reload. Generated native-font regressions check lines-only automatic/fixed spacing and the round trip.
+Mac Word renders OOXML inset/outset borders as single strokes, including colored borders. A generated bundled-font test preserves the legacy profile and checks the Mac border style, width and color. Oversized percentage tables retain their preferred width so the existing grid-width fallback can preserve their size.
+
+The first continuous section initializes its page grid in the Mac profile. Native SimSun/YaHei Word probes additionally cover 24 grid cases: YaHei retains CJK leading for grid-row selection, with a two-row boundary at 10pt. The private grid regression checks the 9pt/10pt boundary. Literal generic font names (`sans-serif`, `monospace`) use the observed Times New Roman/SimSun fallback; explicit Helvetica and Menlo remain native.
+
+The private font pack now pins 38 files, including Aptos, Aptos Display, Segoe UI,
+Helvetica, Menlo, Wingdings and Apple Color Emoji. Fontconfig preserves explicit
+fonts and uses the observed Mac Word fallback for generic family names and symbols.
+Binary fonts and document samples must never be committed.
+
+The optional `COCOLIAN_WORD_MAC_AUTOFIT=1` profile uses content minima and preferred
+percentages for flat, non-floating AutoFit tables with uniform unmerged rows.
+Fixed-layout and merged tables retain their existing layout. The first resize
+recalculates after paragraph defaults resolve. Short ASCII tokens are kept intact
+only when all column minima fit the available width; long URLs can still wrap.
+Generated fixtures cover noWrap import/export, an omitted font size, short tokens,
+and a long URL that must not widen the page.
+
+`COCOLIAN_WORD_MAC_GRID_BOTTOM=1` permits unused lower grid leading at the page
+end. It preserves glyph positions, excludes inline objects, and does not subtract
+padding twice. Generated native-font positive/negative cases require a last pair
+of text lines to fit, and a further 5pt to force the page break. The fixed-grid
+baseline independently follows Word's 80% rule.
+
+A private 15-document corpus has 229 actual Mac Word PDF reference pages. It is
+not a binary test fixture and is not stored here. Page counts, unique-line page
+positions, baseline coordinates and side-by-side page images are recorded locally.
+Matching page counts alone must never be reported as full visual acceptance.
+
+`COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS=1` makes the normal quarter-em Latin/CJK
+and digit/CJK gaps shrinkable. Remaining line space first restores these gaps,
+then expands compressed punctuation. An actual Word 35pt-cell probe requires
+2.5pt gaps between 12pt Chinese text and a digit; the generated native-font
+regression checks both glyph positions. `COCOLIAN_WORD_MAC_LINE_BUDGET=1`
+limits opportunistic line extension by the next break unit and excludes Japanese
+kana compression. Independent Word probes cover six mixed-script widths and
+fourteen multi-punctuation cases. These flags accompany the server Mac profile;
+legacy Writer formatting remains the default without the profile.
+
+`COCOLIAN_WORD_MAC_CLASSIC_METRICS=1` extends the measured 1.3-em ordinary
+line pitch to SimSun/NSimSun, SimHei, FangSong and KaiTi, including Chinese family
+aliases. Grid selection retains external leading, preserving the 12pt/14pt
+SimSun one-row/two-row boundary. Known YaHei and DengXian families use measured
+centered CJK leading; unknown families retain the previous behavior. Six actual
+Word baseline/pitch probes and generated native-font tests cover these paths.
+Synthetic bold uses the same 40/2048-em visible-glyph advance for the classic
+families and GB2312 fonts; caret, measurement and break widths share the advance.
+Font samples and Word exports remain private validation artifacts.
+
+Numbering levels without explicit first-line/left indents inherit the paragraph
+style in the Mac profile; synthesized UNO zero defaults must not erase the
+style's indentation. Explicit zero list indents retain priority. A generated
+fixture checks number glyph positions with the profile disabled/enabled and
+with a deliberately explicit zero, without committing customer document text.

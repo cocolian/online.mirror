@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 #include <optional>
+#include <wordmacmetrics.hxx>
 #include "DomainMapperTableManager.hxx"
 #include "ConversionHelper.hxx"
 #include "MeasureHandler.hxx"
@@ -191,7 +192,13 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                         else if( sal::static_int_cast<Id>(pMeasureHandler->getUnit()) == NS_ooxml::LN_Value_ST_TblWidth_pct )
                         {
                             sal_Int32 nPercent = pMeasureHandler->getValue() / 50;
-                            if(nPercent > 100)
+                            // UNO stores whole percentages. Preserve the closest width
+                            // instead of shrinking 99.96% tables to 99% in the Mac profile.
+                            if (sw::UseWordMacMetrics() && pMeasureHandler->getValue() % 50 >= 25)
+                                ++nPercent;
+                            // In the Word Mac profile, keep oversized preferred widths so
+                            // endOfRowAction can use the table grid's absolute width.
+                            if (nPercent > 100 && !sw::UseWordMacMetrics())
                                 nPercent = 100;
                             pPropMap->setValue( TablePropertyMap::TABLE_WIDTH_TYPE, text::SizeType::VARIABLE );
                             pPropMap->setValue( TablePropertyMap::TABLE_WIDTH, nPercent );
@@ -354,6 +361,14 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                     cellProps( pPropMap );
                 break;
             }
+            case NS_ooxml::LN_CT_TcPrBase_noWrap:
+                if (sw::UseWordMacMetrics())
+                {
+                    TablePropertyMapPtr pProps(new TablePropertyMap);
+                    pProps->Insert(PROP_CELL_NO_WRAP, cpo::uno::Any(nIntValue != 0), true, CELL_GRAB_BAG);
+                    cellProps(pProps);
+                }
+                break;
             case NS_ooxml::LN_CT_TcPrBase_tcW:
                 {
                     // Contains unit and value, but unit is not interesting for
@@ -364,6 +379,10 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                     {
                         MeasureHandlerPtr pMeasureHandler(new MeasureHandler());
                         pProperties->resolve(*pMeasureHandler);
+                        if (m_nRow == 0)
+                            m_aWordMacPreferredPercents.push_back(
+                                sal::static_int_cast<Id>(pMeasureHandler->getUnit()) == NS_ooxml::LN_Value_ST_TblWidth_pct
+                                    ? pMeasureHandler->getValue() : -1);
                         if (sal::static_int_cast<Id>(pMeasureHandler->getUnit()) == NS_ooxml::LN_Value_ST_TblWidth_auto)
                             getCurrentCellWidths()->push_back(sal_Int32(-1));
                         else
@@ -889,6 +908,7 @@ void DomainMapperTableManager::endOfRowAction()
 
 void DomainMapperTableManager::clearData()
 {
+    m_aWordMacPreferredPercents.clear();
     m_nRow = m_nHeaderRepeat = m_nTableWidth = m_nLayoutType = 0;
     m_TableLook = TableLook{};
 }

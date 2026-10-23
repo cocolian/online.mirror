@@ -18,6 +18,7 @@
  */
 
 #include <sal/config.h>
+#include <wordmacmetrics.hxx>
 
 #include <string_view>
 
@@ -1327,6 +1328,122 @@ void SectionPropertyMap::HandleMarginsHeaderFooter(DomainMapper_Impl& rDM_Impl)
     rDM_Impl.ConvertHeaderFooterToTextFrame(m_bDynamicHeightTop, m_bDynamicHeightBottom);
 }
 
+void SectionPropertyMap::PrepareTextGridProperties(DomainMapper_Impl& rDM_Impl)
+{
+    //prepare text grid properties
+    sal_Int32 nHeight = 1;
+    std::optional< PropertyMap::Property > pProp = getProperty( PROP_HEIGHT );
+    if ( pProp )
+        pProp->second >>= nHeight;
+
+    sal_Int32 nWidth = 1;
+    pProp = getProperty( PROP_WIDTH );
+    if ( pProp )
+        pProp->second >>= nWidth;
+
+    sal_Int16 nWritingMode = text::WritingMode2::LR_TB;
+    pProp = getProperty( PROP_WRITING_MODE );
+    if ( pProp )
+        pProp->second >>= nWritingMode;
+
+    sal_Int32 nTextAreaHeight = nWritingMode == text::WritingMode2::LR_TB ?
+        nHeight - m_nTopMargin - m_nBottomMargin :
+        nWidth - m_nLeftMargin - m_nRightMargin;
+
+    sal_Int32 nGridLinePitch = m_nGridLinePitch;
+    //sep.dyaLinePitch
+    if ( nGridLinePitch < 1 || nGridLinePitch > 31680 )
+    {
+        SAL_WARN( "writerfilter", "sep.dyaLinePitch outside legal range: " << nGridLinePitch );
+        nGridLinePitch = 1;
+    }
+
+    const sal_Int32 nGridLines = nTextAreaHeight / nGridLinePitch;
+    sal_Int16 nGridType = m_nGridType;
+    if ( nGridLines >= 0 && nGridLines <= SAL_MAX_INT16 )
+        Insert( PROP_GRID_LINES, cpo::uno::Any( sal_Int16(nGridLines) ) );
+    else
+        nGridType = text::TextGridMode::NONE;
+
+    // PROP_GRID_MODE
+    if ( nGridType == text::TextGridMode::LINES_AND_CHARS )
+    {
+        if (!m_nDxtCharSpace)
+            nGridType = text::TextGridMode::LINES;
+        else
+            Insert( PROP_GRID_SNAP_TO_CHARS, cpo::uno::Any( m_bGridSnapToChars ) );
+    }
+
+    Insert( PROP_GRID_MODE, cpo::uno::Any( nGridType ) );
+
+    sal_Int32 nCharWidth = 423; //240 twip/ 12 pt
+
+    // tdf#139418: Fetch the default Asian text height for grid pitch calculation
+    if (const auto pEntry = rDM_Impl.GetStyleSheetTable()->GetDefaultCharProps(); pEntry)
+    {
+        const auto pPropHeight = pEntry->getProperty(PROP_CHAR_HEIGHT_ASIAN);
+        if (pPropHeight.has_value())
+        {
+            double fHeight = 0;
+            if (pPropHeight->second >>= fHeight)
+            {
+                nCharWidth = ConversionHelper::convertTwipToMm100_Limited(
+                    static_cast<sal_Int32>(fHeight * 20.0 + 0.5));
+            }
+        }
+    }
+
+    // tdf#107359: Override the default Asian height from the Standard style, if present.
+    if (const auto pEntry
+        = rDM_Impl.GetStyleSheetTable()->FindStyleSheetByConvertedStyleName(u"Standard");
+        pEntry)
+    {
+        const auto pPropHeight = pEntry->m_pProperties->getProperty(PROP_CHAR_HEIGHT_ASIAN);
+        if (pPropHeight.has_value())
+        {
+            double fHeight = 0;
+            if (pPropHeight->second >>= fHeight)
+            {
+                nCharWidth = ConversionHelper::convertTwipToMm100_Limited(
+                    static_cast<sal_Int32>(fHeight * 20.0 + 0.5));
+            }
+        }
+    }
+
+    //dxtCharSpace
+    if ( m_nDxtCharSpace )
+    {
+        sal_Int32 nCharSpace = m_nDxtCharSpace;
+        //main lives in top 20 bits, and is signed.
+        sal_Int32 nMain = (nCharSpace & 0xFFFFF000);
+        nMain /= 0x1000;
+        nCharWidth += ConversionHelper::convertTwipToMm100_Limited(nMain * 20);
+
+        sal_Int32 nFraction = (nCharSpace & 0x00000FFF);
+        nFraction = (nFraction * 20) / 0xFFF;
+        nCharWidth += ConversionHelper::convertTwipToMm100_Limited(nFraction);
+    }
+
+    // #i119558#, force to set document as standard page mode,
+    // refer to ww8 import process function "SwWW8ImplReader::SetDocumentGrid"
+    try
+    {
+        if (rDM_Impl.GetTextDocument())
+        {
+            Insert(PROP_GRID_STANDARD_MODE, cpo::uno::Any(true));
+            rDM_Impl.GetTextDocument()->setPropertyValue(u"DefaultPageMode"_ustr, cpo::uno::Any(false));
+        }
+    }
+    catch ( const cpo::uno::Exception& )
+    {
+        DBG_UNHANDLED_EXCEPTION("writerfilter.dmapper", "Exception in SectionPropertyMap::CloseSectionGroup");
+    }
+
+    Insert( PROP_GRID_BASE_HEIGHT, cpo::uno::Any( nGridLinePitch ) );
+    Insert( PROP_GRID_BASE_WIDTH, cpo::uno::Any( nCharWidth ) );
+    Insert( PROP_GRID_RUBY_HEIGHT, cpo::uno::Any( sal_Int32( 0 ) ) );
+}
+
 void SectionPropertyMap::InheritOrFinalizePageStyles(DomainMapper_Impl& rDM_Impl)
 {
     // if no new styles have been created for this section, inherit from the previous section,
@@ -1758,6 +1875,10 @@ void SectionPropertyMap::CloseSectionGroup( DomainMapper_Impl& rDM_Impl )
 
         try
         {
+            // A continuous first section still defines the initial page grid.
+            // Later continuous sections must not replace the current page style.
+            if (sw::UseWordMacMetrics() && m_bIsFirstSection)
+                PrepareTextGridProperties(rDM_Impl);
             setHeaderFooterProperties(rDM_Impl);
             InheritOrFinalizePageStyles( rDM_Impl );
             ApplySectionProperties( xSection, rDM_Impl );  //depends on InheritOrFinalizePageStyles
@@ -1942,121 +2063,9 @@ void SectionPropertyMap::CloseSectionGroup( DomainMapper_Impl& rDM_Impl )
         if ( pPrevSection && pPrevSection->ColumnCount() )
             pPrevSection->DontBalanceTextColumns();
 
-        //prepare text grid properties
-        sal_Int32 nHeight = 1;
-        std::optional< PropertyMap::Property > pProp = getProperty( PROP_HEIGHT );
-        if ( pProp )
-            pProp->second >>= nHeight;
-
-        sal_Int32 nWidth = 1;
-        pProp = getProperty( PROP_WIDTH );
-        if ( pProp )
-            pProp->second >>= nWidth;
-
-        sal_Int16 nWritingMode = text::WritingMode2::LR_TB;
-        pProp = getProperty( PROP_WRITING_MODE );
-        if ( pProp )
-            pProp->second >>= nWritingMode;
-
-        sal_Int32 nTextAreaHeight = nWritingMode == text::WritingMode2::LR_TB ?
-            nHeight - m_nTopMargin - m_nBottomMargin :
-            nWidth - m_nLeftMargin - m_nRightMargin;
-
-        sal_Int32 nGridLinePitch = m_nGridLinePitch;
-        //sep.dyaLinePitch
-        if ( nGridLinePitch < 1 || nGridLinePitch > 31680 )
-        {
-            SAL_WARN( "writerfilter", "sep.dyaLinePitch outside legal range: " << nGridLinePitch );
-            nGridLinePitch = 1;
-        }
-
-        const sal_Int32 nGridLines = nTextAreaHeight / nGridLinePitch;
-        sal_Int16 nGridType = m_nGridType;
-        if ( nGridLines >= 0 && nGridLines <= SAL_MAX_INT16 )
-            Insert( PROP_GRID_LINES, cpo::uno::Any( sal_Int16(nGridLines) ) );
-        else
-            nGridType = text::TextGridMode::NONE;
-
-        // PROP_GRID_MODE
-        if ( nGridType == text::TextGridMode::LINES_AND_CHARS )
-        {
-            if (!m_nDxtCharSpace)
-                nGridType = text::TextGridMode::LINES;
-            else
-                Insert( PROP_GRID_SNAP_TO_CHARS, cpo::uno::Any( m_bGridSnapToChars ) );
-        }
-
-        Insert( PROP_GRID_MODE, cpo::uno::Any( nGridType ) );
-
-        sal_Int32 nCharWidth = 423; //240 twip/ 12 pt
-
-        // tdf#139418: Fetch the default Asian text height for grid pitch calculation
-        if (const auto pEntry = rDM_Impl.GetStyleSheetTable()->GetDefaultCharProps(); pEntry)
-        {
-            const auto pPropHeight = pEntry->getProperty(PROP_CHAR_HEIGHT_ASIAN);
-            if (pPropHeight.has_value())
-            {
-                double fHeight = 0;
-                if (pPropHeight->second >>= fHeight)
-                {
-                    nCharWidth = ConversionHelper::convertTwipToMm100_Limited(
-                        static_cast<sal_Int32>(fHeight * 20.0 + 0.5));
-                }
-            }
-        }
-
-        // tdf#107359: Override the default Asian height from the Standard style, if present.
-        if (const auto pEntry
-            = rDM_Impl.GetStyleSheetTable()->FindStyleSheetByConvertedStyleName(u"Standard");
-            pEntry)
-        {
-            const auto pPropHeight = pEntry->m_pProperties->getProperty(PROP_CHAR_HEIGHT_ASIAN);
-            if (pPropHeight.has_value())
-            {
-                double fHeight = 0;
-                if (pPropHeight->second >>= fHeight)
-                {
-                    nCharWidth = ConversionHelper::convertTwipToMm100_Limited(
-                        static_cast<sal_Int32>(fHeight * 20.0 + 0.5));
-                }
-            }
-        }
-
-        //dxtCharSpace
-        if ( m_nDxtCharSpace )
-        {
-            sal_Int32 nCharSpace = m_nDxtCharSpace;
-            //main lives in top 20 bits, and is signed.
-            sal_Int32 nMain = (nCharSpace & 0xFFFFF000);
-            nMain /= 0x1000;
-            nCharWidth += ConversionHelper::convertTwipToMm100_Limited(nMain * 20);
-
-            sal_Int32 nFraction = (nCharSpace & 0x00000FFF);
-            nFraction = (nFraction * 20) / 0xFFF;
-            nCharWidth += ConversionHelper::convertTwipToMm100_Limited(nFraction);
-        }
-
+        PrepareTextGridProperties(rDM_Impl);
         if ( m_nPageNumberType >= 0 )
             Insert( PROP_NUMBERING_TYPE, cpo::uno::Any( m_nPageNumberType ) );
-
-        // #i119558#, force to set document as standard page mode,
-        // refer to ww8 import process function "SwWW8ImplReader::SetDocumentGrid"
-        try
-        {
-            if (rDM_Impl.GetTextDocument())
-            {
-                Insert(PROP_GRID_STANDARD_MODE, cpo::uno::Any(true));
-                rDM_Impl.GetTextDocument()->setPropertyValue(u"DefaultPageMode"_ustr, cpo::uno::Any(false));
-            }
-        }
-        catch ( const cpo::uno::Exception& )
-        {
-            DBG_UNHANDLED_EXCEPTION("writerfilter.dmapper", "Exception in SectionPropertyMap::CloseSectionGroup");
-        }
-
-        Insert( PROP_GRID_BASE_HEIGHT, cpo::uno::Any( nGridLinePitch ) );
-        Insert( PROP_GRID_BASE_WIDTH, cpo::uno::Any( nCharWidth ) );
-        Insert( PROP_GRID_RUBY_HEIGHT, cpo::uno::Any( sal_Int32( 0 ) ) );
 
         if (rDM_Impl.IsNewDoc() && xPageStyle.is())
             ApplyProperties_(xPageStyle);

@@ -68,7 +68,7 @@ def compile_source(repo,engine,online,office_config):
  commands=['set -euo pipefail','export CCACHE_DIR=/workspace/cache/ccache','export CCACHE_MAXSIZE=8G']
  if engine:
   commands += ['cd /workspace/engine','make -j3 build',
-   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
+   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
    'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log']
  if online:commands += ['cd /workspace/source','make -j3','DESTDIR=/workspace/stage make install']
  run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus','3','--memory','12g','--user','1000:1000',
@@ -84,7 +84,7 @@ def compile_source(repo,engine,online,office_config):
        '-v',str(office_config/'deploy/source-build/word-mac-fontconfig.xml')+':/etc/fonts/word-mac-fontconfig.xml:ro',
        '-e','FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml','-e','NON_APPLICATION_FONT_USE=allow',
        '-e','CCACHE_DIR=/workspace/cache/ccache',BUILDER,'bash','-lc',
-       'cd /workspace/engine && make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacGbBoldTableWrap" '
+       'cd /workspace/engine && make -j3 CppunitTest_sw_layoutwriter5 NON_APPLICATION_FONT_USE=allow CPPUNIT_TEST_NAME="testWordMacClassicBoldAdvance testWordMacCjkBaseline testWordMacMultiplePunctuationBudget testWordMacMixedScriptLineBudget testWordMacFlexibleScriptGap testWordMacGbBoldTableWrap testWordMacGridBottomPadding testWordMacDengXianPitch testWordMacMissingThemeFonts testWordMacPunctuationWrap testWordMacAutomaticScriptSpacing testWordMacGridPunctuationCompression testWordMacYaHeiGridHeight testWordMacWesternPunctuationHint" '
        '&& cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-gb-font-tests.log'],timeout=1200)
 
 def registry_transport():
@@ -166,7 +166,7 @@ def build_images(paths,heads,old,out,engine,online,targets):
   else:
    lines += ['COPY --chmod=644 office-fonts/ /usr/local/share/fonts/word-mac/',
     'COPY --chmod=644 word-mac-fontconfig.xml /etc/fonts/word-mac-fontconfig.xml',
-    'ENV FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml COCOLIAN_WORD_MAC_METRICS=1',
+    'ENV FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml COCOLIAN_WORD_MAC_METRICS=1 COCOLIAN_WORD_MAC_CLASSIC_METRICS=1 COCOLIAN_WORD_MAC_AUTOFIT=1 COCOLIAN_WORD_MAC_GRID_BOTTOM=1 COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS=1 COCOLIAN_WORD_MAC_LINE_BUDGET=1',
     'RUN chmod -R a+rX /usr/local/share/fonts/word-mac && fc-cache -f']
    if engine:lines += ['COPY engine/ /opt/collaboraoffice/']
    if deployment=='libreoffice':lines += ['COPY --chmod=755 source-conversion-service.py /usr/local/bin/source-conversion-service.py']

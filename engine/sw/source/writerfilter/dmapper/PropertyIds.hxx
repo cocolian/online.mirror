@@ -414,6 +414,8 @@ enum PropertyIds
         ,PROP_PARA_CONNECT_BORDERS
         ,PROP_CHAR_FONT_FAMILY
         ,PROP_INLINE_HEADING
+        ,PROP_PARA_IS_CHARACTER_DISTANCE
+        ,PROP_CELL_NO_WRAP
     };
 
 //Returns the UNO string equivalent to eId.

@@ -18,6 +18,7 @@
  */
 
 #include <sal/config.h>
+#include <wordmacmetrics.hxx>
 
 #include "ConversionHelper.hxx"
 #include "NumberingManager.hxx"
@@ -835,6 +836,18 @@ void ListsManager::lcl_sprm( Sprm& rSprm )
         (nSprmId == NS_ooxml::LN_CT_NumPicBullet_pict && m_pCurrentNumPicBullet) ||
         nSprmId == NS_ooxml::LN_CT_Numbering_numPicBullet))
         return;
+
+    // Word treats an omitted level index as level zero. Some producers omit
+    // ilvl on single-level definitions; without a current level all their
+    // start values, formats and bullet fonts would otherwise be discarded.
+    if (sw::UseWordMacMetrics() && m_pCurrentDefinition
+        && !m_pCurrentDefinition->GetCurrentLevel()
+        && (nSprmId == NS_ooxml::LN_CT_Lvl_start
+            || nSprmId == NS_ooxml::LN_CT_Lvl_numFmt
+            || nSprmId == NS_ooxml::LN_CT_Lvl_lvlText
+            || nSprmId == NS_ooxml::LN_CT_Lvl_rPr
+            || nSprmId == NS_ooxml::LN_CT_Lvl_pPr))
+        m_pCurrentDefinition->AddLevel(0);
 
     static bool bIsStartVisited = false;
     const Value* pValue = rSprm.getValue();

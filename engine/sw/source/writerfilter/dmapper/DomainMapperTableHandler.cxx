@@ -18,6 +18,8 @@
  */
 
 #include <sal/config.h>
+#include <wordmacmetrics.hxx>
+#include <wordmacautofit.hxx>
 
 #include <string_view>
 
@@ -1977,6 +1979,15 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
 
                     // convert special range IDs ABOVE, BELOW, LEFT and RIGHT
                     lcl_convertFormulaRanges(xTable);
+                    const char* pAutoFit = std::getenv("COCOLIAN_WORD_MAC_AUTOFIT");
+                    if (pTable && sw::UseWordMacMetrics() && pAutoFit && std::strcmp(pAutoFit, "1") == 0
+                        && aTableInfo.nNestLevel == 1 && !bConvertToFloating
+                        && m_rDMapper_Impl.getTableManager().GetLayoutType()
+                            != NS_ooxml::LN_Value_doc_ST_TblLayout_fixed)
+                        sw::AttachWordMacAutoFit(*pTable, o3tl::toTwips(
+                            m_rDMapper_Impl.getTableManager().GetPreferredGridWidth(), o3tl::Length::mm100),
+                            m_rDMapper_Impl.getTableManager().GetWordMacPreferredPercents());
+
                 }
             }
         }

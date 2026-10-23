@@ -41,6 +41,9 @@
 #include <frameformats.hxx>
 #include <frame.hxx>
 #include <swtable.hxx>
+#include <wordmacautofit.hxx>
+#include <svl/grabbagitem.hxx>
+#include <editeng/boxitem.hxx>
 #include <ndtxt.hxx>
 #include <fmtcol.hxx>
 #include <tabcol.hxx>
@@ -3397,6 +3400,89 @@ SwTableLines::~SwTableLines()
 {
     for ( const_iterator it = begin(); it != end(); ++it )
         delete *it;
+}
+
+bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
+    const std::vector<sal_Int32>& rColumnPercents)
+{
+    const auto& rLines = rTable.GetTabLines();
+    if (rLines.empty() || rLines.size() > SAL_MAX_UINT16)
+        return false;
+    const auto& rFirstBoxes = rLines.front()->GetTabBoxes();
+    if (rFirstBoxes.size() < 2 || rFirstBoxes.size() > SAL_MAX_UINT16)
+        return false;
+    if (rLines.size() * rFirstBoxes.size() > 100000)
+        return false;
+    if (rColumnPercents.size() != rFirstBoxes.size()
+        || std::any_of(rColumnPercents.begin(), rColumnPercents.end(),
+            [](sal_Int32 nWidth) { return nWidth <= 0 || nWidth > 5000; }))
+        return false;
+    for (const auto* pLine : rLines)
+    {
+        if (pLine->GetTabBoxes().size() != rFirstBoxes.size())
+            return false;
+        for (const auto* pBox : pLine->GetTabBoxes())
+            if (!pBox->GetSttNd() || pBox->getRowSpan() != 1)
+                return false;
+    }
+    SwTwips nModelWidth = 0;
+    for (const auto* pBox : rFirstBoxes)
+        nModelWidth += pBox->GetFrameFormat()->GetFrameSize().GetWidth();
+    if (nModelWidth <= 0)
+        return false;
+    if (nGridWidthTwips <= 0)
+        nGridWidthTwips = nModelWidth;
+    if (nGridWidthTwips > SAL_MAX_UINT16)
+        return false;
+    const auto& rSize = rTable.GetFrameFormat()->GetFrameSize();
+    const sal_uInt16 nPercent = rSize.GetWidthPercent();
+    if (nPercent == 255)
+        return false;
+    const auto& rBox = rFirstBoxes.front()->GetFrameFormat()->GetBox();
+    const sal_uInt16 nPadding = rBox.GetDistance(SvxBoxItemLine::LEFT);
+    const sal_uInt16 nBorder = rBox.GetLeft() ? rBox.GetLeft()->GetScaledWidth() : 0;
+    const sal_uInt16 nRows = rLines.size();
+    const sal_uInt16 nCols = rFirstBoxes.size();
+    const auto nHori = rTable.GetFrameFormat()->GetHoriOrient().GetHoriOrient();
+    const SvxAdjust eAdjust = nHori == text::HoriOrientation::CENTER ? SvxAdjust::Center
+        : nHori == text::HoriOrientation::RIGHT ? SvxAdjust::Right : SvxAdjust::Left;
+    auto xLayout = std::make_shared<SwHTMLTableLayout>(
+        &rTable, nRows, nCols, false, true,
+        nPercent ? nPercent : sal_uInt16(std::min<SwTwips>(SAL_MAX_UINT16, rSize.GetWidth())),
+        nPercent != 0, 0, nPadding, 0, eAdjust, 0, 0, nBorder, nBorder, nBorder);
+    for (sal_uInt16 nCol = 0; nCol < nCols; ++nCol)
+    {
+        const sal_uInt16 nPreferred = rColumnPercents[nCol];
+        xLayout->SetColumn(std::make_unique<SwHTMLTableLayoutColumn>(nPreferred, true,
+            rFirstBoxes[nCol]->GetFrameFormat()->GetBox().GetLeft() != nullptr), nCol);
+    }
+    for (sal_uInt16 nRow = 0; nRow < nRows; ++nRow)
+        for (sal_uInt16 nCol = 0; nCol < nCols; ++nCol)
+        {
+            SwTableBox* pBox = rLines[nRow]->GetTabBoxes()[nCol];
+            bool bNoWrap = false;
+            if (const auto* pItem = pBox->GetFrameFormat()->GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG))
+            {
+                const auto& rBag = pItem->GetGrabBag();
+                const auto it = rBag.find(u"noWrap"_ustr);
+                if (it != rBag.end())
+                    it->second >>= bNoWrap;
+            }
+            auto xContents = std::make_shared<SwHTMLTableLayoutCnts>(
+                pBox->GetSttNd(), nullptr, bNoWrap, nullptr);
+            xContents->SetTableBox(pBox);
+            xLayout->SetCell(std::make_unique<SwHTMLTableLayoutCell>(
+                xContents, 1, 1, 0, false, bNoWrap), nRow, nCol);
+        }
+    xLayout->SetExportable(false);
+    xLayout->SetMustResize(true);
+    xLayout->SetMayBeInFlyFrame(false);
+    xLayout->AutoLayoutPass1();
+    // Normal-style font defaults can be applied after endTable(). Measure
+    // once more when layout has the final paragraph properties available.
+    xLayout->EnableWordMacAutoFit();
+    rTable.SetHTMLTableLayout(xLayout);
+    return true;
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

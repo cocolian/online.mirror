@@ -18,6 +18,7 @@
  */
 
 #include <sal/config.h>
+#include <wordmacmetrics.hxx>
 
 #include <cmath>
 
@@ -260,6 +261,10 @@ void MakeBorderLine( sal_Int32 nLineThickness,   sal_Int32 nLineToken,
         nLineColor = sal_Int32(COL_BLACK);
 
     sal_Int32 nLineType = lcl_convertBorderStyleFromToken(nLineToken);
+    // Mac Word paints OOXML inset/outset as a single line at the requested
+    // width, including colored borders. A 3D border adds extra cell padding.
+    if (bIsOOXML && sw::UseWordMacMetrics() && (nLineType == 26 || nLineType == 27))
+        nLineType = 1;
 
     // Map to our border types, we should use of one equal line
     // thickness, or one of smaller thickness. If too small we

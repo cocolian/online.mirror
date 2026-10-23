@@ -582,7 +582,10 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                     bAllowBefore = rCC.isLetterNumeric(rInf.GetText(), sal_Int32(rInf.GetIdx()) - 1);
                 }
 
-                nLstHeight /= 5;
+                nLstHeight /= sw::UseWordMacMetrics() ? 4 : 5;
+                const tools::Long nFullScriptGap = nLstHeight;
+                if (sw::UseWordMacFlexibleScriptGaps())
+                    nLstHeight = (nLstHeight + 1) / 2;
                 // does the kerning portion still fit into the line?
                 if (bAllowBefore && fnRequireKerningAtPosition(rInf.GetIdx()) && nLstHeight
                     && rInf.X() + nLstHeight <= rInf.Width() && !pPor->InTabGrp())
@@ -590,6 +593,12 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                     SwKernPortion* pKrn =
                         new SwKernPortion( *rInf.GetLast(), nLstHeight,
                                            pLast->InFieldGrp() && pPor->InFieldGrp() );
+
+                    if (sw::UseWordMacFlexibleScriptGaps())
+                    {
+                        pKrn->SetScriptGapMaximum(nFullScriptGap);
+                        rInf.SetMaxWidthDiff(pKrn, nFullScriptGap - nLstHeight);
+                    }
 
                     // ofz#58550 Direct-leak, pKrn adds itself as the NextPortion
                     // of rInf.GetLast(), but may use CopyLinePortion to add a copy
@@ -719,13 +728,16 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                 pPor->GetLen() && !pPor->InFieldGrp() )
             {
                 // The distance between two different scripts is set
-                // to 20% of the fontheight.
+                // to 20% of the fontheight (25% in the Mac Word profile).
                 TextFrameIndex const nTmp = rInf.GetIdx() + pPor->GetLen();
                 if (nTmp == m_pScriptInfo->NextScriptChg(nTmp - TextFrameIndex(1))
                     && nTmp != TextFrameIndex(rInf.GetText().getLength())
                     && fnRequireKerningAtPosition(nTmp))
                 {
-                    const SwTwips nDist = rInf.GetFont()->GetHeight()/5;
+                    const SwTwips nFullScriptGap = rInf.GetFont()->GetHeight()
+                        / (sw::UseWordMacMetrics() ? 4 : 5);
+                    const SwTwips nDist = sw::UseWordMacFlexibleScriptGaps()
+                        ? (nFullScriptGap + 1) / 2 : nFullScriptGap;
 
                     if( nDist )
                     {
@@ -737,7 +749,14 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                         {
                             // does the kerning portion still fit into the line?
                             if ( rInf.X() + pPor->Width() + nDist <= rInf.Width() )
-                                new SwKernPortion( *pPor, nDist );
+                            {
+                                auto* pGap = new SwKernPortion(*pPor, nDist);
+                                if (sw::UseWordMacFlexibleScriptGaps())
+                                {
+                                    pGap->SetScriptGapMaximum(nFullScriptGap);
+                                    rInf.SetMaxWidthDiff(pGap, nFullScriptGap - nDist);
+                                }
+                            }
                             else
                                 bFull = true;
                         }
@@ -2345,7 +2364,13 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             nLineHeight = nLineHeight * std::max<sal_uInt16>(100, pSpace->GetPropLineSpace()) / 100;
         }
 
-        const SwTwips nAsc = m_pCurr->GetAscent() +
+        // Fixed-height Word lines keep the baseline at 80% of the specified
+        // height, just like the non-grid path below. Centering by the font's
+        // metrics made GB2312 text too high and YaHei titles too low.
+        const SwTwips nAsc = sw::UseWordMacMetrics() && pSpace
+            && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Fix
+            ? (4 * nLineHeight) / 5
+            : m_pCurr->GetAscent() +
                       ( bRubyTop ?
                        ( nLineHeight - m_pCurr->Height() + nRubyHeight ) / 2 :
                        ( nLineHeight - m_pCurr->Height() - nRubyHeight ) / 2 );
@@ -2373,6 +2398,27 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             nLineHeight = nTmp / 100;
         }
 
+        if (sw::UseWordMacGridBottom() && !m_pFrame->IsVertical()
+            && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly()
+            && pSpace && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
+            && GetStart() + m_pCurr->GetLen() >= TextFrameIndex(m_pFrame->GetText().getLength()))
+        {
+            bool bHasObject = false;
+            for (const auto* pPart = m_pCurr->GetNextPortion(); pPart; pPart = pPart->GetNextPortion())
+                if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion())
+                    bHasObject = true;
+            const SwTwips nFontHeight = m_pCurr->GetLineSpacingBaseHeight();
+            const SwTwips nPadding = !bHasObject && nFontHeight > 0
+                ? std::max<SwTwips>(0, m_pCurr->Height() - nFontHeight) / 2 : 0;
+            const auto* pUpper = m_pFrame->GetUpper();
+            const SwTwips nAvailable = pUpper->getFrameArea().Top()
+                + pUpper->getFramePrintArea().Bottom() - Y();
+            // Word can place the last glyphs above the footer even if the
+            // unused lower half of their grid leading reaches past the body.
+            if (nAvailable > 0 && nLineHeight > nAvailable
+                && nLineHeight - nAvailable <= nPadding)
+                nLineHeight -= nPadding;
+        }
         m_pCurr->SetRealHeight( nLineHeight );
         return;
     }
