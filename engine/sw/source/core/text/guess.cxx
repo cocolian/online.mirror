@@ -17,6 +17,8 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
+#include <svl/asiancfg.hxx>
 #include <editeng/unolingu.hxx>
 #include <breakit.hxx>
 #include <IDocumentSettingAccess.hxx>
@@ -252,6 +254,74 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
     const bool bUnbreakableNumberings = rInf.GetTextFrame()->GetDoc()
         .getIDocumentSettingAccess().get(DocumentSettingId::UNBREAKABLE_NUMBERINGS);
 
+    const char* pLineBudget = std::getenv("COCOLIAN_WORD_MAC_LINE_BUDGET");
+    const bool bWordMacLineBudget = sw::UseWordMacMetrics() && pLineBudget
+        && std::strcmp(pLineBudget, "1") == 0 && !rInf.IsMulti() && !rPor.InFieldGrp()
+        && rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().getCharacterCompressionType()
+            != CharCompressType::PunctuationAndKana;
+    SwTwips nPreviousCompression = 0;
+    if (bWordMacLineBudget)
+    {
+        const auto* pRoot = rInf.GetRoot();
+        for (const auto* pPart = pRoot->GetNextPortion(); pPart && pPart != &rPor;
+             pPart = pPart->GetNextPortion())
+        {
+            auto nDiff = rInf.GetMaxWidthDiff(pPart);
+            if (!nDiff && pPart == pRoot->GetFirstPortion())
+                nDiff = rInf.GetMaxWidthDiff(pRoot);
+            nPreviousCompression += nDiff;
+        }
+    }
+    SwTwips nWordMacAllowance = rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()) / 2;
+    if (bWordMacLineBudget && rInf.GetFont()->GetActual() == SwFontScript::Latin)
+    {
+        TextFrameIndex nWordLen(0);
+        while (nWordLen < nMaxLen)
+        {
+            const sal_Unicode c = rInf.GetChar(rInf.GetIdx() + nWordLen);
+            if (c <= 0x20 || c >= 0x7f)
+                break;
+            ++nWordLen;
+        }
+        if (nWordLen > TextFrameIndex(1))
+        {
+            SwTwips nWordWidth = 0, nIgnoredAscent = 0, nIgnoredDescent = 0;
+            tools::Long nIgnoredDiff = 0;
+            rInf.GetTextSize(&rSI, rInf.GetIdx(), nWordLen, rInf.GetLayoutContext(), 0,
+                nWordWidth, nIgnoredDiff, nIgnoredAscent, nIgnoredDescent);
+            nWordMacAllowance = std::max(nWordMacAllowance, nWordWidth / 2);
+        }
+    }
+    if (bWordMacLineBudget && rInf.GetIdx() > TextFrameIndex(0)
+        && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(rInf.GetIdx())) >= 0)
+    {
+        // A closing punctuation portion belongs to the preceding ASCII word.
+        // Do not replace that break unit's allowance with half a CJK glyph
+        // solely because the font/script scanner split off its punctuation.
+        TextFrameIndex nStart = rInf.GetIdx();
+        while (nStart > rInf.GetLineStart())
+        {
+            const sal_Unicode c = rInf.GetChar(nStart - TextFrameIndex(1));
+            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                  || (c >= '0' && c <= '9')))
+                break;
+            --nStart;
+        }
+        const TextFrameIndex nLength = rInf.GetIdx() - nStart;
+        if (nLength > TextFrameIndex(1))
+        {
+            SwTwips nWidth = 0, nAscent = 0, nDescent = 0;
+            tools::Long nDiff = 0;
+            rInf.GetTextSize(&rSI, nStart, nLength, rInf.GetLayoutContext(), 0,
+                nWidth, nDiff, nAscent, nDescent);
+            nWordMacAllowance = std::max(nWordMacAllowance, nWidth / 2
+                + rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()));
+        }
+    }
+    const SwTwips nUncompressedLimit = nLineWidth + nWordMacAllowance - nPreviousCompression;
+    auto aWithinLineBudget = [&] {
+        return !bWordMacLineBudget || m_nBreakWidth + nMaxSizeDiff <= nUncompressedLimit;
+    };
     // first check if everything fits to line
     if ( ( nLineWidth * 2 > SwTwips(sal_Int32(nMaxLen)) * nPorHeight ) ||
          ( bUnbreakableNumberings && rPor.IsNumberPortion() ) )
@@ -260,7 +330,8 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         rInf.GetTextSize(&rSI, rInf.GetIdx(), nMaxLen, rInf.GetLayoutContext(), nMaxComp,
                          m_nBreakWidth, nMaxSizeDiff, nExtraAscent, nExtraDescent);
 
-        if ( ( m_nBreakWidth <= nLineWidth ) || ( bUnbreakableNumberings && rPor.IsNumberPortion() ) )
+        if ( ( m_nBreakWidth <= nLineWidth && aWithinLineBudget() )
+             || ( bUnbreakableNumberings && rPor.IsNumberPortion() ) )
         {
             // portion fits to line
             m_nCutPos = rInf.GetIdx() + nMaxLen;
@@ -543,6 +614,15 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
 #endif
     }
 
+    if (bWordMacLineBudget)
+    {
+        // A font or script boundary must not grant another allowance for
+        // extending the line into the next break unit.
+        const auto nBudgetCut = rInf.GetTextBreak(std::max<SwTwips>(0, nUncompressedLimit),
+            nMaxLen, 0, rInf.GetCachedVclData().get());
+        m_nCutPos = std::min(m_nCutPos, nBudgetCut);
+    }
+
     if( m_nCutPos > rInf.GetIdx() + nMaxLen )
     {
         // second check if everything fits to line
@@ -552,7 +632,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
 
         // The following comparison should always give true, otherwise
         // there likely has been a pixel rounding error in GetTextBreak
-        if ( m_nBreakWidth <= nLineWidth )
+        if ( m_nBreakWidth <= nLineWidth && aWithinLineBudget() )
         {
             bool bRet = rPor.InFieldGrp()
                         || maybeAdjustPositionsForBlockAdjust(

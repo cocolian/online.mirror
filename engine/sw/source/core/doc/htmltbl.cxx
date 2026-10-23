@@ -443,6 +443,8 @@ static void lcl_GetMinMaxSize( sal_uLong& rMinNoAlignCnts, sal_uLong& rMaxNoAlig
 void SwHTMLTableLayout::AutoLayoutPass1()
 {
     m_nPass1Done++;
+    if (m_bWordMacAutoFit)
+        m_aWordMacTokenMinima.assign(m_nCols, 0);
 
     m_nMin = m_nMax = 0; // clear pass1 info
 
@@ -502,6 +504,19 @@ void SwHTMLTableLayout::AutoLayoutPass1()
                                                    nAbsMinNoAlignCnts,
                                                    pTextNd, nIdx,
                                                    pCnts->HasNoBreakTag() );
+                                if (m_bWordMacAutoFit && nColSpan == 1
+                                    && !pTextNd->GetText().isEmpty())
+                                {
+                                    // Word's AutoFit keeps a short ASCII identifier
+                                    // (including a slash or quote) intact if all column
+                                    // minima still fit. Long URLs may wrap as before.
+                                    const OUString& rText = pTextNd->GetText();
+                                    if (std::all_of(rText.getStr(), rText.getStr() + rText.getLength(),
+                                        [](sal_Unicode c) { return c > 0x20 && c < 0x7f; }))
+                                        m_aWordMacTokenMinima[i] = std::max(
+                                            m_aWordMacTokenMinima[i], nMaxNoAlignCnts);
+                                }
+
 
                                 if( nMinNoAlignCnts > nMinNoAlignCell )
                                     nMinNoAlignCell = nMinNoAlignCnts;
@@ -1666,8 +1681,36 @@ void SwHTMLTableLayout::Resize_( sal_uInt16 nAbsAvail, bool bRecalc )
 {
     // If bRecalc is set, the table's content changed.
     // We need to execute pass 1 again.
-    if( bRecalc )
+    // The Mac import constraints depend on the available width. Recompute
+    // their base minima so a later narrower layout can wrap long identifiers.
+    if( bRecalc || m_bWordMacAutoFit )
         AutoLayoutPass1();
+
+    if (m_bWordMacAutoFit && m_aWordMacTokenMinima.size() == m_nCols)
+    {
+        std::vector<sal_uLong> aMinima;
+        sal_uLong nMinimum = 0;
+        for (sal_uInt16 i = 0; i < m_nCols; ++i)
+        {
+            sal_uLong nMinimumWidth = m_aWordMacTokenMinima[i];
+            sal_uLong nDummy = 0, nDummy2 = 0;
+            if (nMinimumWidth)
+                AddBorderWidth(nMinimumWidth, nDummy, nDummy2, i, 1);
+            nMinimumWidth = std::max(nMinimumWidth, GetColumn(i)->GetMin());
+            aMinima.push_back(nMinimumWidth);
+            nMinimum += nMinimumWidth;
+        }
+        const sal_uLong nAvailable = m_bPercentWidthOption
+            ? sal_uLong(nAbsAvail) * m_nWidthOption / 100
+            : std::min<sal_uLong>(nAbsAvail, m_nWidthOption ? m_nWidthOption : nAbsAvail);
+        if (nMinimum <= nAvailable)
+        {
+            for (sal_uInt16 i = 0; i < m_nCols; ++i)
+                GetColumn(i)->SetMinMax(aMinima[i],
+                    std::max(aMinima[i], GetColumn(i)->GetMax()));
+            m_nMin = nMinimum;
+        }
+    }
 
     SwRootFrame *pRoot = GetDoc().getIDocumentLayoutAccess().GetCurrentViewShell()->GetLayout();
     if ( pRoot && pRoot->IsCallbackActionEnabled() )
@@ -1696,6 +1739,12 @@ bool SwHTMLTableLayout::Resize( sal_uInt16 nAbsAvail, bool bRecalc,
     // May the table be resized at all? Or is it forced?
     if( m_bMustNotResize && !bForce )
         return false;
+
+    if (m_bRecalcOnFirstResize)
+    {
+        m_bRecalcOnFirstResize = false;
+        bRecalc = true;
+    }
 
     // May the table be recalculated? Or is it forced?
     if( m_bMustNotRecalc && !bForce )

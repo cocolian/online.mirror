@@ -18,6 +18,7 @@
  */
 
 #include <memory>
+#include <wordmacmetrics.hxx>
 #include "docxattributeoutput.hxx"
 #include "docxhelper.hxx"
 #include "docxsdrexport.hxx"
@@ -5191,6 +5192,15 @@ void DocxAttributeOutput::TableCellProperties( ww8::WW8TableNodeInfoInner::Point
     }
 
     TableBackgrounds( pTableTextNodeInfoInner );
+    if (const auto* pItem = pTableBox->GetFrameFormat()->GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG))
+    {
+        const auto& rBag = pItem->GetGrabBag();
+        const auto it = rBag.find(u"noWrap"_ustr);
+        if (it != rBag.end())
+            m_pSerializer->singleElementNS(XML_w, XML_noWrap,
+                FSNS(XML_w, XML_val), OString::boolean(it->second.get<bool>()));
+    }
+
 
     {
         // Cell margins
@@ -9988,6 +9998,9 @@ void DocxAttributeOutput::ParaScriptSpace( const SfxBoolItem& rScriptSpace )
 {
     m_pSerializer->singleElementNS( XML_w, XML_autoSpaceDE,
            FSNS( XML_w, XML_val ), OString::boolean( rScriptSpace.GetValue() ) );
+    if (sw::UseWordMacMetrics())
+        m_pSerializer->singleElementNS(XML_w, XML_autoSpaceDN,
+            FSNS(XML_w, XML_val), OString::boolean(rScriptSpace.GetValue()));
 }
 
 void DocxAttributeOutput::ParaHangingPunctuation( const SfxBoolItem& rItem )

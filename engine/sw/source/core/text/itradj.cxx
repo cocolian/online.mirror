@@ -30,6 +30,7 @@
 #include "itrtxt.hxx"
 #include "porglue.hxx"
 #include "porlay.hxx"
+#include "porrst.hxx"
 #include "porfly.hxx"
 #include "pormulti.hxx"
 #include "portab.hxx"
@@ -479,6 +480,8 @@ SwTwips SwTextAdjuster::CalcKanaAdj( SwLineLayout* pCurrent )
     const sal_uInt16 nNull = 0;
     size_t nKanaIdx = 0;
     tools::Long nKanaDiffSum = 0;
+    SwTwips nScriptGapSum = 0;
+    std::vector<SwKernPortion*> aScriptGaps;
     SwTwips nRepaintOfst = 0;
     SwTwips nX = 0;
     bool bNoCompression = false;
@@ -508,6 +511,13 @@ SwTwips SwTextAdjuster::CalcKanaAdj( SwLineLayout* pCurrent )
             if ( nMaxWidthDiff && !nRepaintOfst )
                 nRepaintOfst = nX + GetLeftMargin();
         }
+        else if (pPos->IsKernPortion()
+                 && static_cast<SwKernPortion*>(pPos)->IsScriptGap())
+        {
+            auto* pGap = static_cast<SwKernPortion*>(pPos);
+            nScriptGapSum += pGap->GetScriptGapCapacity();
+            aScriptGaps.push_back(pGap);
+        }
         else if( pPos->InGlueGrp() && pPos->InFixMargGrp() )
         {
             if ( nKanaIdx == pCurrent->GetKanaComp().size() )
@@ -534,6 +544,19 @@ SwTwips SwTextAdjuster::CalcKanaAdj( SwLineLayout* pCurrent )
                         0;
 
                 bNoCompression = false;
+            }
+
+            if (nScriptGapSum)
+            {
+                // Restore script gaps before expanding compressed punctuation.
+                // Word narrows the normally quarter-em gaps only as needed.
+                const SwTwips nExpansion = std::clamp<SwTwips>(nRest, 0, nScriptGapSum);
+                for (auto* pGap : aScriptGaps)
+                    pGap->Width(pGap->GetScriptGapMinimum()
+                        + pGap->GetScriptGapCapacity() * nExpansion / nScriptGapSum);
+                nRest -= nExpansion;
+                nScriptGapSum = 0;
+                aScriptGaps.clear();
             }
 
             if( nKanaDiffSum )
@@ -581,6 +604,13 @@ SwTwips SwTextAdjuster::CalcKanaAdj( SwLineLayout* pCurrent )
             pPos->Width( nMinWidth +
                        ( ( 10000 - nCompress ) * nMaxWidthDiff ) / 10000 );
             nDecompress += pPos->Width() - nMinWidth;
+        }
+        else if (pPos->IsKernPortion()
+                 && static_cast<SwKernPortion*>(pPos)->IsScriptGap())
+        {
+            const auto* pGap = static_cast<SwKernPortion*>(pPos);
+            if (pGap->Width())
+                nDecompress += pGap->Width() - pGap->GetScriptGapMinimum();
         }
         else if( pPos->InGlueGrp() && pPos->InFixMargGrp() )
         {

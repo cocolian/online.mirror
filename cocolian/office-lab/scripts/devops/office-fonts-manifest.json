@@ -99,12 +99,60 @@
       "sha256": "f957cbaf4af5b52260462b486dd10a01507184dc39cdbbb3364e428b800b37e6"
     },
     {
-      "file": "仿宋_GB2312.ttf",
+      "file": "\u4eff\u5b8b_GB2312.ttf",
       "sha256": "fef7cf991b458cabd184b73378918d9d15429010e1d6c804f08d394395c3c3b4"
     },
     {
-      "file": "楷体_GB2312.ttf",
+      "file": "\u6977\u4f53_GB2312.ttf",
       "sha256": "99092cbb0df301625f46509e85854db8685556551742097ab3fbbc2e2ca0778b"
+    },
+    {
+      "file": "Aptos-Bold-Italic.ttf",
+      "sha256": "7d7ba35b867c5873274466c743a9812c7bca1a0828f137f7697ae311664f41b9"
+    },
+    {
+      "file": "Aptos-Bold.ttf",
+      "sha256": "cf4b35ac6d81e0eb42ffa44c3829b710c058de6fa3cf2c7cdad0407e22538877"
+    },
+    {
+      "file": "Aptos-Italic.ttf",
+      "sha256": "888909eceb9acd84157078cc097c11f8a94a34ff3bd3fe08194ce7866f5998d1"
+    },
+    {
+      "file": "Aptos.ttf",
+      "sha256": "95980114fcfd42f2f9c446dae429b70582bf2f03097d68433ea9e7d85a49da0b"
+    },
+    {
+      "file": "AptosDisplay-30169865670.ttf",
+      "sha256": "af7a83e6f1d18b62535a8ee97939ab8653d5ac1fe1861cdb8fce829d3878d901"
+    },
+    {
+      "file": "AptosDisplay-32677218994.ttf",
+      "sha256": "e66a3774f5c9f2799f1a7f4734f5d1ad942cc9aeb173eb2c94bc09a5f1bf1142"
+    },
+    {
+      "file": "Helvetica.ttc",
+      "sha256": "25eceb458d4baf628ee0b6a135a9f8ac5ec7b2826646720834bd2bf00dfc825a"
+    },
+    {
+      "file": "Menlo.ttc",
+      "sha256": "dc256e0b39c2a6fec947129d421fef41b8b429f58f9b6e5d1b148c87f775c1f6"
+    },
+    {
+      "file": "SegoeUI-41119599467.ttf",
+      "sha256": "fcb0c4655a6bc4fd3e9fef00d5c90622e27710914cb1471e6b04c420bf489ded"
+    },
+    {
+      "file": "SegoeUI-48155170935.ttf",
+      "sha256": "38444a06583e8e7a0669700ae55a018265491a101326d4e8c3fa32f704789829"
+    },
+    {
+      "file": "Wingdings.ttf",
+      "sha256": "472858c86b3af58a8d46d96ac423f861717c8164a8104432eb92278bbf921a73"
+    },
+    {
+      "file": "AppleColorEmoji.ttc",
+      "sha256": "435ee0b75b26d671e089ddad38640473cc31febc4dbdfae27843a0a000d7ff62"
     }
   ]
 }

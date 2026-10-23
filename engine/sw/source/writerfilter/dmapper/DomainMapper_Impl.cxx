@@ -24,6 +24,7 @@
 #include <com/sun/star/xml/sax/SAXException.hpp>
 #include <ooxml/resourceids.hxx>
 #include "DomainMapper_Impl.hxx"
+#include <wordmacmetrics.hxx>
 #include "ConversionHelper.hxx"
 #include "SdtHelper.hxx"
 #include "DomainMapperTableHandler.hxx"
@@ -2411,6 +2412,30 @@ void DomainMapper_Impl::finishParagraph( const ParagraphPropertyMapPtr& pParaCon
         // Apply it as direct formatting, also left and first line indentation of numbering to keep them.
         else if (isNumberingViaRule)
         {
+            if (sw::UseWordMacMetrics() && pList && nListLevel >= 0 && nListLevel < 9)
+            {
+                // Missing list-level indents inherit the paragraph style in
+                // Word. UNO's synthesized zero defaults otherwise mask it.
+                const auto pAbstract = pList->GetAbstractDefinition();
+                const auto pOverride = pList->GetLevel(nListLevel);
+                const auto pBase = pAbstract ? pAbstract->GetLevel(nListLevel) : nullptr;
+                auto hasIndent = [&](PropertyIds nListProp, PropertyIds nLegacyProp) {
+                    return (pOverride && (pOverride->isSet(nListProp) || pOverride->isSet(nLegacyProp)))
+                        || (pBase && (pBase->isSet(nListProp) || pBase->isSet(nLegacyProp)));
+                };
+                if (!hasIndent(PROP_FIRST_LINE_INDENT, PROP_FIRST_LINE_OFFSET))
+                {
+                    const auto aIndent = GetPropertyFromParaStyleSheet(PROP_PARA_FIRST_LINE_INDENT);
+                    if (aIndent.hasValue())
+                        pParaContext->Insert(PROP_PARA_FIRST_LINE_INDENT, aIndent, false);
+                }
+                if (!hasIndent(PROP_INDENT_AT, PROP_LEFT_MARGIN))
+                {
+                    const auto aIndent = GetPropertyFromParaStyleSheet(PROP_PARA_LEFT_MARGIN);
+                    if (aIndent.hasValue())
+                        pParaContext->Insert(PROP_PARA_LEFT_MARGIN, aIndent, false);
+                }
+            }
             cpo::uno::Any aRightMargin = GetPropertyFromParaStyleSheet(PROP_PARA_RIGHT_MARGIN);
             if ( aRightMargin != cpo::uno::Any() )
             {
@@ -10581,6 +10606,24 @@ OUString DomainMapper_Impl::getFontNameForTheme(const Id id)
     auto const& pHandler = getThemeHandler();
     if (pHandler)
         return pHandler->getFontNameForTheme(id);
+    if (sw::UseWordMacMetrics())
+    {
+        // Mac Word supplies its current Office theme when the package has
+        // theme font references but no theme part. Keep explicit themes intact.
+        switch (id)
+        {
+            case NS_ooxml::LN_Value_ST_Theme_majorAscii:
+            case NS_ooxml::LN_Value_ST_Theme_majorHAnsi:
+                return u"Aptos Display"_ustr;
+            case NS_ooxml::LN_Value_ST_Theme_minorAscii:
+            case NS_ooxml::LN_Value_ST_Theme_minorHAnsi:
+                return u"Aptos"_ustr;
+            case NS_ooxml::LN_Value_ST_Theme_majorEastAsia:
+                return u"DengXian Light"_ustr;
+            case NS_ooxml::LN_Value_ST_Theme_minorEastAsia:
+                return u"DengXian"_ustr;
+        }
+    }
     return OUString();
 }
 

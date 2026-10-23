@@ -218,6 +218,9 @@ class SwHTMLTableLayout
     bool m_bUseRelWidth : 1;          ///< SwTable gets relative width.
 
     bool m_bMustResize : 1;           ///< Table width must be defined.
+    bool m_bWordMacAutoFit = false;
+    std::vector<sal_uLong> m_aWordMacTokenMinima;
+    bool m_bRecalcOnFirstResize = false; ///< Import defaults may resolve after table creation.
     bool m_bExportable : 1;           ///< Layout may be used for export.
     bool m_bBordersChanged : 1;       ///< Borders have been changed.
     bool m_bMayBeInFlyFrame : 1;      ///< Table could be within frame.
@@ -287,6 +290,7 @@ public:
 
     bool IsTopTable() const  { return m_pSwTable != nullptr; }
 
+    void EnableWordMacAutoFit() { m_bWordMacAutoFit = true; m_bRecalcOnFirstResize = true; }
     void SetMustResize( bool bSet ) { m_bMustResize = bSet; }
     void SetMustNotResize( bool bSet ) { m_bMustNotResize = bSet; }
     void SetMustNotRecalc( bool bSet ) { m_bMustNotRecalc = bSet; }

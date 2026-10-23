@@ -90,6 +90,7 @@ class SwKernPortion : public SwLinePortion
     short m_nKern;
     bool m_bBackground;
     bool m_bGridKern;
+    short m_nScriptGapMaximum = 0;
 
 public:
 
@@ -104,6 +105,12 @@ public:
     // This constructor only sets the height and ascent to the values
     // of rPortion. It is only used for kerning portions for grid mode
     explicit SwKernPortion( const SwLinePortion &rPortion );
+
+    void SetScriptGapMaximum(short nMaximum) { m_nScriptGapMaximum = nMaximum; }
+    bool IsScriptGap() const { return m_nScriptGapMaximum > 0; }
+    SwTwips GetScriptGapMinimum() const { return m_nKern; }
+    SwTwips GetScriptGapCapacity() const
+    { return Width() ? m_nScriptGapMaximum - m_nKern : 0; }
 
     virtual void FormatEOL( SwTextFormatInfo &rInf ) override;
     virtual void Paint( const SwTextPaintInfo &rInf ) const override;

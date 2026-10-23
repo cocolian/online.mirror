@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
 #include "SettingsTable.hxx"
 #include "DocumentProtection.hxx"
 #include "TagLogger.hxx"
@@ -286,7 +287,12 @@ void SettingsTable::lcl_sprm(Sprm& rSprm)
     case NS_ooxml::LN_CT_Settings_noPunctuationKerning: //  92526;
     break;
     case NS_ooxml::LN_CT_Settings_characterSpacingControl: //  92527;
-     // doNotCompress, compressPunctuation, compressPunctuationAndJapaneseKana
+        if (sStringValue == u"doNotCompress")
+            m_oCharacterCompressionType = 0;
+        else if (sStringValue == u"compressPunctuation")
+            m_oCharacterCompressionType = 1;
+        else if (sStringValue == u"compressPunctuationAndJapaneseKana")
+            m_oCharacterCompressionType = 2;
     break;
     case NS_ooxml::LN_CT_Settings_doNotIncludeSubdocsInStats: //  92554; // Do Not Include Content in Text Boxes, Footnotes, and Endnotes in Document Statistics)
     break;
@@ -320,6 +326,9 @@ void SettingsTable::lcl_sprm(Sprm& rSprm)
         break;
     case NS_ooxml::LN_CT_Settings_writeProtection:
         resolveSprmProps(*m_pWriteProtection, rSprm);
+        break;
+    case NS_ooxml::LN_CT_Compat_doNotUseEastAsianBreakRules:
+        m_bDoNotCompressWithGrid = nIntValue != 0;
         break;
     case NS_ooxml::LN_CT_Compat_usePrinterMetrics:
         m_bUsePrinterMetrics = nIntValue;
@@ -673,6 +682,12 @@ void SettingsTable::ApplyProperties(rtl::Reference<SwXTextDocument> const& xDoc)
     if (!xDoc)
         throw cpo::uno::RuntimeException();
     rtl::Reference<SwXDocumentSettings> xDocumentSettings(xDoc->createDocumentSettings());
+    if (sw::UseWordMacMetrics() && m_oCharacterCompressionType)
+        xDocumentSettings->setPropertyValue(u"CharacterCompressionType"_ustr,
+                                           cpo::uno::Any(*m_oCharacterCompressionType));
+
+    xDocumentSettings->setPropertyValue(u"DoNotCompressWithGrid"_ustr,
+                                       cpo::uno::Any(m_bDoNotCompressWithGrid));
 
     // Shared between DOCX and RTF, unconditional flags.
     xDocumentSettings->setPropertyValue(u"TableRowKeep"_ustr, cpo::uno::Any(true));

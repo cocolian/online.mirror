@@ -155,6 +155,8 @@ private:
     bool m_bBalanceSingleByteDoubleByteWidth = false;
     bool m_bDisplayBackgroundShape;
     bool m_bNoLeading = false;
+    std::optional<sal_Int16> m_oCharacterCompressionType;
+    bool m_bDoNotCompressWithGrid = false;
     OUString m_sDecimalSymbol;
     OUString m_sListSeparator;
     std::vector<std::pair<OUString, OUString>> m_aDocVars;

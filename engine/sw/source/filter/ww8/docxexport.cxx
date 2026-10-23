@@ -18,6 +18,7 @@
  */
 
 #include <config_wasm_strip.h>
+#include <wordmacmetrics.hxx>
 
 #include "docxexport.hxx"
 #include "docxexportfilter.hxx"
@@ -1257,6 +1258,8 @@ WriteCompat(SwDoc const& rDoc, ::sax_fastparser::FSHelperPtr const& rpFS) -> voi
     {
         rpFS->singleElementNS(XML_w, XML_doNotExpandShiftReturn);
     }
+    if (rIDSA.get(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID))
+        rpFS->singleElementNS(XML_w, XML_doNotUseEastAsianBreakRules);
     // tdf#146515 export "Use printer metrics for document formatting"
     if (!rIDSA.get(DocumentSettingId::USE_VIRTUAL_DEVICE))
         rpFS->singleElementNS(XML_w, XML_usePrinterMetrics);
@@ -1697,6 +1700,16 @@ void DocxExport::WriteSettings()
     // Even and Odd Headers
     if( m_aSettings.evenAndOddHeaders )
         pFS->singleElementNS(XML_w, XML_evenAndOddHeaders);
+
+    if (sw::UseWordMacMetrics())
+    {
+        const sal_Int16 nCompression = static_cast<sal_Int16>(
+            m_rDoc.getIDocumentSettingAccess().getCharacterCompressionType());
+        pFS->singleElementNS(XML_w, XML_characterSpacingControl, FSNS(XML_w, XML_val),
+            nCompression == 1 ? "compressPunctuation"
+                              : nCompression == 2 ? "compressPunctuationAndJapaneseKana"
+                                                  : "doNotCompress");
+    }
 
     // Has Footnotes
     if( m_pAttrOutput->HasFootnotes())

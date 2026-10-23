@@ -297,6 +297,8 @@ bool sw::DocumentSettingManager::get(/*[in]*/ DocumentSettingId id) const
             return mbForceTopAlignmentInCellWithFloatingAnchor;
         case DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT:
             return mbAdjustTableLineHeightsToGridHeight;
+        case DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID:
+            return mbDoNotCompressWithGrid;
         case DocumentSettingId::ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
             return mbAssignConsecutiveLeftRightPages;
         default:
@@ -652,6 +654,9 @@ void sw::DocumentSettingManager::set(/*[in]*/ DocumentSettingId id, /*[in]*/ boo
         case DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT:
             mbAdjustTableLineHeightsToGridHeight = value;
             break;
+        case DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID:
+            mbDoNotCompressWithGrid = value;
+            break;
         case DocumentSettingId::ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
             mbAssignConsecutiveLeftRightPages = value;
             break;
@@ -858,6 +863,7 @@ void sw::DocumentSettingManager::ReplaceCompatibilityOptions(const DocumentSetti
     mbLineSpacingAsGapBelow = rSource.mbLineSpacingAsGapBelow;
     mbBalanceSpacesAndIdeographicSpaces = rSource.mbBalanceSpacesAndIdeographicSpaces;
     mbForceTopAlignmentInCellWithFloatingAnchor = rSource.mbForceTopAlignmentInCellWithFloatingAnchor;
+    mbDoNotCompressWithGrid = rSource.mbDoNotCompressWithGrid;
     mbAdjustTableLineHeightsToGridHeight = rSource.mbAdjustTableLineHeightsToGridHeight;
     mbAssignConsecutiveLeftRightPages = rSource.mbAssignConsecutiveLeftRightPages;
 }

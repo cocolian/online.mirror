@@ -18,6 +18,9 @@
  */
 
 #include <layfrm.hxx>
+#include <wordmacmetrics.hxx>
+#include <tgrditem.hxx>
+#include <pagedesc.hxx>
 #include <ftnboss.hxx>
 #include <ndtxt.hxx>
 #include <paratr.hxx>
@@ -133,6 +136,34 @@ bool SwTextFrameBreak::IsInside(SwTextMargin const& rLine, SwResizeLimitReason& 
 
     // Calculate extra space for bottom border.
     nLineHeight += aRectFnSet.GetBottomMargin(*m_pFrame);
+    if (sw::UseWordMacGridBottom() && !m_pFrame->IsVertical()
+        && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly()
+        && !rLine.GetNext() && rLine.GetEnd() >= TextFrameIndex(m_pFrame->GetText().getLength()))
+    {
+        const auto& rNode = *m_pFrame->GetTextNodeForParaProps();
+        const auto& rSet = rNode.GetSwAttrSet();
+        const auto* pPage = rNode.FindPageDesc();
+        if (rNode.getIDocumentSettingAccess()->get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+            && rSet.GetParaGrid().GetValue()
+            && rSet.GetLineSpacing().GetLineSpaceRule() == SvxLineSpaceRule::Auto
+            && pPage && pPage->GetMaster().GetTextGrid().GetGridType() != SwTextGrid::NONE)
+        {
+            bool bHasObject = false;
+            for (const auto* pPart = rLine.GetCurr()->GetNextPortion(); pPart; pPart = pPart->GetNextPortion())
+                if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion())
+                    bHasObject = true;
+            const SwTwips nFontHeight = rLine.GetCurr()->GetLineSpacingBaseHeight();
+            if (!bHasObject && nFontHeight > 0)
+            {
+                const SwTwips nPadding = std::max<SwTwips>(0,
+                    rLine.GetCurr()->Height() - nFontHeight) / 2;
+                const SwTwips nAlreadyTrimmed = std::max<SwTwips>(0,
+                    rLine.GetCurr()->Height() - rLine.GetCurr()->GetRealHeight());
+                nLineHeight -= std::max<SwTwips>(0, nPadding - nAlreadyTrimmed);
+            }
+        }
+    }
+
 
     // cool#15942: when checking if a follow can be merged back, the checked line (currently part
     // of the follow) could be the last line of a cell, and then it might need additional lower

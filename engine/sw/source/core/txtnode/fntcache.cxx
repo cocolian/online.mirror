@@ -19,6 +19,7 @@
 
 #include <sal/config.h>
 #include <wordmacmetrics.hxx>
+#include <svl/asiancfg.hxx>
 
 #include <config_vclplug.h>
 
@@ -290,7 +291,7 @@ static sal_uInt16 lcl_ApplyCjkHeightAdjustment(sal_uInt16 nBase, const SwViewShe
             || stCaps.oCodePageRange->test(vcl::CodePageCoverage::CP949)
             || stCaps.oCodePageRange->test(vcl::CodePageCoverage::CP950))
         {
-            const tools::Long nMacHeight = sw::WordMacGbFontHeight(rDev);
+            const tools::Long nMacHeight = sw::WordMacCjkFontHeight(rDev);
             const tools::Long nRawHeight = rDev.GetTextHeight();
             if (nMacHeight > 0 && nRawHeight > 0)
             {
@@ -300,7 +301,10 @@ static sal_uInt16 lcl_ApplyCjkHeightAdjustment(sal_uInt16 nBase, const SwViewShe
                     return nBase + (nMacHeight - nRawHeight) / 2;
                 return (nBase * nMacHeight) / nRawHeight;
             }
-            return (nBase * 127) / 100;
+            if (sw::UseWordMacClassicMetrics() && sw::IsWordMacModernCjkFont(rDev.GetFont())
+                && bAscent && nRawHeight > 0)
+                return nBase + (nRawHeight * 130 / 100 - nRawHeight) / 2;
+            return (nBase * sw::WordMacCjkMetricScale(rDev.GetFont())) / 100;
         }
     }
 
@@ -396,7 +400,7 @@ sal_uInt16 SwFntObj::GetFontLeading( const SwViewShell *pSh, const OutputDevice&
     // The measured Mac GB2312 pitch already includes its inter-line leading.
     // Adding Writer's separately guessed leading would count it twice.
     if (pSh && pSh->getIDocumentSettingAccess().get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
-        && sw::WordMacGbFontHeight(rOut) > 0)
+        && sw::WordMacCjkFontHeight(rOut) > 0)
         return 0;
     sal_uInt16 nRet = 0;
 
@@ -826,7 +830,7 @@ static void GetTextArray(const SwDrawTextInfo& rExtraInf, const OutputDevice& rD
         (void)rDevice.GetTextArray(rStr, &rDXAry, nIndex, nLen, bCaret, layoutCache, pLayoutCache, &oBounds);
     }
 
-    const double nBoldAdvance = sw::WordMacGbBoldAdvance(rDevice.GetFont());
+    const double nBoldAdvance = sw::WordMacCjkBoldAdvance(rDevice.GetFont());
     if (nBoldAdvance > 0)
     {
         double nPrevious = 0;
@@ -962,7 +966,7 @@ void SwFntObj::DrawText( SwDrawTextInfo &rInf )
     // bDirectPrint indicates that we can enter the branch which calls
     // the DrawText functions instead of calling the DrawTextArray functions
     const bool bDirectPrint = (bPrt || bBrowse)
-        && sw::WordMacGbBoldAdvance(m_aFont) == 0;
+        && sw::WordMacCjkBoldAdvance(m_aFont) == 0;
 
     // Condition for output font / refdev font adjustment
     const bool bUseScrFont =
@@ -2304,7 +2308,7 @@ TextFrameIndex SwFont::GetTextBreak(SwDrawTextInfo const & rInf, tools::Long nTe
             }
         }
 
-        if (sw::WordMacGbBoldAdvance(GetActualFont()) > 0 && aKernArray.empty())
+        if (sw::WordMacCjkBoldAdvance(GetActualFont()) > 0 && aKernArray.empty())
         {
             // Use the same fractional advances for line breaking as for
             // measurement, painting and cursor positioning.
@@ -2367,6 +2371,21 @@ TextFrameIndex SwFont::GetTextBreak(SwDrawTextInfo const & rInf, tools::Long nTe
             nLn = nTextBreak2 + nTextBreak2;
         GetTextArray(rInf, rInf.GetOut(), rInf.GetText(), aKernArray, sal_Int32(rInf.GetIdx()),
                      sal_Int32(nLn), rInf.GetLayoutContext());
+        if (sw::UseWordMacMetrics() && rInf.GetShell()
+            && rInf.GetShell()->getIDocumentSettingAccess().getCharacterCompressionType()
+                != CharCompressType::PunctuationAndKana)
+        {
+            // Limit the CJK breakpoint look-ahead to half a nominal glyph.
+            // Punctuation elsewhere in the paragraph must not allow an
+            // arbitrary number of extra glyphs on the current line.
+            const tools::Long nAllowance = GetHeight(m_nActual) / 2;
+            TextFrameIndex nCandidate(0);
+            while (nCandidate < nLn
+                && aKernArray[sal_Int32(nCandidate)]
+                    + nKern * sal_Int32(nCandidate) <= nTextWidth + nAllowance)
+                ++nCandidate;
+            nLn = std::max(TextFrameIndex(1), nCandidate);
+        }
         if( rInf.GetScriptInfo()->Compress( aKernArray, rInf.GetIdx(), nLn,
                             rInf.GetKanaComp(), o3tl::narrowing<sal_uInt16>(GetHeight( m_nActual )),
                             lcl_IsFullstopCentered( rInf.GetOut() ) ) )

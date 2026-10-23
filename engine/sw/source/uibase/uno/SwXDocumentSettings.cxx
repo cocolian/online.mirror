@@ -181,6 +181,7 @@ enum SwDocumentSettingsPropertyHandles
     HANDLE_FORCE_TOP_ALIGNMENT_IN_CELL_WITH_FLOATING_ANCHOR,
     HANDLE_ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT,
     HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES,
+    HANDLE_DO_NOT_COMPRESS_WITH_GRID,
     // Every SdrCompatibilityFlag, told apart by the property name
     HANDLE_COMPATIBILITY_FLAG,
 };
@@ -302,6 +303,7 @@ static rtl::Reference<MasterPropertySetInfo> lcl_createSettingsInfo()
         { u"LineSpacingAsGapBelow"_ustr, HANDLE_LINE_SPACING_AS_GAP_BELOW, cppu::UnoType<bool>::get(), 0 },
         { u"BalanceSpacesAndIdeographicSpaces"_ustr, HANDLE_BALANCE_SPACES_AND_IDEOGRAPHIC_SPACES, cppu::UnoType<bool>::get(), 0 },
         { u"ForceTopAlignmentInCellWithFloatingAnchor"_ustr, HANDLE_FORCE_TOP_ALIGNMENT_IN_CELL_WITH_FLOATING_ANCHOR, cppu::UnoType<bool>::get(), 0 },
+        { u"DoNotCompressWithGrid"_ustr, HANDLE_DO_NOT_COMPRESS_WITH_GRID, cppu::UnoType<bool>::get(), 0 },
         { u"AdjustTableLineHeightsToGridHeight"_ustr, HANDLE_ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT, cppu::UnoType<bool>::get(), 0 },
         { u"AssignConsecutiveLeftRightPages"_ustr, HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES, cppu::UnoType<bool>::get(), 0 },
 
@@ -1300,6 +1302,10 @@ void SwXDocumentSettings::_setSingleValue( const comphelper::PropertyInfo & rInf
                     DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT, bTmp);
             }
             break;
+        case HANDLE_DO_NOT_COMPRESS_WITH_GRID:
+            if (bool bTmp; rValue >>= bTmp)
+                mpDoc->getIDocumentSettingAccess().set(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID, bTmp);
+            break;
         case HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
             if (bool bTmp; rValue >>= bTmp)
             {
@@ -1976,6 +1982,9 @@ void SwXDocumentSettings::_getSingleValue( const comphelper::PropertyInfo & rInf
                 DocumentSettingId::ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT);
         }
         break;
+        case HANDLE_DO_NOT_COMPRESS_WITH_GRID:
+            rValue <<= mpDoc->getIDocumentSettingAccess().get(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID);
+            break;
         case HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
         {
             rValue <<= mpDoc->getIDocumentSettingAccess().get(

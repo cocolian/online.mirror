@@ -24,6 +24,7 @@
 #include "TagLogger.hxx"
 #include "TDefTableHandler.hxx"
 #include "DomainMapper_Impl.hxx"
+#include <wordmacmetrics.hxx>
 #include "ConversionHelper.hxx"
 #include "ModelEventListener.hxx"
 #include "MeasureHandler.hxx"
@@ -583,7 +584,8 @@ void DomainMapper::lcl_attribute(Id nName, const Value & val)
                 sal_Int32 nIndentAt = m_pImpl->getCurrentNumberingProperty(u"IndentAt"_ustr);
 
                 sal_Int32 nParaLeftMargin = ConversionHelper::convertTwipToMm100_Limited(nIntValue);
-                if (nParaLeftMargin != 0 && nIndentAt == nParaLeftMargin)
+                if (nParaLeftMargin != 0 && nIndentAt == nParaLeftMargin
+                    && !sw::UseWordMacMetrics())
                     // Avoid direct left margin when it's the same as from the
                     // numbering.
                     break;
@@ -2094,8 +2096,11 @@ void DomainMapper::sprmWithProps( Sprm& rSprm, const PropertyMapPtr& rContext )
     case NS_ooxml::LN_CT_PPrBase_topLinePunct:
         break;
     case NS_ooxml::LN_CT_PPrBase_autoSpaceDE:
-        break;
     case NS_ooxml::LN_CT_PPrBase_autoSpaceDN:
+        // Writer exposes a shared Asian/non-Asian spacing switch. Preserve
+        // explicit matching Word DE/DN settings (notably code styles).
+        if (sw::UseWordMacMetrics())
+            rContext->Insert(PROP_PARA_IS_CHARACTER_DISTANCE, cpo::uno::Any(nIntValue != 0));
         break;
     case NS_ooxml::LN_CT_PPrBase_textAlignment:
         {
@@ -3009,6 +3014,10 @@ void DomainMapper::sprmWithProps( Sprm& rSprm, const PropertyMapPtr& rContext )
     break;
     case NS_ooxml::LN_CT_PPrBase_pStyle:
     {
+        // An empty style reference behaves like an omitted reference in Word.
+        // Passing it to UNO can abort applying the paragraph's direct properties.
+        if (sw::UseWordMacMetrics() && sStringValue.isEmpty())
+            break;
         StyleSheetTablePtr pStyleTable = m_pImpl->GetStyleSheetTable();
         const OUString sConvertedStyleName = pStyleTable->ConvertStyleNameExt(sStringValue);
         m_pImpl->SetCurrentParaStyleName( sConvertedStyleName );

@@ -196,6 +196,7 @@ class DocumentSettingManager final :
     bool mbLineSpacingAsGapBelow : 1 = true; // tdf#172113
     bool mbBalanceSpacesAndIdeographicSpaces : 1 = false; // tdf#88908
     bool mbForceTopAlignmentInCellWithFloatingAnchor : 1 = false; // tdf#37153
+    bool mbDoNotCompressWithGrid : 1 = false;
     bool mbAdjustTableLineHeightsToGridHeight : 1 = true; // tdf#167583
     bool mbAssignConsecutiveLeftRightPages : 1 = false; // tdf#159133
 
