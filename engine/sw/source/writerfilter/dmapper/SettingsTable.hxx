@@ -64,6 +64,7 @@ public:
     bool GetEvenAndOddHeaders() const;
 
     bool GetUsePrinterMetrics() const;
+    bool GetGrowAutoFit() const { return m_bGrowAutoFit; }
 
     bool GetEmbedTrueTypeFonts() const;
     bool GetEmbedSystemFonts() const;
@@ -136,6 +137,7 @@ private:
     Id m_nView;
     bool m_bEvenAndOddHeaders;
     bool m_bUsePrinterMetrics;
+    bool m_bGrowAutoFit = false;
     bool embedTrueTypeFonts;
     bool embedSystemFonts;
     bool m_bDoNotUseHTMLParagraphAutoSpacing;

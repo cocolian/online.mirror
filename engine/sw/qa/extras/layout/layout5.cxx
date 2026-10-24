@@ -2410,6 +2410,88 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacLegacyPercentTablePadding)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacAutoFitPageWidth)
+{
+    const std::array<OUString, 2> aNames = {
+        u"COCOLIAN_WORD_MAC_METRICS"_ustr, u"COCOLIAN_WORD_MAC_AUTOFIT"_ustr };
+    std::array<OUString, 2> aPrevious;
+    std::array<bool, 2> aHadPrevious;
+    for (size_t i = 0; i < aNames.size(); ++i)
+        aHadPrevious[i] = osl_getEnvironment(aNames[i].pData, &aPrevious[i].pData)
+            == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+        {
+            if (aHadPrevious[i])
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+        }
+    });
+    const OUString aOn = u"1"_ustr;
+    for (const auto& rName : aNames)
+        osl_setEnvironment(rName.pData, aOn.pData);
+    for (bool bGrow : { false, true })
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            const OString aDocument = R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblInd w:w="0" w:type="dxa"/><w:tblLayout w:type="autofit"/><w:tblCellMar><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="2768"/><w:gridCol w:w="2768"/><w:gridCol w:w="2770"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="1666" w:type="pct"/></w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:hAnsi="Liberation Serif"/><w:sz w:val="24"/></w:rPr><w:t>TOKEN</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1666" w:type="pct"/></w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:hAnsi="Liberation Serif"/><w:sz w:val="24"/></w:rPr><w:t>TOKEN</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1668" w:type="pct"/></w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Liberation Serif" w:hAnsi="Liberation Serif"/><w:sz w:val="24"/></w:rPr><w:t>TOKEN</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/></w:sectPr></w:body></w:document>)xml"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr, aDocument.replaceAll("TOKEN"_ostr,
+                "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"_ostr));
+            const OString aSettings = R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:growAutofit w:val=")xml"_ostr
+                + (bGrow ? "1"_ostr : "0"_ostr)
+                + R"xml("/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr;
+            writeWordMacPart(xWord, u"settings.xml"_ustr, aSettings);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        for (int nRound = 0; nRound < 3; ++nRound)
+        {
+            Scheduler::ProcessEventsToIdle();
+            calcLayout();
+            if (nRound > 0)
+            {
+                assertXPath(parseExport(u"word/settings.xml"_ustr),
+                    "/w:settings/w:compat/w:growAutofit", "val", bGrow ? u"1"_ustr : u"0"_ustr);
+                assertXPath(parseExport(u"word/document.xml"_ustr),
+                    "/w:document/w:body/w:tbl/w:tblPr/w:tblLayout", "type", u"autofit"_ustr);
+            }
+            auto pLayout = parseLayoutDump();
+            const auto nBody = getXPath(pLayout, "/root/page[1]/body/infos/prtBounds", "width").toInt32();
+            const auto nTable = getXPath(pLayout, "/root/page[1]/body/tab/infos/prtBounds", "width").toInt32();
+            const auto* pTable = SwTable::FindTable(
+                (*getSwDocShell()->GetDoc()->GetTableFrameFormats())[0]);
+            CPPUNIT_ASSERT(pTable);
+            const auto* pAutoFit = pTable->GetHTMLTableLayout();
+            if (nRound == 0)
+                CPPUNIT_ASSERT_MESSAGE("AutoFit layout must be attached", pAutoFit);
+            const OString aDiagnostic = "grow="_ostr + (bGrow ? "1"_ostr : "0"_ostr)
+                + " round="_ostr + OString::number(nRound)
+                + " body="_ostr + OString::number(nBody)
+                + " table="_ostr + OString::number(nTable)
+                + " minimum="_ostr + OString::number(pAutoFit ? pAutoFit->GetMin() : 0);
+            if (nRound == 0)
+                CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), pAutoFit->GetMin() > sal_uLong(nBody));
+            if (bGrow)
+                CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), nTable > nBody);
+            else
+            {
+                CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), std::abs(nTable - nBody) <= 1);
+                CPPUNIT_ASSERT_GREATER(1, countXPathNodes(pLayout,
+                    "/root/page[1]/body/tab/row/cell[1]/txt/SwParaPortion/SwLineLayout"));
+            }
+            if (nRound < 2)
+                saveAndReload(TestFilter::DOCX);
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacAutoFitAsciiToken)
 {
     const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;

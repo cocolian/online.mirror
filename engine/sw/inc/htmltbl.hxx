@@ -219,6 +219,7 @@ class SwHTMLTableLayout
 
     bool m_bMustResize : 1;           ///< Table width must be defined.
     bool m_bWordMacAutoFit = false;
+    bool m_bWordMacGrowAutoFit = false;
     sal_uInt16 m_nWordMacPercentPadding = 0;
     std::vector<sal_uLong> m_aWordMacTokenMinima;
     bool m_bRecalcOnFirstResize = false; ///< Import defaults may resolve after table creation.
@@ -292,9 +293,10 @@ public:
     bool IsTopTable() const  { return m_pSwTable != nullptr; }
 
     sal_uInt16 GetWordMacPercentPadding() const { return m_nWordMacPercentPadding; }
-    void EnableWordMacAutoFit(sal_uInt16 nPercentPadding = 0)
+    void EnableWordMacAutoFit(sal_uInt16 nPercentPadding = 0, bool bGrowAutoFit = false)
     {
         m_bWordMacAutoFit = true;
+        m_bWordMacGrowAutoFit = bGrowAutoFit;
         m_bRecalcOnFirstResize = true;
         m_nWordMacPercentPadding = nPercentPadding;
     }

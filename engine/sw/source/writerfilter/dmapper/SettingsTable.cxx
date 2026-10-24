@@ -333,6 +333,15 @@ void SettingsTable::lcl_sprm(Sprm& rSprm)
     case NS_ooxml::LN_CT_Compat_doNotWrapTextWithPunct:
         m_bDoNotWrapPunctuationWithGrid = nIntValue != 0;
         break;
+    case NS_ooxml::LN_CT_Compat_growAutofit:
+    {
+        m_bGrowAutoFit = nIntValue != 0;
+        beans::PropertyValue aValue;
+        aValue.Name = u"growAutofit"_ustr;
+        aValue.Value <<= m_bGrowAutoFit;
+        m_aCompatSettings.push_back(aValue);
+        break;
+    }
     case NS_ooxml::LN_CT_Compat_usePrinterMetrics:
         m_bUsePrinterMetrics = nIntValue;
         break;
@@ -816,7 +825,7 @@ std::pair<bool, bool> SettingsTable::GetCompatSettingHasAndValue( std::u16string
     bool bRet = false;
     for (const auto& rProp : m_aCompatSettings)
     {
-        if (rProp.Name == "compatSetting") //always true
+        if (rProp.Name == "compatSetting")
         {
             cpo::uno::Sequence<css::beans::PropertyValue> aCurrentCompatSettings;
             rProp.Value >>= aCurrentCompatSettings;
@@ -850,7 +859,7 @@ sal_Int32 SettingsTable::GetWordCompatibilityMode()
 
     for (const auto& rProp : m_aCompatSettings)
     {
-        if (rProp.Name == "compatSetting") //always true
+        if (rProp.Name == "compatSetting")
         {
             cpo::uno::Sequence<css::beans::PropertyValue> aCurrentCompatSettings;
             rProp.Value >>= aCurrentCompatSettings;

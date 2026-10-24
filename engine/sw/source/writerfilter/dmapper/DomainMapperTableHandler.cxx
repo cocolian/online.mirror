@@ -2054,9 +2054,17 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
                         && aTableInfo.nNestLevel == 1 && !bConvertToFloating
                         && m_rDMapper_Impl.getTableManager().GetLayoutType()
                             != NS_ooxml::LN_Value_doc_ST_TblLayout_fixed)
+                    {
+                        auto aBag = pTable->GetFrameFormat()->GetAttrSet()
+                            .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG)->GetGrabBag();
+                        aBag[u"WordMacAutoFit"_ustr] <<= true;
+                        pTable->GetFrameFormat()->SetFormatAttr(
+                            SfxGrabBagItem(RES_FRMATR_GRABBAG, std::move(aBag)));
                         sw::AttachWordMacAutoFit(*pTable, o3tl::toTwips(
                             m_rDMapper_Impl.getTableManager().GetPreferredGridWidth(), o3tl::Length::mm100),
-                            m_rDMapper_Impl.getTableManager().GetWordMacPreferredPercents());
+                            m_rDMapper_Impl.getTableManager().GetWordMacPreferredPercents(),
+                            m_rDMapper_Impl.GetSettingsTable()->GetGrowAutoFit());
+                    }
 
                 }
             }

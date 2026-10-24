@@ -284,12 +284,16 @@ void DocxAttributeOutput::TableDefinition(
     m_pSerializer->singleElementNS(XML_w, XML_tblW, FSNS(XML_w, XML_w), OString::number(nPageSize),
                                    FSNS(XML_w, XML_type), widthType);
 
-    // Disable layout autofit, as it does not exist in LibreOffice yet
-    m_pSerializer->singleElementNS(XML_w, XML_tblLayout, FSNS(XML_w, XML_type), "fixed");
-
-    // Look for the table style property in the table grab bag
+    // Keep the supported Word Mac AutoFit mode across DOCX saves. The
+    // default renderer retains its fixed-layout export behavior.
     const std::map<OUString, cpo::uno::Any>& rGrabBag
         = pTableFormat->GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG)->GetGrabBag();
+    bool bWordMacAutoFit = false;
+    const auto itAutoFit = rGrabBag.find(u"WordMacAutoFit"_ustr);
+    if (itAutoFit != rGrabBag.end())
+        itAutoFit->second >>= bWordMacAutoFit;
+    m_pSerializer->singleElementNS(XML_w, XML_tblLayout, FSNS(XML_w, XML_type),
+        bWordMacAutoFit ? "autofit" : "fixed");
 
     // We should clear the TableStyle map. In case of Table inside multiple tables it contains the
     // table border style of the previous table.
@@ -334,6 +338,9 @@ void DocxAttributeOutput::TableDefinition(
             oStyleHoriOrient = rGrabBagElement.second.get<sal_Int16>();
             continue;
         }
+        // This internal mode was already emitted as w:tblLayout above.
+        if (rGrabBagElement.first == "WordMacAutoFit")
+            continue;
         if (rGrabBagElement.first == "TableStyleName")
         {
             // A style the import could not resolve into a live one is still referred to by
