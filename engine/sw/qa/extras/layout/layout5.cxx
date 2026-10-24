@@ -8,6 +8,8 @@
  */
 
 #include <array>
+#include <rtl/strbuf.hxx>
+#include <com/sun/star/io/XInputStream.hpp>
 
 #include <swmodeltestbase.hxx>
 #include <swtable.hxx>
@@ -2147,9 +2149,12 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
     });
     const OUString aOn = u"1"_ustr;
     osl_setEnvironment(aName.pData, aOn.pData);
-    for (sal_Int32 nCase : { 0, 1, 2 })
+    for (const OString& rLanguage : { "en-US"_ostr, "zh-CN"_ostr })
+    for (bool bKinsoku : { false, true })
+    for (sal_Int32 nWidth : { 3900, 4040 })
+    for (sal_Int32 nCase : { 0, 1, 2, 3 })
     {
-        const bool bWordWrap = nCase == 0;
+        const bool bWordWrap = nCase == 0 || nCase == 3;
         const bool bInherited = nCase == 2;
         utl::TempFileNamed aFile;
         aFile.EnableKillingFile();
@@ -2163,9 +2168,11 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
                     R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:wordWrap w:val="0"/></w:pPr></w:style></w:styles>)xml"_ostr);
             writeWordMacPart(xWord, u"document.xml"_ustr,
                 R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr>)xml"_ostr
-                + (bInherited ? OString() : "<w:wordWrap w:val=\""_ostr
+                + (bInherited || nCase == 3 ? OString() : "<w:wordWrap w:val=\""_ostr
                     + (bWordWrap ? "1"_ostr : "0"_ostr) + "\"/>"_ostr)
-                + R"xml(<w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Liberation Mono" w:hAnsi="Liberation Mono"/><w:sz w:val="24"/></w:rPr><w:t>alpha beta</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="4040" w:h="6000"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="default"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                + "<w:kinsoku w:val=\""_ostr + (bKinsoku ? "1"_ostr : "0"_ostr) + "\"/>"_ostr
+                + R"xml(<w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Liberation Mono" w:hAnsi="Liberation Mono"/><w:sz w:val="24"/><w:lang w:val="LANGUAGE"/></w:rPr><w:t>alpha beta</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="PAGE_WIDTH" w:h="6000"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="default"/></w:sectPr></w:body></w:document>)xml"_ostr.replaceAll("LANGUAGE"_ostr, rLanguage)
+                    .replaceAll("PAGE_WIDTH"_ostr, OString::number(nWidth)));
             uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
             uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
         }
@@ -2179,15 +2186,22 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
                 const OString aPath = bInherited
                     ? "/w:styles/w:style[@w:styleId='Normal']/w:pPr/w:wordWrap"_ostr
                     : "/w:document/w:body/w:p/w:pPr/w:wordWrap"_ostr;
-                assertXPath(pXml, aPath + (bWordWrap ? "[@w:val='1']"_ostr : "[@w:val='0']"_ostr), 1);
+                if (nCase == 3)
+                    assertXPath(pXml, aPath, 0);
+                else
+                    assertXPath(pXml, aPath + (bWordWrap ? "[@w:val='1']"_ostr : "[@w:val='0']"_ostr), 1);
             }
+            const OString aInputs = rLanguage + " kinsoku="_ostr + (bKinsoku ? "1"_ostr : "0"_ostr)
+                + " case="_ostr + OString::number(nCase) + " width="_ostr + OString::number(nWidth);
             auto pDump = parseLayoutDump();
             const OString aLines = "/root/page[1]/body/txt/SwParaPortion/SwLineLayout"_ostr;
             assertXPath(pDump, aLines, 2);
-            assertXPath(pDump, aLines + "[1]"_ostr, "portion",
-                bWordWrap ? u"alpha "_ustr : u"alpha be"_ustr);
-            assertXPath(pDump, aLines + "[2]"_ostr, "portion",
-                bWordWrap ? u"beta"_ustr : u"ta"_ustr);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(aInputs.getStr(),
+                bWordWrap ? u"alpha "_ustr : nWidth == 3900 ? u"alpha b"_ustr : u"alpha be"_ustr,
+                getXPath(pDump, aLines + "[1]"_ostr, "portion"));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(aInputs.getStr(),
+                bWordWrap ? u"beta"_ustr : nWidth == 3900 ? u"eta"_ustr : u"ta"_ustr,
+                getXPath(pDump, aLines + "[2]"_ostr, "portion"));
         }
     }
 }
@@ -3824,10 +3838,11 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacYaHeiGridHeight)
         makeWordMacPackage(aFile, true, true, false, false, false, false, false,
                            false, false, false, 0, 0, false, nSize);
         loadFromURL(aFile.GetURL());
-        // Word's 9pt YaHei fits one grid row and retains 150% leading after
-        // the first line. 10pt occupies two rows and ignores that multiplier.
+        // A Mac Word print-PDF probe confirms 9pt YaHei centers its glyphs
+        // in the full 150% grid pitch, including the first line. 10pt occupies
+        // two grid rows and ignores that multiplier.
         assertXPath(parseLayoutDump(), "/root/page[1]/body/txt[1]/infos/bounds",
-                    "height", nSize == 9 ? u"1248" : u"1872");
+                    "height", nSize == 9 ? u"1404" : u"1872");
     }
 }
 
@@ -4194,6 +4209,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacStrictGridTablePunctuation)
                 osl_clearEnvironment(aNames[i].pData);
         }
     });
+    for (const OString& rAlignment : { "left"_ostr, "center"_ostr })
     for (bool bStrict : { false, true })
     {
         utl::TempFileNamed aFile;
@@ -4204,7 +4220,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacStrictGridTablePunctuation)
                 ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
             auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
             writeWordMacPart(xWord, u"document.xml"_ustr,
-                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4480" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="4480"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4480" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="left"/><w:autoSpaceDE/><w:autoSpaceDN/><w:overflowPunct/><w:snapToGrid/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:eastAsia="宋体"/><w:sz w:val="24"/></w:rPr><w:t>甲乙丙丁APP戊己庚辛壬癸子丑寅卯辰巳。sampleToken甲乙丙丁戊己庚辛壬癸</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4480" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="4480"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4480" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="ALIGNMENT"/><w:autoSpaceDE/><w:autoSpaceDN/><w:overflowPunct/><w:snapToGrid/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:eastAsia="宋体"/><w:sz w:val="24"/></w:rPr><w:t>甲乙丙丁APP戊己庚辛壬癸子丑寅卯辰巳。sampleToken甲乙丙丁戊己庚辛壬癸</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr.replaceAll("ALIGNMENT"_ostr, rAlignment));
             writeWordMacPart(xWord, u"settings.xml"_ustr,
                 R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val="compressPunctuation"/><w:compat><w:adjustLineHeightInTable/><w:doNotWrapTextWithPunct w:val=")xml"_ostr
                 + (bStrict ? "1"_ostr : "0"_ostr)
@@ -4428,6 +4444,57 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacSmallTableGridProportional)
     // tables: all three lines occupy 468 twips, including the first line.
     assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt[1]/infos/bounds", "height", u"1404");
     assertXPath(parseLayoutDump(), "/root/page/body/tab/row/cell/txt[2]/infos/bounds", "height", u"468");
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacSmallBodyGridProportional)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, true, true);
+    {
+        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::READWRITE);
+        auto xStream = xWord->openStreamElement(u"document.xml"_ustr, embed::ElementModes::READ);
+        auto xInput = xStream->getInputStream();
+        uno::Sequence<sal_Int8> aBytes;
+        OStringBuffer aBuffer;
+        for (sal_Int32 nRead; (nRead = xInput->readBytes(aBytes, 4096)) > 0;)
+            aBuffer.append(reinterpret_cast<const char*>(aBytes.getConstArray()), nRead);
+        xInput->closeInput();
+        xInput.clear();
+        const OString aDocument = aBuffer.makeStringAndClear();
+        xStream.clear();
+        writeWordMacPart(xWord, u"document.xml"_ustr,
+            aDocument.replaceAll("w:val=\"36\""_ostr, "w:val=\"24\""_ostr));
+        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+    }
+    for (bool bMac : { false, true })
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aName.pData, aValue.pData);
+        loadFromURL(aFile.GetURL());
+        for (bool bReload : { false, true })
+        {
+            if (bReload)
+                saveAndReload(TestFilter::DOCX);
+            auto pDump = parseLayoutDump();
+            // One grid row with 150% leading occupies the full 468 twips,
+            // including the first line, in Mac Word.
+            assertXPath(pDump, "/root/page[1]/body/txt[1]/infos/bounds", "height",
+                bMac ? u"1404"_ustr : u"1248"_ustr);
+        }
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordBodyGridProportional)

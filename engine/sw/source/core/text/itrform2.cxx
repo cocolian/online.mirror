@@ -2380,16 +2380,19 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             }
         }
 
-        const bool bMacTableProportionalGrid = sw::UseWordMacMetrics()
-            && m_pFrame->IsInTab() && nAmpRatio == 1
+        const bool bMacProportionalGrid = sw::UseWordMacMetrics()
+            && (m_pFrame->IsInTab()
+                || (!m_pFrame->IsVertical() && m_pFrame->IsInDocBody()
+                    && !m_pFrame->IsInFly()))
+            && nAmpRatio == 1
             && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
             && pSpace && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
             && pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop;
-        if (bMacTableProportionalGrid)
+        if (bMacProportionalGrid)
         {
-            // Table cells include proportional leading in the first line too.
-            // Center the glyph in that full pitch, instead of adding a gap above
-            // later lines and leaving the first line at the unscaled grid pitch.
+            // Word centers a single grid row's glyphs in the full proportional
+            // pitch, including the first line of a horizontal body paragraph.
+            // Keep that pitch from being multiplied a second time below.
             nLineHeight = nLineHeight * std::max<sal_uInt16>(100, pSpace->GetPropLineSpace()) / 100;
         }
 
@@ -2411,11 +2414,11 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
         // Mac Word ignores proportional leading only when text spans multiple
         // grid rows. Text fitting one row retains its multiplier in both body
         // paragraphs and table cells. Keep the legacy table rule off-profile.
-        const bool bWordTableGrid
-            = bMacTableProportionalGrid
+        const bool bKeepGridHeight
+            = bMacProportionalGrid
               || ((sw::UseWordMacMetrics() ? nAmpRatio > 1 : m_pFrame->IsInTab())
                   && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS));
-        if ( !bWordTableGrid && !IsParaLine() && pSpace &&
+        if ( !bKeepGridHeight && !IsParaLine() && pSpace &&
              SvxInterLineSpaceRule::Prop == pSpace->GetInterLineSpaceRule() )
         {
             sal_uLong nTmp = pSpace->GetPropLineSpace();
