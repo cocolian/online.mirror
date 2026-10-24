@@ -382,14 +382,15 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         // cannot borrow the half-em line-fit allowance used for body text.
         nUncompressedLimit = nLineWidth - nPreviousCompression;
     }
-    if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Left
+    if (bWordMacLineBudget && bModernLineBreaking
+        && (aAdjust == SvxAdjust::Left || aAdjust == SvxAdjust::Center)
         && rInf.GetTextFrame()->IsInTab() && rInf.SnapToGrid()
         && rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().get(
             DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID))
     {
         const auto* pGrid = GetGridItem(rInf.GetTextFrame()->FindPageFrame());
-        // A strict grid also bounds left-aligned cell text. Do not accept a
-        // compressed whole portion before the hanging-punctuation check runs.
+        // A strict grid also bounds left-aligned and centered cell text.
+        // Do not accept a compressed whole portion before checking punctuation.
         if (pGrid && pGrid->GetGridType() == SwTextGrid::LinesOnly)
             nUncompressedLimit = nLineWidth - nPreviousCompression;
     }
@@ -879,7 +880,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             if (pGrid && (pGrid->GetGridType() == SwTextGrid::LinesAndChars
                 || (bModernLineBreaking
                     && pGrid->GetGridType() == SwTextGrid::LinesOnly
-                    && aAdjust == SvxAdjust::Left)))
+                    && (aAdjust == SvxAdjust::Left || aAdjust == SvxAdjust::Center))))
                 bAllowHanging = false;
         }
 
@@ -944,6 +945,43 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 aHyphOpt, aRetryOpt);
             if (aRetry.breakIndex == nRetryPos)
                 aResult = aRetry;
+        }
+
+        if (sw::UseWordMacMetrics() && !rPor.InFieldGrp() && !cFieldChr
+            && aResult.breakType != BreakType::HYPHENATION
+            && aResult.breakIndex == sal_Int32(m_nCutPos)
+            && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
+            && m_nCutPos < rInf.GetIdx() + nMaxLen
+            && aAsciiWordWrapChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
+            && aAsciiWordWrapChar(rInf.GetChar(m_nCutPos))
+            && wordMacWrapAtWordBoundary(rInf))
+        {
+            // A CJK iterator can return a cut inside an ASCII word, even with
+            // kinsoku enabled. An ordinary space-separated word that fits the
+            // next line still obeys Word's independent wordWrap setting.
+            const OUString& rText = rInf.GetText();
+            sal_Int32 nStart = sal_Int32(m_nCutPos);
+            sal_Int32 nEnd = nStart;
+            while (nStart > 0 && aAsciiWordWrapChar(rText[nStart - 1]))
+                --nStart;
+            while (nEnd < rText.getLength() && aAsciiWordWrapChar(rText[nEnd]))
+                ++nEnd;
+            if (nStart > sal_Int32(rInf.GetLineStart()) && IsBlank(rText[nStart - 1])
+                && (nEnd == rText.getLength() || IsBlank(rText[nEnd]))
+                && nStart >= sal_Int32(rInf.GetIdx())
+                && nEnd <= sal_Int32(rInf.GetIdx() + nMaxLen))
+            {
+                const lang::Locale aLatinLocale(u"en"_ustr, u"US"_ustr, OUString());
+                const auto aLatin = g_pBreakIt->GetBreakIter()->getLineBreak(rText,
+                    sal_Int32(m_nCutPos), aLatinLocale, sal_Int32(rInf.GetLineStart()),
+                    aHyphOpt, aUserOpt);
+                const auto aWord = rInf.GetTextSize(&rSI, TextFrameIndex(nStart),
+                    TextFrameIndex(nEnd - nStart));
+                if (aLatin.breakType == BreakType::WORDBOUNDARY
+                    && aLatin.breakIndex == nStart
+                    && aWord.Width() <= rInf.RealWidth() - nLeftRightBorderSpace)
+                    aResult = aLatin;
+            }
         }
 
         if (sw::UseWordMacMetrics() && !rPor.InFieldGrp() && !cFieldChr

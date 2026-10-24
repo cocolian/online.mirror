@@ -224,7 +224,7 @@ DOCX save/reload with namespace-aware assertions. See the
 Closing-punctuation fitting treats decimal and percentage tokens as complete
 units across script portions. The generated native-font
 `testWordMacPercentageClosingUnit` covers a percentage followed by a CJK closing
-parenthesis. The pipeline now runs 31 strict bundled-font and 26 native-font
+parenthesis. The pipeline now runs 32 strict bundled-font and 26 native-font
 regressions. These individual checks do not establish full corpus equivalence.
 
 The Mac profile additionally renders explicit uniform positive row-level cell
@@ -245,7 +245,7 @@ character-level wrapping, including underscores in identifiers. The generated
 profiles, long-tail fallback, and DOCX save/reload with reserved example.invalid
 addresses. Private sample documents and font binaries remain outside Git.
 
-Left-aligned table text snapped to a strict line grid now obeys the Word 2013
+Left-aligned and centered table text snapped to a strict line grid now obeys the Word 2013
 punctuation setting, including whole-portion fitting before line breaking.
 `testWordMacStrictGridTablePunctuation` checks the enabled/disabled setting
 and DOCX save/reload with pinned Segoe UI and SimSun fonts.
@@ -272,7 +272,7 @@ digest, runtime configuration, OS/architecture, and every uncompressed layer
 identity are checked before candidate deployment. Base-image reuse requires
 identical registry configuration and layer identities. Temporary archives are
 removed on success or failure; original documents and private fonts stay outside
-Git. Nine release-flow unit tests cover these gates and the existing rollback
+Git. Ten release-flow unit tests cover these gates and the existing rollback
 and cache-provenance checks.
 
 Top-level Mac-profile AutoFit tables stay within the page text width unless
@@ -281,3 +281,21 @@ setting and the AutoFit layout mode survive DOCX save/reload. The generated
 `testWordMacAutoFitPageWidth` checks both settings through two save/reload cycles,
 including wrapping oversized content inside the page. Legacy-profile and fixed
 table behavior are unchanged. Private sample documents remain outside Git.
+
+Runtime COPY inputs receive the existing read/execute permission contract in the
+private build context. Image recipes no longer run recursive chmod over the
+installed engine, avoiding duplicate full-engine layers. Source files and
+symlink targets outside that context keep their original permissions.
+
+The Mac profile also keeps an ordinary space-delimited ASCII word intact when
+a CJK break iterator cuts after its first character, provided the complete word
+fits the next line. Explicit character-level wrapping, fields, hyphenation, URLs
+and longer tokens retain their prior behavior. `testWordMacWordWrap` covers
+English/Chinese language tags, both kinsoku flags, two widths, direct/inherited
+and omitted wordWrap values, and DOCX save/reload.
+
+Horizontal body text fitting one grid row now centers glyphs in its full
+proportional pitch. This also applies to the first line, as in table cells,
+while multi-row text retains its existing grid pitch.
+`testWordMacSmallBodyGridProportional` verifies three-line paragraphs, the
+unchanged legacy profile, and DOCX save/reload with generated documents.

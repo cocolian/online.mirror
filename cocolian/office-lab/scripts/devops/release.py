@@ -68,7 +68,7 @@ def compile_source(repo,engine,online,office_config):
  commands=['set -euo pipefail','export CCACHE_DIR=/workspace/cache/ccache','export CCACHE_MAXSIZE=8G']
  if engine:
   commands += ['cd /workspace/engine','make -j3 build',
-   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacAutoFitPageWidth testWordMacUrlBreakUnits testWordMacRowCellSpacing testWordMacWordWrap testWordMacInlineImageGridLeading testWordMacFirstCharacterIndentFont testWordMacGridOverflowSetting testWordMacLegacyPercentTablePadding testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacFixedLayoutNoAutoFit testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
+   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallBodyGridProportional testWordMacAutoFitPageWidth testWordMacUrlBreakUnits testWordMacRowCellSpacing testWordMacWordWrap testWordMacInlineImageGridLeading testWordMacFirstCharacterIndentFont testWordMacGridOverflowSetting testWordMacLegacyPercentTablePadding testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacFixedLayoutNoAutoFit testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
    'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log']
  if online:commands += ['cd /workspace/source','make -j3','DESTDIR=/workspace/stage make install']
  run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus','3','--memory','12g','--user','1000:1000',
@@ -170,6 +170,16 @@ def stage_office_fonts(destination,source=None,manifest=None):
   shutil.copy2(font,destination/name)
  return len(manifest['fonts'])
 
+def stage_runtime_tree(source,destination):
+ # Set COPY input permissions before layering, avoiding a recursive chmod
+ # that copies the complete installed engine into another image layer.
+ shutil.copytree(source,destination,symlinks=True)
+ for path in [destination,*destination.rglob('*')]:
+  if path.is_symlink():continue
+  mode=path.stat().st_mode & 0o7777
+  if path.is_dir() or mode & 0o111:mode |= 0o111
+  path.chmod(mode | 0o444)
+
 def build_images(paths,heads,old,out,engine,online,targets):
  context=out/'context';context.mkdir();outer=paths['cocolian-office']/'deploy/source-build'
  if 'wopi' in targets:
@@ -180,8 +190,8 @@ def build_images(paths,heads,old,out,engine,online,targets):
   stage_office_fonts(context/'office-fonts')
   for name in ('word-mac-fontconfig.xml','editor-aids.css','editor-aids.xcd','source-conversion-service.py'):
    shutil.copy2(outer/name,context/name)
- if engine:shutil.copytree(CACHE/'engine/instdir',context/'engine',symlinks=True)
- if online:shutil.copytree(CACHE/'stage/usr',context/'usr',symlinks=True)
+ if engine:stage_runtime_tree(CACHE/'engine/instdir',context/'engine')
+ if online:stage_runtime_tree(CACHE/'stage/usr',context/'usr')
  tag='auto-'+time.strftime('%Y%m%d%H%M%S')+'-'+heads['online.mirror'][:8]
  images={}
  for deployment,component in targets.items():
@@ -201,8 +211,8 @@ def build_images(paths,heads,old,out,engine,online,targets):
     lines += ['COPY --chmod=644 editor-aids.css /usr/share/coolwsd/browser/dist/editor-aids-20261020.css',
      'COPY --chmod=644 editor-aids.xcd /opt/collaboraoffice/share/registry/cocolian-editor-aids.xcd',
      '''RUN if ! grep -q 'editor-aids-20261020.css' /usr/share/coolwsd/browser/dist/cool.html; then sed -i 's|</head>|<link rel="stylesheet" href="%SERVICE_ROOT%/browser/%VERSION%/editor-aids-20261020.css"></head>|' /usr/share/coolwsd/browser/dist/cool.html; fi''']
-    lines += ['RUN chmod -R a+rX /opt/collaboraoffice /usr/share/coolwsd && fc-cache -f && coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && chown -R 1001:1001 /opt/cool/systemplate']
-   lines += ['RUN chmod -R a+rX /opt/collaboraoffice','USER 1001:1001']
+    lines += ['RUN fc-cache -f && coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice && chown -R 1001:1001 /opt/cool/systemplate']
+   lines += ['USER 1001:1001']
   revision=heads['cocolian'] if deployment=='wopi' else heads['online.mirror']
   lines += [f'LABEL org.opencontainers.image.revision="{revision}"']
   for name,sha in heads.items():lines += [f'LABEL cn.cocolian.source.{name}="{sha}"']

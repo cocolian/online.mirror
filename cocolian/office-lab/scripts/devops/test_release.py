@@ -3,6 +3,30 @@ from pathlib import Path
 from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('release',Path(__file__).with_name('release.py'));r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
 class ReleaseTests(unittest.TestCase):
+ def test_runtime_copy_permissions_and_symlink_isolation(self):
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);source=root/'source';source.mkdir(mode=0o700)
+   (source/'data').write_text('resource');(source/'data').chmod(0o600)
+   (source/'program').write_text('executable');(source/'program').chmod(0o700)
+   outside=root/'private-source';outside.write_text('private');outside.chmod(0o600)
+   (source/'link').symlink_to(outside)
+   outside_dir=root/'private-directory';outside_dir.mkdir(mode=0o700)
+   (outside_dir/'secret').write_text('private');(outside_dir/'secret').chmod(0o600)
+   (source/'directory-link').symlink_to(outside_dir,target_is_directory=True)
+   destination=root/'context'
+   r.stage_runtime_tree(source,destination)
+   self.assertEqual(destination.stat().st_mode & 0o777,0o755)
+   self.assertEqual((destination/'data').stat().st_mode & 0o777,0o644)
+   self.assertEqual((destination/'program').stat().st_mode & 0o777,0o755)
+   self.assertTrue((destination/'link').is_symlink())
+   self.assertEqual(outside.stat().st_mode & 0o777,0o600)
+   self.assertTrue((destination/'directory-link').is_symlink())
+   self.assertEqual(outside_dir.stat().st_mode & 0o777,0o700)
+   self.assertEqual((outside_dir/'secret').stat().st_mode & 0o777,0o600)
+   self.assertEqual((source/'data').stat().st_mode & 0o777,0o600)
+   self.assertEqual((source/'program').stat().st_mode & 0o777,0o700)
+   self.assertEqual((destination/'data').read_bytes(),(source/'data').read_bytes())
+
  def test_independent_main_changes(self):
   baseline={n:'old' for n in ('cocolian','cocolian-office','online.mirror')}
   self.assertEqual(set(r.select_targets(dict(baseline,cocolian='new'),baseline)),{'wopi'})
