@@ -342,6 +342,16 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
     if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Left
         && !rInf.GetTextFrame()->IsInTab() && rInf.GetLineStart() > TextFrameIndex(0))
         nUncompressedLimit = nLineWidth - nPreviousCompression;
+    if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Center
+        && !rInf.GetTextFrame()->IsInTab() && rInf.SnapToGrid()
+        && rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().get(
+            DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID)
+        && GetGridItem(rInf.GetTextFrame()->FindPageFrame()))
+    {
+        // A centered grid heading with Word's strict punctuation option
+        // cannot borrow the half-em line-fit allowance used for body text.
+        nUncompressedLimit = nLineWidth - nPreviousCompression;
+    }
     auto aWithinLineBudget = [&] {
         return !bWordMacLineBudget || m_nBreakWidth + nMaxSizeDiff <= nUncompressedLimit;
     };

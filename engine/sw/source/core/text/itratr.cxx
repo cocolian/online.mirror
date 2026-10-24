@@ -1015,6 +1015,7 @@ public:
     tools::Long m_nWordWidth;
     tools::Long m_nWordAdd;
     sal_Int32 m_nNoLineBreak;
+    bool m_bRoundWidths = false;
     SwMinMaxArgs(OutputDevice* pOutI, SwViewShell const* pShI, sal_uLong& rMinI, sal_uLong& rAbsI)
         : m_pOut(pOutI)
         , m_pSh(pShI)
@@ -1058,6 +1059,11 @@ static bool lcl_MinMaxString( SwMinMaxArgs& rArg, SwFont* pFnt, const OUString &
 
         SwDrawTextInfo aDrawInf(rArg.m_pSh, *rArg.m_pOut, rText, nIdx, nStop - nIdx);
         tools::Long nCurrentWidth = pFnt->GetTextSize_( aDrawInf ).Width();
+        // Independent Latin break units can each lose a fractional twip in
+        // the integer measuring API. Round each one outward for AutoFit.
+        if (rArg.m_bRoundWidths && pFnt->GetActual() == SwFontScript::Latin
+            && nCurrentWidth > 0)
+            ++nCurrentWidth;
         rArg.m_nRowWidth += nCurrentWidth;
         if( bClear )
             rArg.NewWord();
@@ -1227,8 +1233,14 @@ static void lcl_MinMaxNode(SwFrameFormat* pNd, SwMinMaxNodeArgs& rIn)
  * Changing this method very likely requires changing of GetScalingOfSelectedText
  * This one is called exclusively from import filters, so there is no layout.
  */
-void SwTextNode::GetMinMaxSize( SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong &rMax,
-                               sal_uLong& rAbsMin ) const
+void SwTextNode::GetMinMaxSize(SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong& rMax,
+                               sal_uLong& rAbsMin) const
+{
+    GetMinMaxSize(nIndex, rMin, rMax, rAbsMin, true);
+}
+
+void SwTextNode::GetMinMaxSize(SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong& rMax,
+                               sal_uLong& rAbsMin, bool bAddLayoutSlack) const
 {
     SwViewShell const * pSh = GetDoc().getIDocumentLayoutAccess().GetCurrentViewShell();
     OutputDevice* pOut = nullptr;
@@ -1289,6 +1301,7 @@ void SwTextNode::GetMinMaxSize( SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong 
     tools::Long nCurrentWidth = 0;
     tools::Long nAdd = 0;
     SwMinMaxArgs aArg( pOut, pSh, rMin, rAbsMin );
+    aArg.m_bRoundWidths = !bAddLayoutSlack;
     while( nIdx < nLen )
     {
         TextFrameIndex nNextChg = aIter.GetNextAttr();
@@ -1451,6 +1464,10 @@ void SwTextNode::GetMinMaxSize( SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong 
 
     nLROffset += rRightMargin.ResolveRight({});
 
+    // Word AutoFit uses intrinsic widths. Allow a single twip for the
+    // relative cell-width conversion, rather than HTML's blanket point.
+    if (!bAddLayoutSlack && nAdd)
+        nAdd = 1;
     rAbsMin += nLROffset;
     rAbsMin += nAdd;
     rMin += nLROffset;
