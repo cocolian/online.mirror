@@ -137,6 +137,7 @@ protected:
     tools::SvRef<SwServerObject> m_xRefObj;   // In case DataServer -> pointer is set.
 
     std::shared_ptr<SwHTMLTableLayout> m_xHTMLLayout;
+    sal_uInt16 m_nWordMacPercentPadding = 0;
 
     // Usually, the table node of a SwTable can be accessed by getting a box
     // out of m_TabSortContentBoxes, which know their SwStartNode. But in some rare
@@ -222,6 +223,9 @@ public:
     SwHTMLTableLayout *GetHTMLTableLayout() { return m_xHTMLLayout.get(); }
     const SwHTMLTableLayout *GetHTMLTableLayout() const { return m_xHTMLLayout.get(); }
     void SetHTMLTableLayout(std::shared_ptr<SwHTMLTableLayout> const& r);    //Change of property!
+
+    sal_uInt16 GetWordMacPercentPadding() const { return m_nWordMacPercentPadding; }
+    void SetWordMacPercentPadding(sal_uInt16 nPadding) { m_nWordMacPercentPadding = nPadding; }
 
     sal_uInt16 IncGrfsThatResize() { return ++m_nGraphicsThatResize; }
     sal_uInt16 DecGrfsThatResize() { return m_nGraphicsThatResize ? --m_nGraphicsThatResize : 0; }

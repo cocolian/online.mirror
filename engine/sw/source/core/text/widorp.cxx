@@ -137,8 +137,7 @@ bool SwTextFrameBreak::IsInside(SwTextMargin const& rLine, SwResizeLimitReason& 
     // Calculate extra space for bottom border.
     nLineHeight += aRectFnSet.GetBottomMargin(*m_pFrame);
     if (sw::UseWordMacGridBottom() && !m_pFrame->IsVertical()
-        && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly()
-        && !rLine.GetNext() && rLine.GetEnd() >= TextFrameIndex(m_pFrame->GetText().getLength()))
+        && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly())
     {
         const auto& rNode = *m_pFrame->GetTextNodeForParaProps();
         const auto& rSet = rNode.GetSwAttrSet();

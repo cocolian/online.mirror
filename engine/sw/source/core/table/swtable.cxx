@@ -3480,7 +3480,7 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     xLayout->AutoLayoutPass1();
     // Normal-style font defaults can be applied after endTable(). Measure
     // once more when layout has the final paragraph properties available.
-    xLayout->EnableWordMacAutoFit();
+    xLayout->EnableWordMacAutoFit(rTable.GetWordMacPercentPadding());
     rTable.SetHTMLTableLayout(xLayout);
     return true;
 }

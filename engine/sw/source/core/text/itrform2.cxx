@@ -2300,6 +2300,35 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             return;
         }
 
+        const auto* pLineSpace = m_aLineInf.GetLineSpacing();
+        if (sw::UseWordMacMetrics() && pLineSpace
+            && pLineSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto)
+        {
+            // A line containing only an inline image uses its complete bounds,
+            // including drawing effects, as the grid content. Do not include
+            // the invisible paragraph mark's descent or a previously rounded
+            // line height: both change centering after a second layout pass.
+            const SwLinePortion* pInline = nullptr;
+            bool bOnlyInline = true;
+            for (const auto* pPart = m_pCurr->GetNextPortion(); pPart;
+                 pPart = pPart->GetNextPortion())
+            {
+                if (pPart->IsFlyCntPortion())
+                {
+                    if (pInline)
+                        bOnlyInline = false;
+                    pInline = pPart;
+                }
+                else if (pPart->InTextGrp() || pPart->InFieldGrp())
+                    bOnlyInline = false;
+            }
+            if (bOnlyInline && pInline && pInline->Height() >= GetInfo().GetTextHeight())
+            {
+                m_pCurr->Height(pInline->Height(), false);
+                m_pCurr->SetAscent(pInline->GetAscent());
+            }
+        }
+
         const sal_uInt16 nGridWidth = pGrid->GetBaseHeight();
         const sal_uInt16 nRubyHeight = pGrid->GetRubyHeight();
         const bool bRubyTop = ! pGrid->GetRubyTextBelow();
@@ -2400,8 +2429,7 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
 
         if (sw::UseWordMacGridBottom() && !m_pFrame->IsVertical()
             && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly()
-            && pSpace && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
-            && GetStart() + m_pCurr->GetLen() >= TextFrameIndex(m_pFrame->GetText().getLength()))
+            && pSpace && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto)
         {
             bool bHasObject = false;
             for (const auto* pPart = m_pCurr->GetNextPortion(); pPart; pPart = pPart->GetNextPortion())

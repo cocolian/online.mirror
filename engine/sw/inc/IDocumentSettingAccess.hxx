@@ -157,7 +157,10 @@ enum class DocumentSettingId
     // tdf#159133 left/right page is not decided by even/odd page number
     ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES,
     // OOXML doNotUseEastAsianBreakRules: suppress compression when using the grid.
-    DO_NOT_COMPRESS_WITH_GRID
+    DO_NOT_COMPRESS_WITH_GRID,
+    // OOXML doNotWrapTextWithPunct: forbid hanging punctuation on the grid.
+    DO_NOT_WRAP_PUNCTUATION_WITH_GRID,
+    WORD_2013_LINE_BREAKING
 };
 
 /** Provides access to settings of a document

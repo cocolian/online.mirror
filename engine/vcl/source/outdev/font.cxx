@@ -33,6 +33,7 @@
 #include <vcl/BinaryDataContainer.hxx>
 #include <vcl/event.hxx>
 #include <vcl/fontcharmap.hxx>
+#include <vcl/fontfamily.hxx>
 #include <vcl/metaact.hxx>
 #include <vcl/metric.hxx>
 #include <vcl/print.hxx>
@@ -696,6 +697,13 @@ const LogicalFontInstance* OutputDevice::GetFontInstance() const
     if (!InitFont())
         return nullptr;
     return mpFontInstance.get();
+}
+
+OUString vcl::GetPhysicalFontFamilyName(const OutputDevice& rDevice)
+{
+    const auto* pInstance = rDevice.GetFontInstance();
+    const auto* pFace = pInstance ? pInstance->GetFontFace() : nullptr;
+    return pFace ? pFace->GetFamilyName() : OUString();
 }
 
 BinaryDataContainer OutputDevice::GetCurrentFontRawData() const

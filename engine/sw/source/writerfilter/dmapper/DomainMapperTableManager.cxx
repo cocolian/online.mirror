@@ -544,8 +544,9 @@ void DomainMapperTableManager::endLevel( )
         m_aCellWidths.back()->push_back(*oCurrentWidth);
 
     m_nCell.pop_back( );
-    m_nTableWidth = 0;
-    m_nLayoutType = 0;
+    // endTable() still needs the closing table's layout and preferred width.
+    // resolveCurrentTable() calls clearData() after invoking the handler;
+    // resetting here would make fixed tables look like AutoFit tables.
 
     m_aTmpPosition.pop_back( );
     m_aTmpTableProperties.pop_back( );

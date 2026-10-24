@@ -3835,6 +3835,11 @@ tools::Long SwLayoutFrame::CalcRel( const SwFormatFrameSize &rSz ) const
         }
         nRel = std::min( nRel, pRel->getFramePrintArea().Width() );
         nRet = nRel * nPercent / 100;
+        if (IsTabFrame())
+        {
+            const auto* pTable = static_cast<const SwTabFrame*>(this)->GetTable();
+            nRet += pTable->GetWordMacPercentPadding();
+        }
     }
     return nRet;
 }

@@ -3171,7 +3171,11 @@ void DomainMapper::sprmWithProps( Sprm& rSprm, const PropertyMapPtr& rContext )
         sal_Int16 nEscapement = 0;
         sal_Int8 nProp = DFLT_ESC_PROP;
         if ( sStringValue == "superscript" )
-                nEscapement = DFLT_ESC_AUTO_SUPER;
+        {
+            nEscapement = DFLT_ESC_AUTO_SUPER;
+            if (sw::UseWordMacMetrics())
+                nProp = 65;
+        }
         else if ( sStringValue == "subscript" )
                 nEscapement = DFLT_ESC_AUTO_SUB;
         else

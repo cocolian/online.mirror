@@ -1260,6 +1260,8 @@ WriteCompat(SwDoc const& rDoc, ::sax_fastparser::FSHelperPtr const& rpFS) -> voi
     }
     if (rIDSA.get(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID))
         rpFS->singleElementNS(XML_w, XML_doNotUseEastAsianBreakRules);
+    if (rIDSA.get(DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID))
+        rpFS->singleElementNS(XML_w, XML_doNotWrapTextWithPunct);
     // tdf#146515 export "Use printer metrics for document formatting"
     if (!rIDSA.get(DocumentSettingId::USE_VIRTUAL_DEVICE))
         rpFS->singleElementNS(XML_w, XML_usePrinterMetrics);

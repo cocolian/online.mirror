@@ -330,6 +330,9 @@ void SettingsTable::lcl_sprm(Sprm& rSprm)
     case NS_ooxml::LN_CT_Compat_doNotUseEastAsianBreakRules:
         m_bDoNotCompressWithGrid = nIntValue != 0;
         break;
+    case NS_ooxml::LN_CT_Compat_doNotWrapTextWithPunct:
+        m_bDoNotWrapPunctuationWithGrid = nIntValue != 0;
+        break;
     case NS_ooxml::LN_CT_Compat_usePrinterMetrics:
         m_bUsePrinterMetrics = nIntValue;
         break;
@@ -688,6 +691,11 @@ void SettingsTable::ApplyProperties(rtl::Reference<SwXTextDocument> const& xDoc)
 
     xDocumentSettings->setPropertyValue(u"DoNotCompressWithGrid"_ustr,
                                        cpo::uno::Any(m_bDoNotCompressWithGrid));
+    xDocumentSettings->setPropertyValue(u"DoNotWrapPunctuationWithGrid"_ustr,
+                                       cpo::uno::Any(m_bDoNotWrapPunctuationWithGrid));
+
+    xDocumentSettings->setPropertyValue(u"Word2013LineBreaking"_ustr,
+                                       cpo::uno::Any(GetWordCompatibilityMode() >= 15));
 
     // Shared between DOCX and RTF, unconditional flags.
     xDocumentSettings->setPropertyValue(u"TableRowKeep"_ustr, cpo::uno::Any(true));

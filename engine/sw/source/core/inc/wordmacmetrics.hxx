@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #ifndef INCLUDED_SW_SOURCE_CORE_INC_WORDMACMETRICS_HXX
 #define INCLUDED_SW_SOURCE_CORE_INC_WORDMACMETRICS_HXX
+#include <vcl/fontfamily.hxx>
 #include <cstdlib>
 #include <cstring>
 #include <tools/long.hxx>
@@ -58,11 +59,25 @@ inline bool IsWordMacModernCjkFont(const vcl::Font& rFont)
         || rFamily.equalsIgnoreAsciiCase(u"DengXian") || rFamily.equalsIgnoreAsciiCase(u"DengXian Light")
         || rFamily == u"等线" || rFamily == u"等线 Light";
 }
+inline vcl::Font WordMacResolvedFont(const OutputDevice& rDev)
+{
+    vcl::Font aFont(rDev.GetFont());
+    if (UseWordMacMetrics())
+    {
+        const OUString aFamily = vcl::GetPhysicalFontFamilyName(rDev);
+        if (!aFamily.isEmpty())
+            aFont.SetFamilyName(aFamily);
+    }
+    return aFont;
+}
 inline tools::Long WordMacCjkFontHeight(const OutputDevice& rDev)
 {
-    return UseWordMacMetrics() && (IsWordMacGbFont(rDev.GetFont())
-        || (UseWordMacClassicMetrics() && IsWordMacClassicCjkFont(rDev.GetFont())))
-        ? rDev.GetFont().GetFontSize().Height() * 130 / 100 : 0;
+    if (!UseWordMacMetrics())
+        return 0;
+    const auto aFont = WordMacResolvedFont(rDev);
+    return IsWordMacGbFont(aFont)
+        || (UseWordMacClassicMetrics() && IsWordMacClassicCjkFont(aFont))
+        ? aFont.GetFontSize().Height() * 130 / 100 : 0;
 }
 inline double WordMacCjkBoldAdvance(const vcl::Font& rFont)
 {
@@ -94,7 +109,8 @@ inline tools::Long WordMacGridHeight(tools::Long nHeight, const OutputDevice& rD
     // Unlike the GB2312 and SimSun families, Mac Word retains YaHei's
     // CJK leading when selecting grid rows. Actual 9--14pt Word probes
     // put 9pt in one 15.6pt row, but 10--14pt in two rows.
-    const OUString& rFamily = rDev.GetFont().GetFamilyName();
+    const auto aFont = WordMacResolvedFont(rDev);
+    const OUString& rFamily = aFont.GetFamilyName();
     if (rFamily.equalsIgnoreAsciiCase(u"Microsoft YaHei") || rFamily == u"微软雅黑")
         return nHeight;
     vcl::FontCapabilities aCaps;
@@ -108,7 +124,7 @@ inline tools::Long WordMacGridHeight(tools::Long nHeight, const OutputDevice& rD
         // a grid multiple. GB2312 fonts have a measured Mac-specific pitch.
         const tools::Long nBase = rDev.GetTextHeight();
         const tools::Long nMacHeight = WordMacCjkFontHeight(rDev);
-        const tools::Long nAdjusted = nMacHeight > 0 ? nMacHeight : (nBase * WordMacCjkMetricScale(rDev.GetFont())) / 100;
+        const tools::Long nAdjusted = nMacHeight > 0 ? nMacHeight : (nBase * WordMacCjkMetricScale(aFont)) / 100;
         nHeight -= nAdjusted - nBase;
         // Grid row selection includes the font's external leading even
         // though ordinary Mac GB2312 line pitch already contains it.

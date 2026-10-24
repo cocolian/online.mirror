@@ -14,7 +14,7 @@
 
 源码归属：门户使用 cocolian/main；渲染引擎、coolwsd 和 browser 使用 online.mirror/main；字体配置、编辑辅助标记和转换适配器使用 cocolian-office/main。这里明确采用引擎 main，不使用外层旧的 submodule 提交号；每次运行的 commits.json 锁定三个实际提交。其他 SDK/office-core 子模块不参与现有服务构建。
 
-流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行 22 个严格字体布局测试和 14 个私有字体测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 res.cocolian.cn → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
+流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行 27 个严格字体布局测试和 20 个私有字体测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 res.cocolian.cn → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
 
 只修改 office-lab 中本次选定模块的镜像，保留 gateway 配置、Secret、文档 PVC、字体及既有运行参数。不会自动应用仓库中的任意 Kubernetes YAML 或修改命名空间/入口配置。新建另一套服务需要单独维护部署模板。失败不更新 last_success；部署后失败自动恢复本次已修改的 Deployment 模板；存在并发修改时停止覆盖并记录待人工处理原因。候选 Pod 为本流程临时资源，验收后删除；仅删除本次创建的 UUID 命名测试文件，不修改业务文档。不会删除历史镜像/PVC，导出中间 tar 在推送后删除。
 
@@ -120,7 +120,10 @@ Binary fonts and document samples must never be committed.
 
 The optional `COCOLIAN_WORD_MAC_AUTOFIT=1` profile uses content minima and preferred
 percentages for flat, non-floating AutoFit tables with uniform unmerged rows.
-Fixed-layout and merged tables retain their existing layout. The first resize
+Merged tables retain their existing column-sizing algorithm. Explicitly indented or centered
+percentage tables in pre-2013 OOXML compatibility modes include their outer cell
+padding outside the preferred text width. This applies independently of AutoFit
+and preserves the modern-mode and disabled-profile behavior. The first resize
 recalculates after paragraph defaults resolve. Short ASCII tokens are kept intact
 only when all column minima fit the available width; long URLs can still wrap.
 Generated fixtures cover noWrap import/export, an omitted font size, short tokens,
@@ -162,3 +165,33 @@ style in the Mac profile; synthesized UNO zero defaults must not erase the
 style's indentation. Explicit zero list indents retain priority. A generated
 fixture checks number glyph positions with the profile disabled/enabled and
 with a deliberately explicit zero, without committing customer document text.
+
+The Mac profile resolves character-unit paragraph indents from the first
+character's effective font size, with paragraph-mark fallback for empty text.
+Inline-only image lines include drawing effect extents and recompute their
+natural bounds before grid rounding, preserving vertical centering across
+repeated layout passes. Generated, self-contained fixtures exercise both cases;
+no private document or font binary is stored in the repository.
+
+The Mac profile derives line-breaking behavior from the document's Word
+compatibility mode: Word 2013+ left-aligned body lines keep the measured
+extension limit, while legacy documents retain their original break policy.
+`doNotWrapTextWithPunct` is imported and exported separately from compression.
+Grid metrics use the realized physical font family after substitution; a missing
+requested family must not apply the wrong grid pitch to its fallback font.
+
+Fractional synthetic-bold advances are rounded upward for fit decisions, so two
+14pt GB2312 bold glyphs do not fit a 570twip cell but do fit 571twips. Grid-bottom
+leading is trimmed consistently for split paragraphs, painted text and carets.
+Automatic OOXML superscript in the Mac profile uses 65% of the nominal em,
+rounded to half-points, with a 28% baseline rise; DOCX export retains semantic
+superscript to prevent repeated shrinking on save/reload.
+
+Table layout type and preferred width must survive until the closing table is
+handed to its import handler. Clearing them before the callback incorrectly
+attached AutoFit to fixed tables and could push columns beyond the page. The
+fixed-layout regression covers long noWrap content with AutoFit enabled/disabled.
+
+Mac-profile CJK table punctuation reserves half the closing glyph inside the
+cell, while body hanging retains its existing policy. A native-font synthetic
+fixture checks the line break and comma caret position in a 3081twip cell.

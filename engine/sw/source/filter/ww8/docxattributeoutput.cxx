@@ -8551,7 +8551,8 @@ void DocxAttributeOutput::CharEscapement( const SvxEscapementItem& rEscapement )
         nEsc = 0;
         nProp = 100;
     }
-    else if ( DFLT_ESC_PROP == nProp || nProp < 1 || nProp > 100 )
+    else if ( DFLT_ESC_PROP == nProp || nProp < 1 || nProp > 100
+        || (sw::UseWordMacMetrics() && nProp == 65 && nEsc == DFLT_ESC_AUTO_SUPER) )
     {
         if ( DFLT_ESC_SUB == nEsc || DFLT_ESC_AUTO_SUB == nEsc )
             sIss = "subscript"_ostr;

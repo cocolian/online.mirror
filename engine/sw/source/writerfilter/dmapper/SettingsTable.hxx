@@ -157,6 +157,7 @@ private:
     bool m_bNoLeading = false;
     std::optional<sal_Int16> m_oCharacterCompressionType;
     bool m_bDoNotCompressWithGrid = false;
+    bool m_bDoNotWrapPunctuationWithGrid = false;
     OUString m_sDecimalSymbol;
     OUString m_sListSeparator;
     std::vector<std::pair<OUString, OUString>> m_aDocVars;

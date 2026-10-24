@@ -182,6 +182,8 @@ enum SwDocumentSettingsPropertyHandles
     HANDLE_ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT,
     HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES,
     HANDLE_DO_NOT_COMPRESS_WITH_GRID,
+    HANDLE_DO_NOT_WRAP_PUNCTUATION_WITH_GRID,
+    HANDLE_WORD_2013_LINE_BREAKING,
     // Every SdrCompatibilityFlag, told apart by the property name
     HANDLE_COMPATIBILITY_FLAG,
 };
@@ -304,6 +306,8 @@ static rtl::Reference<MasterPropertySetInfo> lcl_createSettingsInfo()
         { u"BalanceSpacesAndIdeographicSpaces"_ustr, HANDLE_BALANCE_SPACES_AND_IDEOGRAPHIC_SPACES, cppu::UnoType<bool>::get(), 0 },
         { u"ForceTopAlignmentInCellWithFloatingAnchor"_ustr, HANDLE_FORCE_TOP_ALIGNMENT_IN_CELL_WITH_FLOATING_ANCHOR, cppu::UnoType<bool>::get(), 0 },
         { u"DoNotCompressWithGrid"_ustr, HANDLE_DO_NOT_COMPRESS_WITH_GRID, cppu::UnoType<bool>::get(), 0 },
+        { u"DoNotWrapPunctuationWithGrid"_ustr, HANDLE_DO_NOT_WRAP_PUNCTUATION_WITH_GRID, cppu::UnoType<bool>::get(), 0 },
+        { u"Word2013LineBreaking"_ustr, HANDLE_WORD_2013_LINE_BREAKING, cppu::UnoType<bool>::get(), 0 },
         { u"AdjustTableLineHeightsToGridHeight"_ustr, HANDLE_ADJUST_TABLE_LINE_HEIGHTS_TO_GRID_HEIGHT, cppu::UnoType<bool>::get(), 0 },
         { u"AssignConsecutiveLeftRightPages"_ustr, HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES, cppu::UnoType<bool>::get(), 0 },
 
@@ -1306,6 +1310,14 @@ void SwXDocumentSettings::_setSingleValue( const comphelper::PropertyInfo & rInf
             if (bool bTmp; rValue >>= bTmp)
                 mpDoc->getIDocumentSettingAccess().set(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID, bTmp);
             break;
+        case HANDLE_DO_NOT_WRAP_PUNCTUATION_WITH_GRID:
+            if (bool bTmp; rValue >>= bTmp)
+                mpDoc->getIDocumentSettingAccess().set(DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID, bTmp);
+            break;
+        case HANDLE_WORD_2013_LINE_BREAKING:
+            if (bool bTmp; rValue >>= bTmp)
+                mpDoc->getIDocumentSettingAccess().set(DocumentSettingId::WORD_2013_LINE_BREAKING, bTmp);
+            break;
         case HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
             if (bool bTmp; rValue >>= bTmp)
             {
@@ -1984,6 +1996,12 @@ void SwXDocumentSettings::_getSingleValue( const comphelper::PropertyInfo & rInf
         break;
         case HANDLE_DO_NOT_COMPRESS_WITH_GRID:
             rValue <<= mpDoc->getIDocumentSettingAccess().get(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID);
+            break;
+        case HANDLE_DO_NOT_WRAP_PUNCTUATION_WITH_GRID:
+            rValue <<= mpDoc->getIDocumentSettingAccess().get(DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID);
+            break;
+        case HANDLE_WORD_2013_LINE_BREAKING:
+            rValue <<= mpDoc->getIDocumentSettingAccess().get(DocumentSettingId::WORD_2013_LINE_BREAKING);
             break;
         case HANDLE_ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
         {
