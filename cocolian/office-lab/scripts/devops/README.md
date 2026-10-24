@@ -213,3 +213,16 @@ Centered modern grid headings with doNotWrapTextWithPunct use the strict line
 budget instead of borrowing half an em. A generic 19-character synthetic bold
 SimSun fixture toggles that option and checks the resulting one/two-line split.
 The private corpus remains a layout comparison, not a full visual acceptance.
+
+Explicit OOXML `wordWrap` values are preserved for paragraphs and paragraph
+styles, including `w:val="0"` on export. In the Mac profile, false permits a
+space-delimited ASCII word to break at the character that physically fits.
+`testWordMacWordWrap` verifies true, false and inherited false before and after
+DOCX save/reload with namespace-aware assertions. See the
+[OOXML WordWrap definition](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.wordwrap?view=openxml-3.0.1).
+
+Closing-punctuation fitting treats decimal and percentage tokens as complete
+units across script portions. The generated native-font
+`testWordMacPercentageClosingUnit` covers a percentage followed by a CJK closing
+parenthesis. The pipeline now runs 28 strict bundled-font and 23 native-font
+regressions. These individual checks do not establish full corpus equivalence.

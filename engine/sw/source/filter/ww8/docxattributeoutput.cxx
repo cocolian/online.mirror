@@ -11106,7 +11106,13 @@ void DocxAttributeOutput::ParaGrabBag(const SfxGrabBagItem& rItem)
     const std::map<OUString, cpo::uno::Any>& rMap = rItem.GetGrabBag();
     for ( const auto & rGrabBagElement : rMap )
     {
-        if (rGrabBagElement.first == "MirrorIndents")
+        if (rGrabBagElement.first == "WordWrap")
+        {
+            bool bWordWrap = true;
+            rGrabBagElement.second >>= bWordWrap;
+            m_pSerializer->singleElementNS(XML_w, XML_wordWrap, FSNS(XML_w, XML_val), bWordWrap ? "1" : "0");
+        }
+        else if (rGrabBagElement.first == "MirrorIndents")
             m_pSerializer->singleElementNS(XML_w, XML_mirrorIndents);
         else if (rGrabBagElement.first == "ParaTopMarginBeforeAutoSpacing")
         {

@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <svl/grabbagitem.hxx>
 #include <wordmacmetrics.hxx>
 #include <svl/asiancfg.hxx>
 #include <editeng/unolingu.hxx>
@@ -268,12 +269,18 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
             || (c >= '0' && c <= '9');
     };
+    // A decimal or percentage stays in the same closing-punctuation unit
+    // as its digits, including when the script scanner splits off the CJK
+    // closing mark into a separate portion.
+    auto aAsciiBreakUnitChar = [&](sal_Unicode c) {
+        return aAsciiWordChar(c) || c == '.' || c == '%';
+    };
     TextFrameIndex nClosing = rInf.GetIdx();
-    while (bWordMacLineBudget && nClosing < rInf.GetIdx() + nMaxLen && aAsciiWordChar(rInf.GetChar(nClosing)))
+    while (bWordMacLineBudget && nClosing < rInf.GetIdx() + nMaxLen && aAsciiBreakUnitChar(rInf.GetChar(nClosing)))
         ++nClosing;
     const bool bClosingAsciiUnit = nClosing > rInf.GetLineStart()
         && nClosing < TextFrameIndex(rInf.GetText().getLength())
-        && aAsciiWordChar(rInf.GetChar(nClosing - TextFrameIndex(1)))
+        && aAsciiBreakUnitChar(rInf.GetChar(nClosing - TextFrameIndex(1)))
         && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(nClosing)) >= 0;
     SwTwips nPreviousCompression = 0;
     if (bWordMacLineBudget)
@@ -322,8 +329,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         while (nStart > rInf.GetLineStart())
         {
             const sal_Unicode c = rInf.GetChar(nStart - TextFrameIndex(1));
-            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-                  || (c >= '0' && c <= '9')))
+            if (!aAsciiBreakUnitChar(c))
                 break;
             --nStart;
         }
@@ -888,7 +894,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         const bool bMacClosingPunctuation = sw::UseWordMacMetrics() && bAllowHanging
             && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
             && m_nCutPos < rInf.GetIdx() + nMaxLen
-            && aAsciiWordChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
+            && aAsciiBreakUnitChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
             && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(m_nCutPos)) >= 0;
         LineBreakResults aResult = g_pBreakIt->GetBreakIter()->getLineBreak(
             rInf.GetText(), sal_Int32(m_nCutPos), aLocale,
@@ -903,6 +909,35 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 aHyphOpt, aRetryOpt);
             if (aRetry.breakIndex == nRetryPos)
                 aResult = aRetry;
+        }
+
+        // OOXML wordWrap=false permits an alphabetic word to break at the
+        // physical character fit. Keep the default word-boundary behavior
+        // unless a paragraph or its style explicitly disables word wrapping.
+        if (sw::UseWordMacMetrics() && !rPor.InFieldGrp() && !cFieldChr
+            && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
+            && m_nCutPos < rInf.GetIdx() + nMaxLen
+            && aAsciiWordChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
+            && aAsciiWordChar(rInf.GetChar(m_nCutPos)))
+        {
+            const SfxItemSet* pSet = &rInf.GetTextFrame()->GetTextNodeForParaProps()->GetSwAttrSet();
+            for (; pSet; pSet = pSet->GetParent())
+            {
+                const auto* pBag = pSet->GetItem(RES_PARATR_GRABBAG, false);
+                if (!pBag)
+                    continue;
+                const auto& rBag = pBag->GetGrabBag();
+                const auto it = rBag.find(u"WordWrap"_ustr);
+                if (it == rBag.end())
+                    continue;
+                bool bWordWrap = true;
+                if ((it->second >>= bWordWrap) && !bWordWrap)
+                {
+                    aResult.breakIndex = sal_Int32(m_nCutPos);
+                    aResult.breakType = BreakType::WORDBOUNDARY;
+                }
+                break;
+            }
         }
 
         m_nBreakPos = TextFrameIndex(aResult.breakIndex);
