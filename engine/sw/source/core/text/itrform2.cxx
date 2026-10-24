@@ -2941,6 +2941,54 @@ void SwTextFormatter::AlignFlyInCntBase( tools::Long nBaseLine ) const
     }
 }
 
+// Floating-object probes and their underflow recheck must use identical
+// natural content bounds. Grid rounding belongs to line pitch, not to ink.
+static bool lcl_WordMacGridFlyMetrics(SwTextFormatInfo& rInf,
+    const SwLineLayout& rLine, const SvxLineSpacingItem* pSpace,
+    tools::Long& rAscent, tools::Long& rHeight)
+{
+    const auto* pFrame = rInf.GetTextFrame();
+
+    if (!sw::UseWordMacMetrics() || pFrame->IsVertical() || !pFrame->IsInDocBody()
+        || pFrame->IsInTab() || pFrame->IsInFly() || pFrame->GetText().isEmpty()
+        || !rInf.SnapToGrid()
+        || !pSpace || pSpace->GetLineSpaceRule() != SvxLineSpaceRule::Auto)
+        return false;
+    const auto* pGrid = GetGridItem(pFrame->FindPageFrame());
+    if (!pGrid)
+        return false;
+
+    tools::Long nAscent = 0;
+    tools::Long nDescent = 0;
+    for (const auto* pPart = rLine.GetNextPortion(); pPart; pPart = pPart->GetNextPortion())
+    {
+        if (pPart->InTextGrp() || pPart->InFieldGrp()
+            || pPart->IsFlyCntPortion() || pPart->IsMultiPortion())
+        {
+            nAscent = std::max<tools::Long>(nAscent, pPart->GetAscent());
+            nDescent = std::max<tools::Long>(nDescent,
+                tools::Long(pPart->Height()) - pPart->GetAscent());
+        }
+    }
+    if (!nAscent && !nDescent)
+    {
+        // Before the first glyph, the root may already contain grid-rounded
+        // metrics. Recover the current font's natural metrics instead.
+        const_cast<SwFont*>(rInf.GetFont())->ChgPhysFnt(rInf.GetVsh(), *rInf.GetOut());
+        nAscent = rInf.GetAscent();
+        nDescent = std::max<tools::Long>(0, tools::Long(rInf.GetTextHeight()) - nAscent);
+    }
+    const tools::Long nHeight = nAscent + nDescent;
+    if (nHeight <= 0)
+        return false;
+    if (nHeight < rHeight)
+    {
+        rHeight = nHeight;
+        rAscent = nAscent;
+    }
+    return true;
+}
+
 bool SwTextFormatter::ChkFlyUnderflow( SwTextFormatInfo &rInf ) const
 {
     OSL_ENSURE( rInf.GetTextFly().IsOn(), "SwTextFormatter::ChkFlyUnderflow: why?" );
@@ -2949,7 +2997,7 @@ bool SwTextFormatter::ChkFlyUnderflow( SwTextFormatInfo &rInf ) const
         // First we check, whether a fly overlaps with the line.
         // = GetLineHeight()
         const SwTwips nHeight = GetCurr()->GetRealHeight();
-        SwRect aLine( GetLeftMargin(), Y(), rInf.RealWidth(), nHeight );
+        SwRect aLine(GetLeftMargin(), Y(), rInf.RealWidth(), nHeight);
 
         SwRect aLineVert( aLine );
         if ( m_pFrame->IsVertical() )
@@ -2958,14 +3006,37 @@ bool SwTextFormatter::ChkFlyUnderflow( SwTextFormatInfo &rInf ) const
         if ( m_pFrame->IsVertical() )
             m_pFrame->SwitchVerticalToHorizontal( aInter );
 
+
         if( !aInter.HasArea() )
             return false;
+
+        tools::Long nProbeHeight = GetCurr()->Height();
+        tools::Long nProbeAscent = GetCurr()->GetAscent();
+        const bool bMacGridBounds = !GetDropLeft()
+            && lcl_WordMacGridFlyMetrics(rInf, *GetCurr(), m_aLineInf.GetLineSpacing(),
+                nProbeAscent, nProbeHeight);
+        const tools::Long nProbeTop = bMacGridBounds
+            ? Y() + AdjustBaseLine(*GetCurr(), nullptr, nProbeHeight, nProbeAscent, false)
+                - nProbeAscent
+            : Y();
+        if (bMacGridBounds)
+        {
+            aLine.SetPosY(nProbeTop);
+            aLine.Height(nProbeHeight);
+            // The legacy rectangle hit an object, but only unused grid
+            // leading may overlap it. Avoid measuring fonts at all when the
+            // initial probe was clear, preserving normal formatting state.
+            aInter = rInf.GetTextFly().GetFrame(aLine);
+            if (!aInter.HasArea())
+                return false;
+        }
 
         // We now check every portion that could have lowered for overlapping
         // with the fly.
         const SwLinePortion *pPos = GetCurr()->GetFirstPortion();
-        aLine.SetPosY(Y() + GetCurr()->GetRealHeight() - GetCurr()->Height());
-        aLine.Height( GetCurr()->Height() );
+        aLine.SetPosY(bMacGridBounds ? nProbeTop
+            : Y() + GetCurr()->GetRealHeight() - GetCurr()->Height());
+        aLine.Height(bMacGridBounds ? nProbeHeight : GetCurr()->Height());
 
         while( pPos )
         {
@@ -3117,6 +3188,26 @@ void SwTextFormatter::CalcFlyWidth( SwTextFormatInfo &rInf )
 
     if ( m_pFrame->IsVertical() )
         m_pFrame->SwitchVerticalToHorizontal( aInter );
+
+
+    if (aInter.HasArea() && aInter.Overlaps(aLine) && !GetDropLeft())
+    {
+        const tools::Long nUpper = nTop - aLine.Top();
+        const tools::Long nLower = aLine.Bottom() - (nTop + nHeight - 1);
+        if (lcl_WordMacGridFlyMetrics(rInf, *m_pCurr,
+                m_aLineInf.GetLineSpacing(), nAscent, nHeight))
+        {
+            nTop = Y() + AdjustBaseLine(*m_pCurr, nullptr, nHeight, nAscent, false) - nAscent;
+            aLine.SetPosY(nTop - nUpper);
+            aLine.Height(nHeight + nUpper + nLower);
+            aLineVert = aLine;
+            if (m_pFrame->IsRightToLeft())
+                m_pFrame->SwitchLTRtoRTL(aLineVert);
+            aInter = rTextFly.GetFrame(aLineVert);
+            if (m_pFrame->IsRightToLeft())
+                m_pFrame->SwitchRTLtoLTR(aInter);
+        }
+    }
 
     if (!aInter.IsEmpty() && aInter.Bottom() < nTop)
     {
