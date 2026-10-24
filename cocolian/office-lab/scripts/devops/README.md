@@ -299,3 +299,9 @@ proportional pitch. This also applies to the first line, as in table cells,
 while multi-row text retains its existing grid pitch.
 `testWordMacSmallBodyGridProportional` verifies three-line paragraphs, the
 unchanged legacy profile, and DOCX save/reload with generated documents.
+
+Justified-line probes can measure only a prefix of a word. The Mac wordWrap
+check may examine the remaining characters when the font attributes and script
+stay uniform; it still checks that the whole word fits a new line. Generated
+native-font cases cover normal and explicit character wrapping through DOCX
+save/reload, and bundled-font cases cover both left and justified alignment.

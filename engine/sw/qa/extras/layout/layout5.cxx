@@ -2149,6 +2149,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
     });
     const OUString aOn = u"1"_ustr;
     osl_setEnvironment(aName.pData, aOn.pData);
+    for (const OString& rAlignment : { "left"_ostr, "both"_ostr })
     for (const OString& rLanguage : { "en-US"_ostr, "zh-CN"_ostr })
     for (bool bKinsoku : { false, true })
     for (sal_Int32 nWidth : { 3900, 4040 })
@@ -2171,6 +2172,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
                 + (bInherited || nCase == 3 ? OString() : "<w:wordWrap w:val=\""_ostr
                     + (bWordWrap ? "1"_ostr : "0"_ostr) + "\"/>"_ostr)
                 + "<w:kinsoku w:val=\""_ostr + (bKinsoku ? "1"_ostr : "0"_ostr) + "\"/>"_ostr
+                + "<w:jc w:val=\""_ostr + rAlignment + "\"/>"_ostr
                 + R"xml(<w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Liberation Mono" w:hAnsi="Liberation Mono"/><w:sz w:val="24"/><w:lang w:val="LANGUAGE"/></w:rPr><w:t>alpha beta</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="PAGE_WIDTH" w:h="6000"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="default"/></w:sectPr></w:body></w:document>)xml"_ostr.replaceAll("LANGUAGE"_ostr, rLanguage)
                     .replaceAll("PAGE_WIDTH"_ostr, OString::number(nWidth)));
             uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
@@ -2191,7 +2193,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
                 else
                     assertXPath(pXml, aPath + (bWordWrap ? "[@w:val='1']"_ostr : "[@w:val='0']"_ostr), 1);
             }
-            const OString aInputs = rLanguage + " kinsoku="_ostr + (bKinsoku ? "1"_ostr : "0"_ostr)
+            const OString aInputs = rAlignment + " "_ostr + rLanguage + " kinsoku="_ostr + (bKinsoku ? "1"_ostr : "0"_ostr)
                 + " case="_ostr + OString::number(nCase) + " width="_ostr + OString::number(nWidth);
             auto pDump = parseLayoutDump();
             const OString aLines = "/root/page[1]/body/txt/SwParaPortion/SwLineLayout"_ostr;
@@ -4115,6 +4117,38 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacLeftAlignedLineBudget)
             "portion", aExpected);
         assertXPath(pLayout, "/root/page/body/txt[2]/SwParaPortion/SwLineLayout", 1);
     }
+    // Justification probes can truncate a word's temporary portion without
+    // changing its formatting. Keep wordWrap independent of those probes.
+    for (bool bWordWrap : { false, true })
+    {
+        utl::TempFileNamed aProbe;
+        aProbe.EnableKillingFile();
+        makeWordMacPackage(aProbe, false, true);
+        const OString aPrefix = "2030/01/01 12:00:00.000|1.0.0|I|SyntheticBatchWorker_Complete 12345"_ostr;
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aProbe.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="both"/><w:wordWrap w:val=")xml"_ostr
+                + (bWordWrap ? "1"_ostr : "0"_ostr)
+                + R"xml("/><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:snapToGrid/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="FangSong_GB2312" w:hAnsi="FangSong_GB2312" w:eastAsia="FangSong_GB2312" w:hint="eastAsia"/><w:sz w:val="24"/><w:lang w:val="zh-CN" w:eastAsia="zh"/></w:rPr><w:t>)xml"_ostr
+                + aPrefix + R"xml( messages for session 0123456789abcdef0123456789abcdef</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aProbe.GetURL());
+        for (bool bReload : { false, true })
+        {
+            if (bReload)
+                saveAndReload(TestFilter::DOCX);
+            const OUString aExpected = OUString::fromUtf8(aPrefix)
+                + (bWordWrap ? OUString() : u" m"_ustr);
+            CPPUNIT_ASSERT_EQUAL(aExpected, getXPath(parseLayoutDump(),
+                "/root/page/body/txt[1]/SwParaPortion/SwLineLayout[1]", "portion").trim());
+        }
+    }
+
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacPdfFallbackBold)

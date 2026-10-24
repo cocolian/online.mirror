@@ -25,6 +25,7 @@
 #include <IDocumentSettingAccess.hxx>
 #include "guess.hxx"
 #include "inftxt.hxx"
+#include "itratr.hxx"
 #include <pagefrm.hxx>
 #include <tgrditem.hxx>
 #include <com/sun/star/i18n/BreakType.hpp>
@@ -968,16 +969,29 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 ++nEnd;
             if (nStart > sal_Int32(rInf.GetLineStart()) && IsBlank(rText[nStart - 1])
                 && (nEnd == rText.getLength() || IsBlank(rText[nEnd]))
-                && nStart >= sal_Int32(rInf.GetIdx())
-                && nEnd <= sal_Int32(rInf.GetIdx() + nMaxLen))
+                && nStart >= sal_Int32(rInf.GetIdx()))
             {
+                bool bUniformWord = nEnd <= sal_Int32(rInf.GetIdx() + nMaxLen);
+                if (!bUniformWord)
+                {
+                    // A justification probe may measure only a word's prefix.
+                    // Looking past that temporary limit is safe only while
+                    // its character attributes and script stay unchanged.
+                    SwScriptInfo aWordScript;
+                    SwAttrIter aWordAttrs(*rInf.GetTextFrame()->GetTextNodeFirst(),
+                        aWordScript, rInf.GetTextFrame());
+                    const TextFrameIndex nWordStart(nStart);
+                    aWordAttrs.Seek(nWordStart);
+                    bUniformWord = TextFrameIndex(nEnd) <= aWordAttrs.GetNextAttr()
+                        && TextFrameIndex(nEnd) <= aWordScript.NextScriptChg(nWordStart);
+                }
                 const lang::Locale aLatinLocale(u"en"_ustr, u"US"_ustr, OUString());
                 const auto aLatin = g_pBreakIt->GetBreakIter()->getLineBreak(rText,
                     sal_Int32(m_nCutPos), aLatinLocale, sal_Int32(rInf.GetLineStart()),
                     aHyphOpt, aUserOpt);
                 const auto aWord = rInf.GetTextSize(&rSI, TextFrameIndex(nStart),
                     TextFrameIndex(nEnd - nStart));
-                if (aLatin.breakType == BreakType::WORDBOUNDARY
+                if (bUniformWord && aLatin.breakType == BreakType::WORDBOUNDARY
                     && aLatin.breakIndex == nStart
                     && aWord.Width() <= rInf.RealWidth() - nLeftRightBorderSpace)
                     aResult = aLatin;
