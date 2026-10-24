@@ -3205,6 +3205,19 @@ bool SwTextFrame::Prepare( const PrepareHint ePrep, const void* pVoid,
             // If we don't overlap with anybody:
             // did any free-flying frame overlapped _before_ the position change?
             bool bFormat = pPara->HasFly();
+            // The unused lower grid leading is trimmed at the body boundary.
+            // Moving a cached paragraph changes that boundary calculation even
+            // when the available width and its text have stayed the same.
+            if (!bFormat && sw::UseWordMacGridBottom() && IsInDocBody()
+                && !IsInTab() && !IsInFly() && !IsVertical() && !GetDrawObjs()
+                && GetDoc().getIDocumentSettingAccess().get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+                && GetTextNodeForParaProps()->GetSwAttrSet().GetParaGrid().GetValue()
+                && GetTextNodeForParaProps()->GetSwAttrSet().GetLineSpacing().GetLineSpaceRule()
+                    == SvxLineSpaceRule::Auto)
+            {
+                const auto* pGrid = GetGridItem(FindPageFrame());
+                bFormat = pGrid && pGrid->GetGridType() != SwTextGrid::NONE;
+            }
             if( !bFormat )
             {
                 if( IsInFly() )
@@ -3587,12 +3600,19 @@ bool SwTextFrame::WouldFit(SwTwips &rMaxHeight, bool &bSplit, bool bTst, bool bM
         bRet = !aFrameBreak.IsKeepAlways() && aFrameBreak.WouldFit(aLine, rMaxHeight, bTst, bMoveBwd);
     else
     {
-        // we need the total height including the current line
+        // A cached paragraph can move to a page edge without rebuilding
+        // its line heights. Consume the same lower grid leading accepted
+        // by IsInside(), instead of returning a negative remaining height.
+        const SwTwips nBottomPadding = aFrameBreak.GetGridBottomPadding(aLine);
+        SwTwips nLineSum = 0;
         aLine.Top();
         do
         {
-            rMaxHeight -= aLine.GetLineHeight();
+            nLineSum += aLine.GetLineHeight();
         } while ( aLine.Next() );
+        if (nLineSum > rMaxHeight && nLineSum - rMaxHeight <= nBottomPadding)
+            nLineSum -= nBottomPadding;
+        rMaxHeight -= nLineSum;
     }
 
     return bRet;

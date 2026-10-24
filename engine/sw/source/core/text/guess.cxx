@@ -382,6 +382,17 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         // cannot borrow the half-em line-fit allowance used for body text.
         nUncompressedLimit = nLineWidth - nPreviousCompression;
     }
+    if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Left
+        && rInf.GetTextFrame()->IsInTab() && rInf.SnapToGrid()
+        && rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().get(
+            DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID))
+    {
+        const auto* pGrid = GetGridItem(rInf.GetTextFrame()->FindPageFrame());
+        // A strict grid also bounds left-aligned cell text. Do not accept a
+        // compressed whole portion before the hanging-punctuation check runs.
+        if (pGrid && pGrid->GetGridType() == SwTextGrid::LinesOnly)
+            nUncompressedLimit = nLineWidth - nPreviousCompression;
+    }
     auto aWithinLineBudget = [&] {
         return !bWordMacLineBudget || m_nBreakWidth + nMaxSizeDiff <= nUncompressedLimit;
     };
@@ -866,7 +877,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         {
             const auto* pGrid = GetGridItem(rInf.GetTextFrame()->FindPageFrame());
             if (pGrid && (pGrid->GetGridType() == SwTextGrid::LinesAndChars
-                || (bModernLineBreaking && !rInf.GetTextFrame()->IsInTab()
+                || (bModernLineBreaking
                     && pGrid->GetGridType() == SwTextGrid::LinesOnly
                     && aAdjust == SvxAdjust::Left)))
                 bAllowHanging = false;
