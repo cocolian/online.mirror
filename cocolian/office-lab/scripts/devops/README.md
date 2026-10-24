@@ -224,7 +224,7 @@ DOCX save/reload with namespace-aware assertions. See the
 Closing-punctuation fitting treats decimal and percentage tokens as complete
 units across script portions. The generated native-font
 `testWordMacPercentageClosingUnit` covers a percentage followed by a CJK closing
-parenthesis. The pipeline now runs 29 strict bundled-font and 23 native-font
+parenthesis. The pipeline now runs 30 strict bundled-font and 23 native-font
 regressions. These individual checks do not establish full corpus equivalence.
 
 The Mac profile additionally renders explicit uniform positive row-level cell
@@ -237,3 +237,10 @@ horizontally merged rows and save/reload geometry. Only dxa units are accepted,
 as specified by the
 [OOXML row cell spacing definition](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.tablecellspacing?view=openxml-3.0.1).
 Table-level default spacing and mixed row-spacing layouts remain unsupported.
+
+The Mac profile keeps an ASCII HTTP(S) path tail together after a hyphen when
+the complete tail fits the next line. Explicit `wordWrap=false` still uses
+character-level wrapping, including underscores in identifiers. The generated
+`testWordMacUrlBreakUnits` covers plain text and HYPERLINK fields, legacy and Mac
+profiles, long-tail fallback, and DOCX save/reload with reserved example.invalid
+addresses. Private sample documents and font binaries remain outside Git.

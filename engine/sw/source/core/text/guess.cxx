@@ -65,6 +65,27 @@ TextFrameIndex AdjustCutPos(TextFrameIndex cutPos, TextFrameIndex& rBreakPos,
     return cutPos;
 }
 
+// OOXML wordWrap=false permits character-level wrapping. A direct grab bag
+// can contain other values, so search paragraph styles until the key is found.
+bool wordMacWrapAtWordBoundary(const SwTextFormatInfo& rInf)
+{
+    const SfxItemSet* pSet = &rInf.GetTextFrame()->GetTextNodeForParaProps()->GetSwAttrSet();
+    for (; pSet; pSet = pSet->GetParent())
+    {
+        const auto* pBag = pSet->GetItem(RES_PARATR_GRABBAG, false);
+        if (!pBag)
+            continue;
+        const auto& rBag = pBag->GetGrabBag();
+        const auto it = rBag.find(u"WordWrap"_ustr);
+        if (it == rBag.end())
+            continue;
+        bool bWordWrap = true;
+        it->second >>= bWordWrap;
+        return bWordWrap;
+    }
+    return true;
+}
+
 bool hasBlanksInLine(const SwTextFormatInfo& rInf, TextFrameIndex end)
 {
     for (auto x = rInf.GetLineStart(); x < end; ++x)
@@ -274,6 +295,9 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
     // closing mark into a separate portion.
     auto aAsciiBreakUnitChar = [&](sal_Unicode c) {
         return aAsciiWordChar(c) || c == '.' || c == '%';
+    };
+    auto aAsciiWordWrapChar = [&](sal_Unicode c) {
+        return aAsciiWordChar(c) || c == '_';
     };
     TextFrameIndex nClosing = rInf.GetIdx();
     while (bWordMacLineBudget && nClosing < rInf.GetIdx() + nMaxLen && aAsciiBreakUnitChar(rInf.GetChar(nClosing)))
@@ -911,32 +935,47 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 aResult = aRetry;
         }
 
-        // OOXML wordWrap=false permits an alphabetic word to break at the
-        // physical character fit. Keep the default word-boundary behavior
-        // unless a paragraph or its style explicitly disables word wrapping.
         if (sw::UseWordMacMetrics() && !rPor.InFieldGrp() && !cFieldChr
             && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
             && m_nCutPos < rInf.GetIdx() + nMaxLen
-            && aAsciiWordChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
-            && aAsciiWordChar(rInf.GetChar(m_nCutPos)))
+            && aAsciiWordWrapChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
+            && aAsciiWordWrapChar(rInf.GetChar(m_nCutPos))
+            && !wordMacWrapAtWordBoundary(rInf))
         {
-            const SfxItemSet* pSet = &rInf.GetTextFrame()->GetTextNodeForParaProps()->GetSwAttrSet();
-            for (; pSet; pSet = pSet->GetParent())
+            aResult.breakIndex = sal_Int32(m_nCutPos);
+            aResult.breakType = BreakType::WORDBOUNDARY;
+        }
+
+        if (sw::UseWordMacMetrics() && !rPor.InFieldGrp() && !cFieldChr
+            && rInf.GetLineStart() == TextFrameIndex(0)
+            && aResult.breakType != BreakType::HYPHENATION
+            && aResult.breakIndex > 0 && aResult.breakIndex <= sal_Int32(m_nCutPos)
+            && wordMacWrapAtWordBoundary(rInf))
+        {
+            const OUString& rText = rInf.GetText();
+            const sal_Int32 nScheme = rText.startsWith(u"https://") ? 8
+                : rText.startsWith(u"http://") ? 7 : 0;
+            if (nScheme && rText[aResult.breakIndex - 1] == u'/')
             {
-                const auto* pBag = pSet->GetItem(RES_PARATR_GRABBAG, false);
-                if (!pBag)
-                    continue;
-                const auto& rBag = pBag->GetGrabBag();
-                const auto it = rBag.find(u"WordWrap"_ustr);
-                if (it == rBag.end())
-                    continue;
-                bool bWordWrap = true;
-                if ((it->second >>= bWordWrap) && !bWordWrap)
+                // Word keeps a slash-separated ASCII URL tail together after
+                // a natural hyphen when that whole tail fits the next line.
+                const sal_Int32 nHyphen = rText.lastIndexOf(u'-', sal_Int32(m_nCutPos));
+                sal_Int32 nEnd = nScheme;
+                while (nEnd < rText.getLength() && rText[nEnd] > 0x20
+                    && rText[nEnd] < 0x7f && rText[nEnd] != u'"'
+                    && rText[nEnd] != u'<' && rText[nEnd] != u'>')
+                    ++nEnd;
+                const bool bAsciiUrl = nEnd == rText.getLength() || rText[nEnd] <= 0x20
+                    || rText[nEnd] == u'"' || rText[nEnd] == u'<' || rText[nEnd] == u'>';
+                if (bAsciiUrl && nHyphen >= nScheme && nHyphen + 1 < aResult.breakIndex
+                    && nHyphen >= sal_Int32(rInf.GetIdx())
+                    && nEnd <= sal_Int32(rInf.GetIdx() + nMaxLen))
                 {
-                    aResult.breakIndex = sal_Int32(m_nCutPos);
-                    aResult.breakType = BreakType::WORDBOUNDARY;
+                    const auto aTail = rInf.GetTextSize(&rSI, TextFrameIndex(nHyphen + 1),
+                        TextFrameIndex(nEnd - nHyphen - 1));
+                    if (aTail.Width() <= rInf.RealWidth() - nLeftRightBorderSpace)
+                        aResult.breakIndex = nHyphen + 1;
                 }
-                break;
             }
         }
 
