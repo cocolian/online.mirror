@@ -7,6 +7,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include <array>
+
 #include <swmodeltestbase.hxx>
 #include <swtable.hxx>
 #include <htmltbl.hxx>
@@ -3091,6 +3093,56 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacAutomaticSuperscript)
             CPPUNIT_ASSERT_DOUBLES_EQUAL(bLarge ? 11.5 : 6., fSize, 0.02);
             CPPUNIT_ASSERT_DOUBLES_EQUAL(bLarge ? 5.05 : 2.5, fSuper - fBase, 0.05);
         }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCenteredGridHeading)
+{
+    const std::array<OUString, 3> aNames = {
+        u"COCOLIAN_WORD_MAC_METRICS"_ustr, u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr };
+    std::array<OUString, 3> aPrevious;
+    std::array<bool, 3> aHadPrevious;
+    for (size_t i = 0; i < aNames.size(); ++i)
+    {
+        aHadPrevious[i] = osl_getEnvironment(aNames[i].pData, &aPrevious[i].pData)
+            == osl_Process_E_None;
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(aNames[i].pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+        {
+            if (aHadPrevious[i])
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+        }
+    });
+    for (bool bStrict : { false, true })
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="center"/><w:snapToGrid/><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:b/><w:sz w:val="44"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:b/><w:sz w:val="44"/></w:rPr><w:t>甲乙丙丁戊（己庚辛）壬癸子丑寅卯辰巳午</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val="compressPunctuation"/><w:compat><w:doNotWrapTextWithPunct w:val=")xml"_ostr
+                + (bStrict ? "1"_ostr : "0"_ostr)
+                + R"xml("/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        auto pDump = parseLayoutDump();
+        const OString aLines = "/root/page[1]/body/txt/SwParaPortion/SwLineLayout"_ostr;
+        assertXPath(pDump, aLines, bStrict ? 2 : 1);
+        if (bStrict)
+            assertXPath(pDump, aLines + "[2]"_ostr, "portion", u"午"_ustr);
     }
 }
 

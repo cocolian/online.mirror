@@ -272,6 +272,8 @@ public:
 
     /// Is in itratr.
     void GetMinMaxSize( SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong &rMax, sal_uLong &rAbs ) const;
+    void GetMinMaxSize(SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong& rMax,
+                       sal_uLong& rAbs, bool bAddLayoutSlack) const;
 
     /// overriding to handle change of certain paragraph attributes
     virtual bool SetAttr( const SfxPoolItem& ) override;

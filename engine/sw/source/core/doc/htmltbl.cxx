@@ -414,10 +414,10 @@ SwFrameFormat *SwHTMLTableLayout::FindFlyFrameFormat() const
 
 static void lcl_GetMinMaxSize( sal_uLong& rMinNoAlignCnts, sal_uLong& rMaxNoAlignCnts,
                         sal_uLong& rAbsMinNoAlignCnts,
-                        SwTextNode const *pTextNd, SwNodeOffset nIdx, bool bNoBreak )
+                        SwTextNode const *pTextNd, SwNodeOffset nIdx, bool bNoBreak, bool bExactWidth )
 {
     pTextNd->GetMinMaxSize( nIdx, rMinNoAlignCnts, rMaxNoAlignCnts,
-                           rAbsMinNoAlignCnts );
+                           rAbsMinNoAlignCnts, !bExactWidth );
     OSL_ENSURE( rAbsMinNoAlignCnts <= rMinNoAlignCnts,
             "GetMinMaxSize: absmin > min" );
     OSL_ENSURE( rMinNoAlignCnts <= rMaxNoAlignCnts,
@@ -503,7 +503,7 @@ void SwHTMLTableLayout::AutoLayoutPass1()
                                                    nMaxNoAlignCnts,
                                                    nAbsMinNoAlignCnts,
                                                    pTextNd, nIdx,
-                                                   pCnts->HasNoBreakTag() );
+                                                   pCnts->HasNoBreakTag(), m_bWordMacAutoFit );
                                 if (m_bWordMacAutoFit && nColSpan == 1
                                     && !pTextNd->GetText().isEmpty())
                                 {
@@ -1195,7 +1195,67 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
 
     // Step 3: Identify the column width and, if applicable, the absolute
     // and relative table widths.
-    if( (!IsTopTable() && m_nMin > static_cast<sal_uLong>(nAbsAvail)) ||
+    bool bWordPercentColumns = m_bWordMacAutoFit && m_bPercentWidthOption
+        && nAbsTabWidth && m_nCols && m_nMin <= nAbsTabWidth;
+    for (sal_uInt16 i = 0; bWordPercentColumns && i < m_nCols; ++i)
+        bWordPercentColumns = GetColumn(i)->IsRelWidthOption()
+            && GetColumn(i)->GetWidthOption() > 0;
+    if (bWordPercentColumns)
+    {
+        // Word honors preferred percentages until a column reaches its
+        // intrinsic minimum. Freeze that column and redistribute only the
+        // remaining percentage columns; HTML's min/max interpolation would
+        // widen already constrained narrow headers and change their wrap.
+        std::vector<sal_uLong> aWidths(m_nCols, 0);
+        std::vector<bool> aFixed(m_nCols, false);
+        sal_uLong nRemaining = nAbsTabWidth;
+        sal_uLong nWeight = 0;
+        for (sal_uInt16 i = 0; i < m_nCols; ++i)
+            nWeight += GetColumn(i)->GetWidthOption();
+        bool bClamped;
+        do
+        {
+            bClamped = false;
+            for (sal_uInt16 i = 0; nWeight && i < m_nCols; ++i)
+            {
+                if (aFixed[i])
+                    continue;
+                const auto* pColumn = GetColumn(i);
+                if (sal_uInt64(nRemaining) * pColumn->GetWidthOption()
+                    < sal_uInt64(pColumn->GetMin()) * nWeight)
+                {
+                    aWidths[i] = pColumn->GetMin();
+                    aFixed[i] = true;
+                    nRemaining -= aWidths[i];
+                    nWeight -= pColumn->GetWidthOption();
+                    bClamped = true;
+                }
+            }
+        } while (bClamped);
+        for (sal_uInt16 i = 0; i < m_nCols; ++i)
+        {
+            if (aFixed[i])
+                continue;
+            const auto nColumnWeight = GetColumn(i)->GetWidthOption();
+            aWidths[i] = sal_uInt64(nRemaining) * nColumnWeight / nWeight;
+            nRemaining -= aWidths[i];
+            nWeight -= nColumnWeight;
+        }
+        m_nRelTabWidth = nRelAvail
+            ? o3tl::narrowing<sal_uInt16>(sal_uLong(nAbsTabWidth) * nRelAvail / nAbsAvail)
+            : nAbsTabWidth;
+        sal_uLong nRelUsed = 0;
+        for (sal_uInt16 i = 0; i < m_nCols; ++i)
+        {
+            auto* pColumn = GetColumn(i);
+            pColumn->SetAbsColWidth(o3tl::narrowing<sal_uInt16>(aWidths[i]));
+            const sal_uLong nRelWidth = i + 1 == m_nCols ? m_nRelTabWidth - nRelUsed
+                : aWidths[i] * m_nRelTabWidth / nAbsTabWidth;
+            pColumn->SetRelColWidth(o3tl::narrowing<sal_uInt16>(nRelWidth));
+            nRelUsed += nRelWidth;
+        }
+    }
+    else if( (!IsTopTable() && m_nMin > static_cast<sal_uLong>(nAbsAvail)) ||
         m_nMin > MAX_TABWIDTH )
     {
         // If
