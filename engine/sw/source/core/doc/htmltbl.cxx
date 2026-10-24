@@ -1195,6 +1195,10 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
 
     // Step 3: Identify the column width and, if applicable, the absolute
     // and relative table widths.
+    // Unlike HTML, Word caps AutoFit at the page text width unless the
+    // document explicitly permits growth into the margins. Break oversized
+    // content proportionally after reserving each column's border/padding.
+    const bool bWordPageLimit = m_bWordMacAutoFit && !m_bWordMacGrowAutoFit;
     bool bWordPercentColumns = m_bWordMacAutoFit && m_bPercentWidthOption
         && nAbsTabWidth && m_nCols && m_nMin <= nAbsTabWidth;
     for (sal_uInt16 i = 0; bWordPercentColumns && i < m_nCols; ++i)
@@ -1255,7 +1259,7 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
             nRelUsed += nRelWidth;
         }
     }
-    else if( (!IsTopTable() && m_nMin > static_cast<sal_uLong>(nAbsAvail)) ||
+    else if( ((!IsTopTable() || bWordPageLimit) && m_nMin > static_cast<sal_uLong>(nAbsAvail)) ||
         m_nMin > MAX_TABWIDTH )
     {
         // If
@@ -1264,7 +1268,7 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
         // has to be adapted to the available space or USHORT_MAX.
         // We preserve the widths' ratio amongst themselves, however.
 
-        nAbsTabWidth = IsTopTable() ? MAX_TABWIDTH : nAbsAvail;
+        nAbsTabWidth = IsTopTable() && !bWordPageLimit ? MAX_TABWIDTH : nAbsAvail;
         m_nRelTabWidth = (nRelAvail ? nRelAvail : nAbsTabWidth );
 
         // First of all, we check whether we can fit the layout constrains,

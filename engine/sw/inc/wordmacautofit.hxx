@@ -10,5 +10,5 @@ class SwTable;
 namespace sw
 {
 SW_DLLPUBLIC bool AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
-    const std::vector<sal_Int32>& rColumnPercents);
+    const std::vector<sal_Int32>& rColumnPercents, bool bGrowAutoFit = false);
 }

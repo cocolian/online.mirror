@@ -3403,7 +3403,7 @@ SwTableLines::~SwTableLines()
 }
 
 bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
-    const std::vector<sal_Int32>& rColumnPercents)
+    const std::vector<sal_Int32>& rColumnPercents, bool bGrowAutoFit)
 {
     const auto& rLines = rTable.GetTabLines();
     if (rLines.empty() || rLines.size() > SAL_MAX_UINT16)
@@ -3413,9 +3413,10 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
         return false;
     if (rLines.size() * rFirstBoxes.size() > 100000)
         return false;
-    if (rColumnPercents.size() != rFirstBoxes.size()
-        || std::any_of(rColumnPercents.begin(), rColumnPercents.end(),
-            [](sal_Int32 nWidth) { return nWidth <= 0 || nWidth > 5000; }))
+    const bool bHavePercents = rColumnPercents.size() == rFirstBoxes.size()
+        && std::all_of(rColumnPercents.begin(), rColumnPercents.end(),
+            [](sal_Int32 nWidth) { return nWidth > 0 && nWidth <= 5000; });
+    if (!bHavePercents && !bGrowAutoFit)
         return false;
     for (const auto* pLine : rLines)
     {
@@ -3430,6 +3431,21 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
         nModelWidth += pBox->GetFrameFormat()->GetFrameSize().GetWidth();
     if (nModelWidth <= 0)
         return false;
+    std::vector<sal_Int32> aPreferredPercents(rColumnPercents);
+    if (!bHavePercents)
+    {
+        // DOCX export can store measured cell widths as dxa. Explicit
+        // growAutofit must still honor content minima after reopening it.
+        aPreferredPercents.clear();
+        for (const auto* pBox : rFirstBoxes)
+        {
+            const SwTwips nWidth = pBox->GetFrameFormat()->GetFrameSize().GetWidth();
+            if (nWidth <= 0)
+                return false;
+            aPreferredPercents.push_back(std::max<sal_Int32>(1,
+                sal_Int64(nWidth) * 5000 / nModelWidth));
+        }
+    }
     if (nGridWidthTwips <= 0)
         nGridWidthTwips = nModelWidth;
     if (nGridWidthTwips > SAL_MAX_UINT16)
@@ -3452,7 +3468,7 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
         nPercent != 0, 0, nPadding, 0, eAdjust, 0, 0, nBorder, nBorder, nBorder);
     for (sal_uInt16 nCol = 0; nCol < nCols; ++nCol)
     {
-        const sal_uInt16 nPreferred = rColumnPercents[nCol];
+        const sal_uInt16 nPreferred = aPreferredPercents[nCol];
         xLayout->SetColumn(std::make_unique<SwHTMLTableLayoutColumn>(nPreferred, true,
             rFirstBoxes[nCol]->GetFrameFormat()->GetBox().GetLeft() != nullptr), nCol);
     }
@@ -3480,7 +3496,7 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     xLayout->AutoLayoutPass1();
     // Normal-style font defaults can be applied after endTable(). Measure
     // once more when layout has the final paragraph properties available.
-    xLayout->EnableWordMacAutoFit(rTable.GetWordMacPercentPadding());
+    xLayout->EnableWordMacAutoFit(rTable.GetWordMacPercentPadding(), bGrowAutoFit);
     rTable.SetHTMLTableLayout(xLayout);
     return true;
 }

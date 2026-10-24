@@ -224,7 +224,7 @@ DOCX save/reload with namespace-aware assertions. See the
 Closing-punctuation fitting treats decimal and percentage tokens as complete
 units across script portions. The generated native-font
 `testWordMacPercentageClosingUnit` covers a percentage followed by a CJK closing
-parenthesis. The pipeline now runs 30 strict bundled-font and 26 native-font
+parenthesis. The pipeline now runs 31 strict bundled-font and 26 native-font
 regressions. These individual checks do not establish full corpus equivalence.
 
 The Mac profile additionally renders explicit uniform positive row-level cell
@@ -274,3 +274,10 @@ identical registry configuration and layer identities. Temporary archives are
 removed on success or failure; original documents and private fonts stay outside
 Git. Nine release-flow unit tests cover these gates and the existing rollback
 and cache-provenance checks.
+
+Top-level Mac-profile AutoFit tables stay within the page text width unless
+OOXML `growAutofit` explicitly permits margin overflow. That compatibility
+setting and the AutoFit layout mode survive DOCX save/reload. The generated
+`testWordMacAutoFitPageWidth` checks both settings through two save/reload cycles,
+including wrapping oversized content inside the page. Legacy-profile and fixed
+table behavior are unchanged. Private sample documents remain outside Git.

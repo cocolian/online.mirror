@@ -1733,6 +1733,14 @@ void DocxExport::WriteSettings()
 
         for (const auto& rCompatSetting : aCompatSettingsSequence)
         {
+            if (rCompatSetting.Name == "growAutofit")
+            {
+                bool bGrow = false;
+                if (rCompatSetting.Value >>= bGrow)
+                    pFS->singleElementNS(XML_w, XML_growAutofit,
+                        FSNS(XML_w, XML_val), bGrow ? "1" : "0");
+                continue;
+            }
             cpo::uno::Sequence< beans::PropertyValue > aCompatSetting;
             rCompatSetting.Value >>= aCompatSetting;
             OUString aName;
