@@ -17,6 +17,8 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
+#include <svl/grabbagitem.hxx>
 #include <config_wasm_strip.h>
 
 #include <bodyfrm.hxx>
@@ -217,6 +219,22 @@ static SwTwips lcl_CalcMinRowHeight( const SwRowFrame *pRow,
                                      const bool _bConsiderObjs );
 static sal_uInt16 lcl_GetTopSpace( const SwRowFrame& rRow );
 static sal_uInt16 lcl_GetBottomLineDist(const SwRowFrame& rRow);
+
+SwTwips SwCellFrame::GetWordMacCellSpacing() const
+{
+    if (!sw::UseWordMacMetrics() || FindTabFrame()->IsCollapsingBorders())
+        return 0;
+    const auto* pRow = static_cast<const SwRowFrame*>(GetUpper());
+    const auto* pBag = pRow->GetFormat()->GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG);
+    if (!pBag)
+        return 0;
+    const auto& rBag = pBag->GetGrabBag();
+    const auto it = rBag.find(u"RowCellSpacingTwips"_ustr);
+    sal_Int32 nSpacing = 0;
+    if (it != rBag.end())
+        it->second >>= nSpacing;
+    return std::clamp<sal_Int32>(nSpacing, 0, SAL_MAX_INT16);
+}
 
 static SwTwips lcl_CalcTopAndBottomMargin( const SwLayoutFrame&, const SwBorderAttrs& );
 
@@ -5158,7 +5176,8 @@ static SwTwips lcl_CalcTopAndBottomMargin( const SwLayoutFrame& rCell, const SwB
         }
     }
 
-    return nTopSpace + nBottomSpace;
+    return nTopSpace + nBottomSpace
+        + 2 * static_cast<const SwCellFrame&>(rCell).GetWordMacCellSpacing();
 }
 
 // #i26945# - add parameter <_bConsiderObjs> in order to
@@ -6279,6 +6298,11 @@ void SwCellFrame::Format( vcl::RenderContext* /*pRenderContext*/, const SwBorder
                 nTopSpace    = pAttrs->CalcTop();
                 nBottomSpace = pAttrs->CalcBottom();
             }
+            const SwTwips nCellSpacing = GetWordMacCellSpacing();
+            nLeftSpace += nCellSpacing;
+            nRightSpace += nCellSpacing;
+            nTopSpace += nCellSpacing;
+            nBottomSpace += nCellSpacing;
             aRectFnSet.SetXMargins( *this, nLeftSpace, nRightSpace );
             aRectFnSet.SetYMargins( *this, nTopSpace, nBottomSpace );
         }

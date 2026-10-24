@@ -17,6 +17,8 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <svl/grabbagitem.hxx>
+#include <svl/eitem.hxx>
 #include <sal/config.h>
 #include <wordmacmetrics.hxx>
 #include <wordmacautofit.hxx>
@@ -2014,6 +2016,39 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
                         pTable->SetWordMacPercentPadding(sal_uInt16(std::clamp<sal_Int32>(
                             o3tl::toTwips(aTableInfo.nWordMacPercentPadding, o3tl::Length::mm100),
                             0, SAL_MAX_UINT16)));
+                    // Uniform explicit row spacing uses separated cell borders.
+                    // Keep the current layout for merged or nested table models.
+                    if (pTable && sw::UseWordMacMetrics() && aTableInfo.nNestLevel == 1
+                        && !bConvertToFloating && !pTable->GetTabLines().empty())
+                    {
+                        sal_Int32 nSpacing = -1;
+                        const size_t nColumns = pTable->GetTabLines().front()->GetTabBoxes().size();
+                        bool bUniform = nColumns > 0;
+                        for (const auto* pLine : pTable->GetTabLines())
+                        {
+                            if (pLine->GetTabBoxes().size() != nColumns)
+                                bUniform = false;
+                            const auto* pBag = pLine->GetFrameFormat()->GetAttrSet()
+                                .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG);
+                            sal_Int32 nRowSpacing = 0;
+                            if (pBag)
+                            {
+                                const auto& rBag = pBag->GetGrabBag();
+                                auto it = rBag.find(u"RowCellSpacingTwips"_ustr);
+                                if (it != rBag.end())
+                                    it->second >>= nRowSpacing;
+                            }
+                            if (nRowSpacing <= 0 || (nSpacing >= 0 && nSpacing != nRowSpacing))
+                                bUniform = false;
+                            nSpacing = nRowSpacing;
+                            for (const auto* pBox : pLine->GetTabBoxes())
+                                if (!pBox->GetSttNd() || pBox->getRowSpan() != 1)
+                                    bUniform = false;
+                        }
+                        if (bUniform)
+                            pTable->GetFrameFormat()->SetFormatAttr(
+                                SfxBoolItem(RES_COLLAPSING_BORDERS, false));
+                    }
                     const char* pAutoFit = std::getenv("COCOLIAN_WORD_MAC_AUTOFIT");
                     if (pTable && sw::UseWordMacMetrics() && pAutoFit && std::strcmp(pAutoFit, "1") == 0
                         && aTableInfo.nNestLevel == 1 && !bConvertToFloating

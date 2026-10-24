@@ -5308,6 +5308,13 @@ void DocxAttributeOutput::StartTableRow( ww8::WW8TableNodeInfoInner::Pointer_t c
     if (const SfxGrabBagItem* pItem = pTableLine->GetFrameFormat()->GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG))
     {
         const std::map<OUString, cpo::uno::Any>& rGrabBag = pItem->GetGrabBag();
+        if (auto aSpacing = rGrabBag.find(u"RowCellSpacingTwips"_ustr); aSpacing != rGrabBag.end())
+        {
+            sal_Int32 nSpacing = 0;
+            if (aSpacing->second >>= nSpacing)
+                m_pSerializer->singleElementNS(XML_w, XML_tblCellSpacing,
+                    FSNS(XML_w, XML_w), OString::number(nSpacing), FSNS(XML_w, XML_type), "dxa");
+        }
         std::map<OUString, cpo::uno::Any>::const_iterator it = rGrabBag.find(u"RowCnfStyle"_ustr);
         if (it != rGrabBag.end())
         {

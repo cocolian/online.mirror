@@ -1991,6 +1991,70 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordManualPageBreakOverridesParagraphD
     assertXPathContent(parseLayoutDump(), "/root/page[2]/body/txt[1]", u"Second page");
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacRowCellSpacing)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    for (bool bMac : { false, true })
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aName.pData, aValue.pData);
+        for (bool bMerged : { false, true })
+        {
+            sal_Int32 nZeroHeight = 0;
+            for (sal_Int32 nSpacing : { 0, 20 })
+            {
+                utl::TempFileNamed aFile;
+                aFile.EnableKillingFile();
+                makeWordMacPackage(aFile, false, true);
+                {
+                    auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                        ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                    auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                    const OString aCell = R"xml(<w:tc><w:tcPr><w:tcW w:w="2000" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:rPr><w:sz w:val="24"/></w:rPr><w:t>Cell</w:t></w:r></w:p></w:tc>)xml"_ostr;
+                    const OString aRow = R"xml(<w:tr><w:trPr><w:tblCellSpacing w:w=")xml"_ostr
+                        + OString::number(nSpacing) + R"xml(" w:type="dxa"/></w:trPr>)xml"_ostr
+                        + aCell + aCell + "</w:tr>"_ostr;
+                    const OString aSecondRow = bMerged
+                        ? R"xml(<w:tr><w:trPr><w:tblCellSpacing w:w=")xml"_ostr
+                            + OString::number(nSpacing) + R"xml(" w:type="dxa"/></w:trPr>)xml"_ostr
+                            + aCell.replaceAll("w:w=\"2000\""_ostr, "w:w=\"4000\""_ostr)
+                                .replaceAll("<w:tcPr>"_ostr, "<w:tcPr><w:gridSpan w:val=\"2\"/>"_ostr)
+                            + "</w:tr>"_ostr
+                        : aRow;
+                    writeWordMacPart(xWord, u"document.xml"_ustr,
+                        R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4000" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders><w:top w:val="single" w:sz="8"/><w:bottom w:val="single" w:sz="8"/><w:left w:val="single" w:sz="8"/><w:right w:val="single" w:sz="8"/><w:insideH w:val="single" w:sz="8"/><w:insideV w:val="single" w:sz="8"/></w:tblBorders><w:tblCellMar><w:top w:w="10" w:type="dxa"/><w:bottom w:w="10" w:type="dxa"/><w:left w:w="10" w:type="dxa"/><w:right w:w="10" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/></w:tblGrid>)xml"_ostr
+                        + aRow + aSecondRow + R"xml(</w:tbl><w:p/><w:sectPr/></w:body></w:document>)xml"_ostr);
+                    uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                    uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+                }
+                loadFromURL(aFile.GetURL());
+                auto pDump = parseLayoutDump();
+                const OString aRowBounds = "/root/page/body/tab/row[1]/infos/bounds"_ostr;
+                const sal_Int32 nHeight = getXPath(pDump, aRowBounds, "height").toInt32();
+                if (!nSpacing)
+                    nZeroHeight = nHeight;
+                else if (bMac && !bMerged)
+                    CPPUNIT_ASSERT_GREATER(nZeroHeight + 39, nHeight);
+                else
+                    CPPUNIT_ASSERT_EQUAL(nZeroHeight, nHeight);
+                saveAndReload(TestFilter::DOCX);
+                auto pXml = parseExport(u"word/document.xml"_ustr);
+                assertXPath(pXml, "/w:document/w:body/w:tbl/w:tr/w:trPr/w:tblCellSpacing[@w:type='dxa' and @w:w='"_ostr
+                    + OString::number(nSpacing) + "']"_ostr, 2);
+                CPPUNIT_ASSERT_EQUAL(nHeight, getXPath(parseLayoutDump(), aRowBounds, "height").toInt32());
+            }
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
 {
     const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;

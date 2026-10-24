@@ -429,8 +429,22 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                 // To-Do: Not yet preserved
                 break;
             case NS_ooxml::LN_CT_TrPrBase_tblCellSpacing:
-                // To-Do: Not yet preserved
+            {
+                if (auto pProperties = rSprm.getProps())
+                {
+                    MeasureHandler aMeasure;
+                    pProperties->resolve(aMeasure);
+                    if (sal::static_int_cast<Id>(aMeasure.getUnit()) == NS_ooxml::LN_Value_ST_TblWidth_dxa)
+                    {
+                        TablePropertyMapPtr pProps(new TablePropertyMap);
+                        pProps->Insert(PROP_ROW_CELL_SPACING,
+                            cpo::uno::Any(std::clamp<sal_Int32>(aMeasure.getValue(), 0, SAL_MAX_INT16)),
+                            true, ROW_GRAB_BAG);
+                        insertRowProps(pProps);
+                    }
+                }
                 break;
+            }
             case NS_ooxml::LN_CT_TblPrBase_tblCellSpacing:
                 // To-Do: Not yet preserved
                 break;
