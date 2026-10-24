@@ -65,6 +65,51 @@ class ReleaseTests(unittest.TestCase):
                                           Path(paths['cocolian-office']))
    self.assertEqual(json.loads(built.read_text()),{'online.mirror':'current'})
 
+ def test_reuse_requires_identical_layers_and_config(self):
+  source={'rootfs':{'diff_ids':['sha256:layer']},'config':{'User':'1001'},'os':'linux','architecture':'amd64'}
+  local={'RootFS':{'Layers':['sha256:layer']},'Config':{'User':'1001'},'Os':'linux','Architecture':'amd64'}
+  for mismatch in (None,'RootFS','Config'):
+   candidate=copy.deepcopy(local)
+   if mismatch=='RootFS':candidate['RootFS']['Layers']=['sha256:wrong']
+   if mismatch=='Config':candidate['Config']['User']='0'
+   def command(args,**kw):
+    if args[:2]==['skopeo','inspect']:return json.dumps(source)
+    if args[:3]==['docker','image','ls']:return 'cocolian/test:old'
+    if args[:3]==['docker','image','inspect']:return json.dumps([candidate])
+    if args[:2]==['docker','tag']:return ''
+    raise AssertionError(args)
+   with patch.object(r,'run',side_effect=command)as run,patch.object(r,'registry_transport',return_value=('127.0.0.1:15000',[],[],[])):
+    self.assertEqual(r.reuse_local_base('res.cocolian.cn/cocolian/test@sha256:digest','test','verified'),mismatch is None)
+    tags=[x.args[0]for x in run.call_args_list if x.args[0][:2]==['docker','tag']]
+    self.assertEqual(len(tags),1 if mismatch is None else 0)
+
+ def test_publish_streams_and_checks_immutable_digest(self):
+  digest='sha256:'+'a'*64
+  source={'Id':'immutable','RootFS':{'Layers':['layer']},'Config':{'User':'1001'},'Os':'linux','Architecture':'amd64'}
+  for mismatch in (None,'digest','config'):
+   with tempfile.TemporaryDirectory()as root:
+    directories=[]
+    def command(args,**kw):
+     if args[:3]==['docker','image','inspect']:return json.dumps([source])
+     if args[:2]==['docker','save']:
+      Path(args[3]).write_bytes(b'exported image');return ''
+     if args[:2]==['skopeo','copy']:
+      self.assertTrue(args[-2].startswith('docker-archive:'));self.assertTrue(args[-2].endswith('/test.docker.tar'))
+      self.assertEqual(args[-1],'docker://127.0.0.1:15000/cocolian/test:tag')
+      path=Path(args[args.index('--digestfile')+1]);directories.append(path.parent);path.write_text(digest);return ''
+     if args[:2]==['skopeo','inspect']:
+      if '--config'in args:
+       remote={'rootfs':{'diff_ids':['layer']},'config':{'User':'0'if mismatch=='config'else'1001'},'os':'linux','architecture':'amd64'}
+       return json.dumps(remote)
+      return digest if mismatch!='digest'else'sha256:'+'b'*64
+     raise AssertionError(args)
+    with patch.object(r,'registry_transport',return_value=('127.0.0.1:15000',[],[],[])),patch.object(r,'run',side_effect=command):
+     if mismatch is None:self.assertEqual(r.publish('cocolian/test:tag','test',Path(root)),'res.cocolian.cn/cocolian/test@'+digest)
+     else:
+      with self.assertRaisesRegex(AssertionError,'mismatch'):r.publish('cocolian/test:tag','test',Path(root))
+    self.assertTrue(directories);self.assertTrue(all(not x.exists()for x in directories))
+    self.assertEqual(list(Path(root).iterdir()),[])
+
  def test_private_font_hash_gate(self):
   import hashlib
   with tempfile.TemporaryDirectory() as directory:

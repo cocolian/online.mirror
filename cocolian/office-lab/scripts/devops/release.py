@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Image-only, immutable office-lab release. Run only through the serialized watcher."""
-import base64,copy,fcntl,hashlib,json,os,shutil,subprocess,sys,time
+import base64,copy,fcntl,hashlib,json,os,shutil,subprocess,sys,tempfile,time
 from pathlib import Path
 HOME=Path.home();CACHE=HOME/'projects/cocolian-office/build/source-19b4efae7fb8'
 AUTH=HOME/'.config/cocolian-devops/registry-auth.json'
@@ -94,10 +94,27 @@ def registry_transport():
  # TLS is bypassed only inside the authenticated SSH loopback tunnel.
  return endpoint,(['--tls-verify=false'] if endpoint=='127.0.0.1:15000' else []),(['--src-tls-verify=false'] if endpoint=='127.0.0.1:15000' else []),(['--dest-tls-verify=false'] if endpoint=='127.0.0.1:15000' else [])
 
+def reuse_local_base(image,component,tag):
+ endpoint,inspect_tls,_,_=registry_transport()
+ remote=json.loads(run(['skopeo','inspect','--config','--authfile',AUTH,*inspect_tls,
+  'docker://'+image.replace('res.cocolian.cn',endpoint,1)]))
+ for local in run(['docker','image','ls','cocolian/'+component,'--format','{{.Repository}}:{{.Tag}}']).splitlines():
+  if local.endswith(':<none>'):continue
+  candidate=json.loads(run(['docker','image','inspect',local]))[0]
+  # A registry/archive import may change the manifest while preserving the
+  # config and every uncompressed layer. Verify both before reusing it.
+  if (remote.get('rootfs',{}).get('diff_ids')==candidate.get('RootFS',{}).get('Layers')
+   and remote.get('config')==candidate.get('Config')
+   and remote.get('os')==candidate.get('Os')
+   and remote.get('architecture')==candidate.get('Architecture')):
+   run(['docker','tag',local,tag]);return True
+ return False
+
 def registry_base(image,component,out):
  assert image.startswith('res.cocolian.cn/cocolian/') and '@sha256:' in image
  tag='cocolian/devops-base-'+component+':'+image.split(':')[-1][:16]
  if subprocess.run(['docker','image','inspect',tag],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:
+  if reuse_local_base(image,component,tag):return tag
   archive=out/(component+'-base.tar')
   endpoint,_,src,_=registry_transport()
   try:
@@ -107,19 +124,28 @@ def registry_base(image,component,out):
  return tag
 
 def publish(tag,component,out):
- archive=out/(component+'.docker.tar');oci=out/(component+'.oci.tar')
- try:
+ # Keep one Docker archive and avoid a second complete OCI archive. Copy
+ # straight to the registry, then verify its digest
+ # and the config/uncompressed-layer identities against the source image.
+ source=json.loads(run(['docker','image','inspect',tag]))[0]
+ endpoint,inspect_tls,_,dest_tls=registry_transport()
+ destination='docker://'+endpoint+'/cocolian/'+component+':'+tag.split(':')[-1]
+ with tempfile.TemporaryDirectory(prefix='publish-',dir=out) as directory:
+  digestfile=Path(directory)/'digest'
+  archive=Path(directory)/(component+'.docker.tar')
   run(['docker','save','-o',archive,tag],timeout=900)
-  run(['skopeo','copy','docker-archive:'+str(archive),'oci-archive:'+str(oci)],timeout=900)
-  endpoint,inspect_tls,_,dest_tls=registry_transport()
-  destination='docker://'+endpoint+'/cocolian/'+component+':'+tag.split(':')[-1]
-  expected=run(['skopeo','inspect','--format','{{.Digest}}','oci-archive:'+str(oci)])
-  run(['skopeo','copy','--preserve-digests','--authfile',AUTH,*dest_tls,'oci-archive:'+str(oci),destination],timeout=1200)
-  actual=run(['skopeo','inspect','--authfile',AUTH,*inspect_tls,'--format','{{.Digest}}',destination])
-  assert expected==actual,'Published digest mismatch'
-  return 'res.cocolian.cn/cocolian/'+component+'@'+actual
- finally:
-  archive.unlink(missing_ok=True);oci.unlink(missing_ok=True)
+  run(['skopeo','copy','--authfile',AUTH,*dest_tls,'--format','oci',
+   '--digestfile',digestfile,'docker-archive:'+str(archive),destination],timeout=1200)
+  expected=digestfile.read_text().strip()
+ actual=run(['skopeo','inspect','--authfile',AUTH,*inspect_tls,'--format','{{.Digest}}',destination])
+ assert expected==actual,'Published digest mismatch'
+ remote=json.loads(run(['skopeo','inspect','--config','--authfile',AUTH,*inspect_tls,destination]))
+ assert (remote['rootfs']['diff_ids']==source['RootFS']['Layers']
+  and remote['config']==source['Config'] and remote['os']==source['Os']
+  and remote['architecture']==source['Architecture']),'Published image configuration mismatch'
+ current=json.loads(run(['docker','image','inspect',tag]))[0]
+ assert current['Id']==source['Id'],'Source image changed during publishing'
+ return 'res.cocolian.cn/cocolian/'+component+'@'+actual
 
 def select_targets(heads,previous):
  selected=set()

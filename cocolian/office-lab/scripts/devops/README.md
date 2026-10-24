@@ -265,3 +265,12 @@ they move. Fitting and remaining-height accounting use the same lower-leading
 allowance. `testWordMacCachedGridBottom` checks backward movement after editing,
 nonnegative remaining space, and a visible-font-box overflow that must still
 break the page. Tables, floating frames, and the default profile are excluded.
+
+Publishing keeps one temporary Docker archive and streams OCI conversion to the
+registry, avoiding a second complete local OCI archive. The resulting registry
+digest, runtime configuration, OS/architecture, and every uncompressed layer
+identity are checked before candidate deployment. Base-image reuse requires
+identical registry configuration and layer identities. Temporary archives are
+removed on success or failure; original documents and private fonts stay outside
+Git. Nine release-flow unit tests cover these gates and the existing rollback
+and cache-provenance checks.
