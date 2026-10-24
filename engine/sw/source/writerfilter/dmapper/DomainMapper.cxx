@@ -2811,7 +2811,7 @@ void DomainMapper::sprmWithProps( Sprm& rSprm, const PropertyMapPtr& rContext )
     }
     break;
     case NS_ooxml::LN_CT_PPrBase_wordWrap:
-        m_pImpl->appendGrabBag(m_pImpl->m_aInteropGrabBag, u"wordWrap"_ustr, u""_ustr);
+        rContext->Insert(PROP_WORD_WRAP, cpo::uno::Any(nIntValue != 0), true, PARA_GRAB_BAG);
     break;
     case NS_ooxml::LN_EG_SectPrContents_footnotePr:
     case NS_ooxml::LN_EG_SectPrContents_endnotePr:

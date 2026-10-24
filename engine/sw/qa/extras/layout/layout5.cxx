@@ -1991,6 +1991,64 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordManualPageBreakOverridesParagraphD
     assertXPathContent(parseLayoutDump(), "/root/page[2]/body/txt[1]", u"Second page");
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    for (sal_Int32 nCase : { 0, 1, 2 })
+    {
+        const bool bWordWrap = nCase == 0;
+        const bool bInherited = nCase == 2;
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            if (bInherited)
+                writeWordMacPart(xWord, u"styles.xml"_ustr,
+                    R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:wordWrap w:val="0"/></w:pPr></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr>)xml"_ostr
+                + (bInherited ? OString() : "<w:wordWrap w:val=\""_ostr
+                    + (bWordWrap ? "1"_ostr : "0"_ostr) + "\"/>"_ostr)
+                + R"xml(<w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Liberation Mono" w:hAnsi="Liberation Mono"/><w:sz w:val="24"/></w:rPr><w:t>alpha beta</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="4040" w:h="6000"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="default"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        for (bool bReload : { false, true })
+        {
+            if (bReload)
+            {
+                saveAndReload(TestFilter::DOCX);
+                auto pXml = parseExport(bInherited ? u"word/styles.xml"_ustr : u"word/document.xml"_ustr);
+                const OString aPath = bInherited
+                    ? "/w:styles/w:style[@w:styleId='Normal']/w:pPr/w:wordWrap"_ostr
+                    : "/w:document/w:body/w:p/w:pPr/w:wordWrap"_ostr;
+                assertXPath(pXml, aPath + (bWordWrap ? "[@w:val='1']"_ostr : "[@w:val='0']"_ostr), 1);
+            }
+            auto pDump = parseLayoutDump();
+            const OString aLines = "/root/page[1]/body/txt/SwParaPortion/SwLineLayout"_ostr;
+            assertXPath(pDump, aLines, 2);
+            assertXPath(pDump, aLines + "[1]"_ostr, "portion",
+                bWordWrap ? u"alpha "_ustr : u"alpha be"_ustr);
+            assertXPath(pDump, aLines + "[2]"_ostr, "portion",
+                bWordWrap ? u"beta"_ustr : u"ta"_ustr);
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCellNoWrap)
 {
     const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
@@ -3650,6 +3708,50 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacClosingUnitBudget)
     // compression; charging it twice incorrectly moves the entire unit.
     assertXPath(pLayout, "/root/page/body/txt/SwParaPortion/SwLineLayout[1]",
         "portion", u"甲乙丙丁200戊己庚辛壬癸子丑寅卯，辰巳2G午未申Word、Excel、"_ustr);
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacPercentageClosingUnit)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    const OUString aOn = u"1"_ustr;
+    for (const auto& rName : aNames)
+        osl_setEnvironment(rName.pData, aOn.pData);
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, false, true, false, false, false, false, false, true);
+    {
+        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+        writeWordMacPart(xWord, u"document.xml"_ustr,
+            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="560" w:lineRule="exact"/><w:ind w:firstLine="640"/><w:jc w:val="both"/><w:autoSpaceDE/><w:autoSpaceDN/><w:overflowPunct/><w:snapToGrid/></w:pPr><w:r><w:rPr><w:rFonts w:hint="eastAsia" w:ascii="FangSong_GB2312" w:hAnsi="FangSong_GB2312" w:eastAsia="FangSong_GB2312"/><w:kern w:val="2"/><w:sz w:val="32"/></w:rPr><w:t>4、甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午（申酉7.20%）</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/></w:sectPr></w:body></w:document>)xml"_ostr);
+        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+    }
+    loadFromURL(aFile.GetURL());
+    auto pLayout = parseLayoutDump();
+    // A percentage and its CJK closing parenthesis form one fitting unit.
+    // Stopping the backward scan at '%' wrongly moves the entire number.
+    assertXPath(pLayout, "/root/page/body/txt/SwParaPortion/SwLineLayout", 1);
+    assertXPath(pLayout, "/root/page/body/txt/SwParaPortion/SwLineLayout[1]",
+        "portion", u"4、甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午（申酉7.20%）"_ustr);
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacLeftAlignedLineBudget)
