@@ -46,6 +46,8 @@ public:
     // #i103961#
     virtual void Cut() override;
 
+    SwTwips GetWordMacCellSpacing() const;
+
     const SwTableBox *GetTabBox() const { return m_pTabBox; }
 
     // used for breaking table rows:

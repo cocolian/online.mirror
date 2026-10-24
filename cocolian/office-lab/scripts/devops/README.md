@@ -224,5 +224,16 @@ DOCX save/reload with namespace-aware assertions. See the
 Closing-punctuation fitting treats decimal and percentage tokens as complete
 units across script portions. The generated native-font
 `testWordMacPercentageClosingUnit` covers a percentage followed by a CJK closing
-parenthesis. The pipeline now runs 28 strict bundled-font and 23 native-font
+parenthesis. The pipeline now runs 29 strict bundled-font and 23 native-font
 regressions. These individual checks do not establish full corpus equivalence.
+
+The Mac profile additionally renders explicit uniform positive row-level cell
+spacing for flat, top-level, non-floating tables with unmerged rows. Cell content,
+border rectangles and minimum row heights include that spacing. Other table
+models retain their existing layout. Explicit row spacing (including zero) is
+preserved as namespaced DOCX attributes for both profiles. The generated
+`testWordMacRowCellSpacing` checks zero/positive values, the disabled profile,
+horizontally merged rows and save/reload geometry. Only dxa units are accepted,
+as specified by the
+[OOXML row cell spacing definition](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.tablecellspacing?view=openxml-3.0.1).
+Table-level default spacing and mixed row-spacing layouts remain unsupported.

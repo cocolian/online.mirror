@@ -2146,6 +2146,8 @@ lcl_ApplyCellProperties(
             try
             {
                 static const std::initializer_list<std::u16string_view> vDenylist = {
+                    // Row metadata is applied to the row separately below.
+                    u"RowInteropGrabBag",
                     u"LeftMargin",
                     // states whether the row hides the mark that ends a cell, which is read
                     // off the row while it is built and is nothing a cell itself holds
@@ -2288,6 +2290,8 @@ SwXText::convertToSwTable(
             try
             {
                 static constexpr auto vDenylist = frozen::make_unordered_set<std::u16string_view>({
+                    // Row metadata is applied to the row separately below.
+                    u"RowInteropGrabBag",
                     u"BottomBorder",
                     u"CellInteropGrabBag",
                     u"CharAutoKerning",

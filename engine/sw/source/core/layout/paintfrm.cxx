@@ -1253,7 +1253,17 @@ static void lcl_CalcBorderRect( SwRect &rRect, const SwFrame *pFrame,
         rRect += pFrame->getFrameArea().Pos();
     }
     else if ( pFrame->IsCellFrame() )
+    {
         rRect = pFrame->getFrameArea();
+        const SwTwips nSpacing = static_cast<const SwCellFrame*>(pFrame)->GetWordMacCellSpacing();
+        if (nSpacing > 0 && rRect.Width() > 2 * nSpacing && rRect.Height() > 2 * nSpacing)
+        {
+            rRect.Left(rRect.Left() + nSpacing);
+            rRect.Right(rRect.Right() - nSpacing);
+            rRect.Top(rRect.Top() + nSpacing);
+            rRect.Bottom(rRect.Bottom() - nSpacing);
+        }
+    }
     else
     {
         rRect = pFrame->getFramePrintArea();

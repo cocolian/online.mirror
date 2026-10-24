@@ -343,6 +343,7 @@ const OUString & getPropertyName( PropertyIds eId )
         { PROP_CHAR_SHADING_VALUE, u"CharShadingValue"_ustr},
         { PROP_CHAR_SHADING_MARKER, u"CharShadingMarker"_ustr},
         { PROP_LABEL_CATEGORY, u"LabelCategory"_ustr},
+        { PROP_ROW_CELL_SPACING, u"RowCellSpacingTwips"_ustr},
         { PROP_WORD_WRAP, u"WordWrap"_ustr},
         { PROP_MIRROR_INDENTS, u"MirrorIndents"_ustr},
         { PROP_SURROUND_TEXT_WRAP_SMALL, u"SurroundTextWrapSmall"_ustr},
