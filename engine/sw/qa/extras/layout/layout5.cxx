@@ -2055,6 +2055,85 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacRowCellSpacing)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacUrlBreakUnits)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bHadPrevious = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    const OUString aBudgetName = u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr;
+    OUString aPreviousBudget;
+    const bool bHadBudget = osl_getEnvironment(aBudgetName.pData, &aPreviousBudget.pData)
+        == osl_Process_E_None;
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aBudgetName.pData, aOn.pData);
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadPrevious)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+        if (bHadBudget)
+            osl_setEnvironment(aBudgetName.pData, aPreviousBudget.pData);
+        else
+            osl_clearEnvironment(aBudgetName.pData);
+    });
+    const std::array<OString, 3> aUrls = {
+        "https://example.invalid/open-api/auth/v1/access_token"_ostr,
+        "https://example.invalid/open-api/auth/v1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"_ostr,
+        "https://example.invalid/api/auth/v1/access_token"_ostr };
+    for (bool bMac : { false, true })
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aName.pData, aValue.pData);
+        for (bool bField : { false, true })
+        {
+            for (bool bWordWrap : { true, false })
+            {
+                for (size_t nCase = 0; nCase < aUrls.size(); ++nCase)
+                {
+                    const auto& rUrl = aUrls[nCase];
+                    utl::TempFileNamed aFile;
+                    aFile.EnableKillingFile();
+                    makeWordMacPackage(aFile, false, true);
+                    {
+                        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                        const OString aRun = R"xml(<w:r><w:rPr><w:rFonts w:ascii="Liberation Mono" w:hAnsi="Liberation Mono"/><w:sz w:val="24"/></w:rPr><w:t>)xml"_ostr
+                            + rUrl + "</w:t></w:r>"_ostr;
+                        const OString aContents = bField
+                            ? R"xml(<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> HYPERLINK "https://example.invalid/" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>)xml"_ostr
+                                + aRun + R"xml(<w:r><w:fldChar w:fldCharType="end"/></w:r>)xml"_ostr
+                            : aRun;
+                        writeWordMacPart(xWord, u"document.xml"_ustr,
+                            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="6200" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="6200"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="6200" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:wordWrap w:val=")xml"_ostr
+                            + (bWordWrap ? "1"_ostr : "0"_ostr)
+                            + R"xml("/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/><w:ind w:firstLine="0"/><w:snapToGrid w:val="0"/></w:pPr>)xml"_ostr
+                            + aContents + R"xml(</w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr/></w:body></w:document>)xml"_ostr);
+                        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+                    }
+                    loadFromURL(aFile.GetURL());
+                    const OUString aExpected = bMac && !bWordWrap
+                        ? OStringToOUString(rUrl.copy(0, 43), RTL_TEXTENCODING_UTF8)
+                        : bMac && nCase == 0 ? u"https://example.invalid/open-"_ustr
+                        : nCase == 2 ? u"https://example.invalid/api/auth/v1/"_ustr
+                        : u"https://example.invalid/open-api/auth/v1/"_ustr;
+                    for (bool bReload : { false, true })
+                    {
+                        if (bReload)
+                            saveAndReload(TestFilter::DOCX);
+                        auto pDump = parseLayoutDump();
+                        assertXPath(pDump, "//tab/row/cell/txt/SwParaPortion/SwLineLayout[1]",
+                            "portion", aExpected);
+                        if (nCase == 0 && bWordWrap)
+                            assertXPath(pDump, "//tab/row/cell/txt/SwParaPortion/SwLineLayout", 2);
+                    }
+                }
+            }
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWordWrap)
 {
     const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
