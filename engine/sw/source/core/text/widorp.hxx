@@ -45,6 +45,7 @@ public:
 
     bool IsInside( SwTextMargin const &rLine ) const;
     bool IsInside(SwTextMargin const& rLine, SwResizeLimitReason&) const;
+    SwTwips GetGridBottomPadding(SwTextMargin const& rLine) const;
 
     // In order to be able to handle special cases with Footnote.
     // SetRstHeight sets the rest height for SwTextFrameBreak. This is needed

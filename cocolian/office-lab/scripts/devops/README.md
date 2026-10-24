@@ -14,7 +14,7 @@
 
 源码归属：门户使用 cocolian/main；渲染引擎、coolwsd 和 browser 使用 online.mirror/main；字体配置、编辑辅助标记和转换适配器使用 cocolian-office/main。这里明确采用引擎 main，不使用外层旧的 submodule 提交号；每次运行的 commits.json 锁定三个实际提交。其他 SDK/office-core 子模块不参与现有服务构建。
 
-流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行 27 个严格字体布局测试和 22 个私有字体测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 registry.example.invalid → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
+流程：独立自动化工作区拉取固定提交 → 按源文件变更复用 Debian 13 构建缓存增量编译（3 CPU / 12 GiB，执行 30 个严格字体布局测试和 26 个私有字体测试）→ 构建本次选中的运行时镜像 → 经加密 SSH 隧道推送 registry.example.invalid → 在现有 k3s 节点串行启动无 Service 标签的候选 Pod 并转换合成 DOCX → 按不可变镜像摘要串行更新 office-lab → 检查登录、浏览器入口、普通/WordMac 编辑器及转换器导出、WOPI 锁定保存读取解锁 → 比较其他命名空间 Pod → 记录成功。未变化的引擎或浏览器复用已验证的编译结果，仍重新打包和发布镜像。发布不向 GitHub 回写，避免循环触发。
 
 只修改 office-lab 中本次选定模块的镜像，保留 gateway 配置、Secret、文档 PVC、字体及既有运行参数。不会自动应用仓库中的任意 Kubernetes YAML 或修改命名空间/入口配置。新建另一套服务需要单独维护部署模板。失败不更新 last_success；部署后失败自动恢复本次已修改的 Deployment 模板；存在并发修改时停止覆盖并记录待人工处理原因。候选 Pod 为本流程临时资源，验收后删除；仅删除本次创建的 UUID 命名测试文件，不修改业务文档。不会删除历史镜像/PVC，导出中间 tar 在推送后删除。
 
@@ -113,7 +113,7 @@ Mac Word renders OOXML inset/outset borders as single strokes, including colored
 
 The first continuous section initializes its page grid in the Mac profile. Native SimSun/YaHei Word probes additionally cover 24 grid cases: YaHei retains CJK leading for grid-row selection, with a two-row boundary at 10pt. The private grid regression checks the 9pt/10pt boundary. Literal generic font names (`sans-serif`, `monospace`) use the observed Times New Roman/SimSun fallback; explicit Helvetica and Menlo remain native.
 
-The private font pack now pins 38 files, including Aptos, Aptos Display, Segoe UI,
+The private font pack now pins 41 files, including Aptos, Aptos Display, Segoe UI,
 Helvetica, Menlo, Wingdings and Apple Color Emoji. Fontconfig preserves explicit
 fonts and uses the observed Mac Word fallback for generic family names and symbols.
 Binary fonts and document samples must never be committed.
@@ -224,7 +224,7 @@ DOCX save/reload with namespace-aware assertions. See the
 Closing-punctuation fitting treats decimal and percentage tokens as complete
 units across script portions. The generated native-font
 `testWordMacPercentageClosingUnit` covers a percentage followed by a CJK closing
-parenthesis. The pipeline now runs 30 strict bundled-font and 23 native-font
+parenthesis. The pipeline now runs 30 strict bundled-font and 26 native-font
 regressions. These individual checks do not establish full corpus equivalence.
 
 The Mac profile additionally renders explicit uniform positive row-level cell
@@ -244,3 +244,24 @@ character-level wrapping, including underscores in identifiers. The generated
 `testWordMacUrlBreakUnits` covers plain text and HYPERLINK fields, legacy and Mac
 profiles, long-tail fallback, and DOCX save/reload with reserved example.invalid
 addresses. Private sample documents and font binaries remain outside Git.
+
+Left-aligned table text snapped to a strict line grid now obeys the Word 2013
+punctuation setting, including whole-portion fitting before line breaking.
+`testWordMacStrictGridTablePunctuation` checks the enabled/disabled setting
+and DOCX save/reload with pinned Segoe UI and SimSun fonts.
+The private font pack additionally pins native Courier New and Tahoma faces.
+Missing Chinese Tahoma glyphs prefer SimSun; missing FangSong_GB2312 glyphs
+prefer Courier New. Installed primary faces remain first in the pattern.
+Font binaries and sample documents remain outside Git.
+
+In the Mac profile, PDF export selects artificial bold for each actual glyph
+font, including fallback faces. A native bold primary face no longer suppresses
+needed synthesis on its fallback, and native bold fallback glyphs avoid a
+second stroke. The generated `testWordMacPdfFallbackBold` checks mixed Latin/CJK
+fonts, horizontal/vertical layout, outline text, and the unchanged default profile.
+
+Cached body-grid paragraphs rebuild their position-dependent line heights when
+they move. Fitting and remaining-height accounting use the same lower-leading
+allowance. `testWordMacCachedGridBottom` checks backward movement after editing,
+nonnegative remaining space, and a visible-font-box overflow that must still
+break the page. Tables, floating frames, and the default profile are excluded.

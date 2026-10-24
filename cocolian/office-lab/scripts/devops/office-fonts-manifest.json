@@ -99,11 +99,11 @@
       "sha256": "f957cbaf4af5b52260462b486dd10a01507184dc39cdbbb3364e428b800b37e6"
     },
     {
-      "file": "\u4eff\u5b8b_GB2312.ttf",
+      "file": "仿宋_GB2312.ttf",
       "sha256": "fef7cf991b458cabd184b73378918d9d15429010e1d6c804f08d394395c3c3b4"
     },
     {
-      "file": "\u6977\u4f53_GB2312.ttf",
+      "file": "楷体_GB2312.ttf",
       "sha256": "99092cbb0df301625f46509e85854db8685556551742097ab3fbbc2e2ca0778b"
     },
     {
@@ -153,6 +153,18 @@
     {
       "file": "AppleColorEmoji.ttc",
       "sha256": "435ee0b75b26d671e089ddad38640473cc31febc4dbdfae27843a0a000d7ff62"
+    },
+    {
+      "file": "CourierNew.ttf",
+      "sha256": "c886ca3172d8ce9189976992d145ec090500a4ff516ecb9d4df56b1a78336247"
+    },
+    {
+      "file": "Tahoma.ttf",
+      "sha256": "97e995a383dfb7afd2378297c0c2ce8862190f83f943a1222663871b7860892f"
+    },
+    {
+      "file": "TahomaBold.ttf",
+      "sha256": "01b32af2fba9b28cebb2031bbcbbecab1762a6221a426a133104ebad373ea29b"
     }
   ]
 }

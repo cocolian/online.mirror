@@ -84,7 +84,7 @@ def compile_source(repo,engine,online,office_config):
        '-v',str(office_config/'deploy/source-build/word-mac-fontconfig.xml')+':/etc/fonts/word-mac-fontconfig.xml:ro',
        '-e','FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml','-e','NON_APPLICATION_FONT_USE=allow',
        '-e','CCACHE_DIR=/workspace/cache/ccache',BUILDER,'bash','-lc',
-       'cd /workspace/engine && make -j3 CppunitTest_sw_layoutwriter5 NON_APPLICATION_FONT_USE=allow CPPUNIT_TEST_NAME="testWordMacCenteredGridHeading testWordMacGridFloatingTableTitle testWordMacTableHalfHanging testWordMacAutomaticSuperscript testWordMacGbBoldFractionalFit testWordMacResolvedFontGrid testWordMacClosingUnitBudget testWordMacPercentageClosingUnit testWordMacLeftAlignedLineBudget testWordMacClassicBoldAdvance testWordMacCjkBaseline testWordMacMultiplePunctuationBudget testWordMacMixedScriptLineBudget testWordMacFlexibleScriptGap testWordMacGbBoldTableWrap testWordMacGridBottomPadding testWordMacDengXianPitch testWordMacMissingThemeFonts testWordMacPunctuationWrap testWordMacAutomaticScriptSpacing testWordMacGridPunctuationCompression testWordMacYaHeiGridHeight testWordMacWesternPunctuationHint" '
+       'cd /workspace/engine && make -j3 CppunitTest_sw_layoutwriter5 NON_APPLICATION_FONT_USE=allow CPPUNIT_TEST_NAME="testWordMacCachedGridBottom testWordMacPdfFallbackBold testWordMacStrictGridTablePunctuation testWordMacCenteredGridHeading testWordMacGridFloatingTableTitle testWordMacTableHalfHanging testWordMacAutomaticSuperscript testWordMacGbBoldFractionalFit testWordMacResolvedFontGrid testWordMacClosingUnitBudget testWordMacPercentageClosingUnit testWordMacLeftAlignedLineBudget testWordMacClassicBoldAdvance testWordMacCjkBaseline testWordMacMultiplePunctuationBudget testWordMacMixedScriptLineBudget testWordMacFlexibleScriptGap testWordMacGbBoldTableWrap testWordMacGridBottomPadding testWordMacDengXianPitch testWordMacMissingThemeFonts testWordMacPunctuationWrap testWordMacAutomaticScriptSpacing testWordMacGridPunctuationCompression testWordMacYaHeiGridHeight testWordMacWesternPunctuationHint" '
        '&& cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-gb-font-tests.log'],timeout=1200)
 
 def registry_transport():
@@ -203,7 +203,7 @@ def candidate(old,image,name):
   k('-n','office-lab','create','-f','-',input=json.dumps(pod).encode());created=True
   k('-n','office-lab','wait','--for=condition=Ready','pod/'+podname,'--timeout=240s',timeout=260)
   if name!='wopi':
-   for family in ('FangSong_GB2312','KaiTi_GB2312','SimSun','Microsoft YaHei','FangSong','STZhongsong','Times New Roman'):
+   for family in ('FangSong_GB2312','KaiTi_GB2312','SimSun','Microsoft YaHei','FangSong','STZhongsong','Times New Roman','Tahoma','Courier New'):
     matched=k('-n','office-lab','exec',podname,'--','fc-match','-f','%{family[0]}',family)
     assert matched==family,'Unexpected font substitution: '+family+' -> '+matched
   ip=json.loads(k('-n','office-lab','get','pod',podname,'-o','json'))['status']['podIP']
@@ -254,15 +254,18 @@ def main():
  dump(out/'deployments-before.json',{'items':list(old.values())})
  before=json.loads(k('get','pods','-A','-o','json'));dump(out/'pods-before.json',before)
  config=json.loads((HOME/'.config/cocolian-devops/config.json').read_text())
- built=CACHE/'devops-built.json';last=json.loads(built.read_text()) if built.exists() else {'online.mirror':config['engine_baseline']}
+ built=CACHE/'devops-built.json'
  previous=json.loads(os.environ.get('DEVOPS_PREVIOUS','{}'))
  targets=select_targets(heads,previous)
  dump(out/'plan.json',{'changed_repositories':[n for n in heads if heads[n]!=previous.get(n)],'deployments':list(targets),'unchanged_deployments':sorted(set(TARGETS)-set(targets))})
  changes=source_changes(paths['online.mirror'],previous.get('online.mirror',config['engine_baseline']),heads['online.mirror'])
  engine=needs_engine(changes);online=needs_online(changes)
- cache_changes=source_changes(paths['online.mirror'],last['online.mirror'],heads['online.mirror'])
  with (CACHE/'devops-build.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
+  # A private build can invalidate provenance while this release waits for
+  # the lock. Read it only after acquiring exclusive access to the cache.
+  last=json.loads(built.read_text()) if built.exists() else {'online.mirror':config['engine_baseline']}
+  cache_changes=source_changes(paths['online.mirror'],last['online.mirror'],heads['online.mirror'])
   if set(targets)-{'wopi'} and (needs_engine(cache_changes) or needs_online(cache_changes)):compile_source(paths['online.mirror'],needs_engine(cache_changes),needs_online(cache_changes),paths['cocolian-office'])
   if set(targets)-{'wopi'}:dump(built,{'online.mirror':heads['online.mirror']})
   images=build_images(paths,heads,old,out,engine,online,targets)

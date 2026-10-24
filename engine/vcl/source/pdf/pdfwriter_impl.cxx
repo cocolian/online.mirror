@@ -24,6 +24,8 @@
 
 #include <math.h>
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <ranges>
 #include <string_view>
 
@@ -6146,6 +6148,15 @@ void PDFWriterImpl::drawShadow( SalLayout& rLayout, const OUString& rText, bool 
     updateGraphicsState();
 }
 
+namespace
+{
+bool useWordMacPdfFontStyles()
+{
+    const char* pProfile = std::getenv("COCOLIAN_WORD_MAC_METRICS");
+    return pProfile && std::strcmp(pProfile, "1") == 0;
+}
+}
+
 void PDFWriterImpl::drawVerticalGlyphs(
         const std::vector<PDFGlyph>& rGlyphs,
         OStringBuffer& rLine,
@@ -6186,6 +6197,8 @@ void PDFWriterImpl::drawVerticalGlyphs(
         aDeltaPos = rRotScale.transform( aDeltaPos );
 
         Matrix3 aMat;
+        if (useWordMacPdfFontStyles() && !m_aCurrentPDFState.m_aFont.IsOutline())
+            rLine.append(rGlyphs[i].m_pFont->NeedsArtificialBold() ? "2 Tr\n" : "0 Tr\n");
         // perform artificial italics if necessary
         if (rGlyphs[i].m_pFont->NeedsArtificialItalic())
             aMat.skew(0.0, ARTIFICIAL_ITALIC_SKEW);
@@ -6270,6 +6283,11 @@ void PDFWriterImpl::drawHorizontalGlyphs(
             m_aPages.back().appendMatrix3(aMat, rLine);
             rLine.append( " Tm\n" );
         }
+        // The primary face can have a native bold while a fallback face
+        // needs synthesis, or vice versa. Select the style for this font run.
+        if (useWordMacPdfFontStyles() && !m_aCurrentPDFState.m_aFont.IsOutline())
+            rLine.append(rGlyphs[nBeginRun].m_pFont->NeedsArtificialBold()
+                ? "2 Tr\n" : "0 Tr\n");
         // set up correct font
         rLine.append( "/F" );
         rLine.append( rGlyphs[nBeginRun].m_nMappedFontId );
@@ -6376,13 +6394,28 @@ void PDFWriterImpl::drawLayout( SalLayout& rLayout, const OUString& rText, bool 
         aRotScale.rotate( -fAngle );
 
     bool bPop = false;
-    bool bABold = false;
-    // artificial bold necessary ?
-    if (GetFontInstance()->NeedsArtificialBold())
+    bool bABold = GetFontInstance()->NeedsArtificialBold();
+    if (useWordMacPdfFontStyles() && !bABold)
+    {
+        // Fallback glyphs can need artificial bold even when the primary
+        // font provides a real bold face. Prepare the stroke state for them.
+        const GlyphItem* pBoldGlyph = nullptr;
+        const LogicalFontInstance* pBoldFont = nullptr;
+        basegfx::B2DPoint aBoldPos;
+        int nBoldIndex = 0;
+        while (rLayout.GetNextGlyph(&pBoldGlyph, aBoldPos, nBoldIndex, &pBoldFont))
+        {
+            if (pBoldFont->NeedsArtificialBold())
+            {
+                bABold = true;
+                break;
+            }
+        }
+    }
+    if (bABold)
     {
         aLine.append("q ");
         bPop = true;
-        bABold = true;
     }
     // setup text colors (if necessary)
     Color aStrokeColor( COL_TRANSPARENT );

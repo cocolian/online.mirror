@@ -118,6 +118,32 @@ SwTextFrameBreak::SwTextFrameBreak(SwTextFrame* pNewFrame, const std::optional<S
  * be done until the Follow is formatted. Unfortunately this is crucial
  * to decide if the whole paragraph goes to the next page or not.
  */
+SwTwips SwTextFrameBreak::GetGridBottomPadding(SwTextMargin const& rLine) const
+{
+    if (!sw::UseWordMacGridBottom() || m_pFrame->IsVertical()
+        || !m_pFrame->IsInDocBody() || m_pFrame->IsInTab() || m_pFrame->IsInFly())
+        return 0;
+    const auto& rNode = *m_pFrame->GetTextNodeForParaProps();
+    const auto& rSet = rNode.GetSwAttrSet();
+    const auto* pPage = rNode.FindPageDesc();
+    if (!rNode.getIDocumentSettingAccess()->get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
+        || !rSet.GetParaGrid().GetValue()
+        || rSet.GetLineSpacing().GetLineSpaceRule() != SvxLineSpaceRule::Auto
+        || !pPage || pPage->GetMaster().GetTextGrid().GetGridType() == SwTextGrid::NONE)
+        return 0;
+    const auto* pLine = rLine.GetCurr();
+    for (const auto* pPart = pLine->GetNextPortion(); pPart; pPart = pPart->GetNextPortion())
+        if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion())
+            return 0;
+    const SwTwips nFontHeight = pLine->GetLineSpacingBaseHeight();
+    if (nFontHeight <= 0)
+        return 0;
+    const SwTwips nPadding = std::max<SwTwips>(0, pLine->Height() - nFontHeight) / 2;
+    const SwTwips nAlreadyTrimmed = std::max<SwTwips>(0,
+        pLine->Height() - pLine->GetRealHeight());
+    return std::max<SwTwips>(0, nPadding - nAlreadyTrimmed);
+}
+
 bool SwTextFrameBreak::IsInside(SwTextMargin const& rLine, SwResizeLimitReason& reason) const
 {
     bool bFit = false;
@@ -136,32 +162,7 @@ bool SwTextFrameBreak::IsInside(SwTextMargin const& rLine, SwResizeLimitReason& 
 
     // Calculate extra space for bottom border.
     nLineHeight += aRectFnSet.GetBottomMargin(*m_pFrame);
-    if (sw::UseWordMacGridBottom() && !m_pFrame->IsVertical()
-        && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly())
-    {
-        const auto& rNode = *m_pFrame->GetTextNodeForParaProps();
-        const auto& rSet = rNode.GetSwAttrSet();
-        const auto* pPage = rNode.FindPageDesc();
-        if (rNode.getIDocumentSettingAccess()->get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
-            && rSet.GetParaGrid().GetValue()
-            && rSet.GetLineSpacing().GetLineSpaceRule() == SvxLineSpaceRule::Auto
-            && pPage && pPage->GetMaster().GetTextGrid().GetGridType() != SwTextGrid::NONE)
-        {
-            bool bHasObject = false;
-            for (const auto* pPart = rLine.GetCurr()->GetNextPortion(); pPart; pPart = pPart->GetNextPortion())
-                if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion())
-                    bHasObject = true;
-            const SwTwips nFontHeight = rLine.GetCurr()->GetLineSpacingBaseHeight();
-            if (!bHasObject && nFontHeight > 0)
-            {
-                const SwTwips nPadding = std::max<SwTwips>(0,
-                    rLine.GetCurr()->Height() - nFontHeight) / 2;
-                const SwTwips nAlreadyTrimmed = std::max<SwTwips>(0,
-                    rLine.GetCurr()->Height() - rLine.GetCurr()->GetRealHeight());
-                nLineHeight -= std::max<SwTwips>(0, nPadding - nAlreadyTrimmed);
-            }
-        }
-    }
+    nLineHeight -= GetGridBottomPadding(rLine);
 
 
     // cool#15942: when checking if a follow can be merged back, the checked line (currently part
@@ -859,6 +860,11 @@ bool WidowsAndOrphans::WouldFit( SwTextMargin &rLine, SwTwips &rMaxHeight, bool 
     //    Widow lines would have wrong width.
     // 2. Test formatting is only done up to the given space.
     //    we do not have any lines for widows at all.
+    // IsInside() already permits the unused lower grid leading. Use the
+    // same allowance when consuming the height of these minimum lines.
+    const SwTwips nBottomPadding = GetGridBottomPadding(rLine);
+    if (nLineSum > rMaxHeight && nLineSum - rMaxHeight <= nBottomPadding)
+        nLineSum -= nBottomPadding;
     if( bTst || nLineCnt - nMinLines >= m_nWidLines )
     {
         if( rMaxHeight >= nLineSum )
