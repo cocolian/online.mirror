@@ -299,6 +299,10 @@ bool sw::DocumentSettingManager::get(/*[in]*/ DocumentSettingId id) const
             return mbAdjustTableLineHeightsToGridHeight;
         case DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID:
             return mbDoNotCompressWithGrid;
+        case DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID:
+            return mbDoNotWrapPunctuationWithGrid;
+        case DocumentSettingId::WORD_2013_LINE_BREAKING:
+            return mbWord2013LineBreaking;
         case DocumentSettingId::ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
             return mbAssignConsecutiveLeftRightPages;
         default:
@@ -657,6 +661,12 @@ void sw::DocumentSettingManager::set(/*[in]*/ DocumentSettingId id, /*[in]*/ boo
         case DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID:
             mbDoNotCompressWithGrid = value;
             break;
+        case DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID:
+            mbDoNotWrapPunctuationWithGrid = value;
+            break;
+        case DocumentSettingId::WORD_2013_LINE_BREAKING:
+            mbWord2013LineBreaking = value;
+            break;
         case DocumentSettingId::ASSIGN_CONSECUTIVE_LEFT_RIGHT_PAGES:
             mbAssignConsecutiveLeftRightPages = value;
             break;
@@ -864,6 +874,8 @@ void sw::DocumentSettingManager::ReplaceCompatibilityOptions(const DocumentSetti
     mbBalanceSpacesAndIdeographicSpaces = rSource.mbBalanceSpacesAndIdeographicSpaces;
     mbForceTopAlignmentInCellWithFloatingAnchor = rSource.mbForceTopAlignmentInCellWithFloatingAnchor;
     mbDoNotCompressWithGrid = rSource.mbDoNotCompressWithGrid;
+    mbDoNotWrapPunctuationWithGrid = rSource.mbDoNotWrapPunctuationWithGrid;
+    mbWord2013LineBreaking = rSource.mbWord2013LineBreaking;
     mbAdjustTableLineHeightsToGridHeight = rSource.mbAdjustTableLineHeightsToGridHeight;
     mbAssignConsecutiveLeftRightPages = rSource.mbAssignConsecutiveLeftRightPages;
 }

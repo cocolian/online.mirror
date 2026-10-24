@@ -18,6 +18,7 @@
  */
 
 #include <ndtxt.hxx>
+#include <wordmacmetrics.hxx>
 #include <txatbase.hxx>
 #include <paratr.hxx>
 #include <vcl/outdev.hxx>
@@ -70,10 +71,25 @@ void SwTextIter::Init()
     m_nLineNr = 1;
 }
 
+static SwTwips lcl_LineLeadingOffset(const SwTextFrame& rFrame, const SwLineLayout& rLine)
+{
+    const SwTwips nOffset = rLine.GetRealHeight() - rLine.Height();
+    if (sw::UseWordMacGridBottom() && nOffset < 0 && !rFrame.IsVertical()
+        && rFrame.IsInDocBody() && !rFrame.IsInTab() && !rFrame.IsInFly()
+        && GetGridItem(rFrame.FindPageFrame())
+        && rFrame.GetTextNodeForParaProps()->GetSwAttrSet().GetParaGrid().GetValue())
+    {
+        // Pagination trims unused lower grid leading, not the glyph or caret
+        // baseline. Painting and cursor placement must use the same offset.
+        return 0;
+    }
+    return nOffset;
+}
+
 void SwTextIter::CalcAscentAndHeight( SwTwips &rAscent, SwTwips &rHeight ) const
 {
     rHeight = GetLineHeight();
-    rAscent = m_pCurr->GetAscent() + rHeight - m_pCurr->Height();
+    rAscent = m_pCurr->GetAscent() + lcl_LineLeadingOffset(*m_pFrame, *m_pCurr);
 }
 
 SwLineLayout *SwTextIter::GetPrev_()
@@ -240,7 +256,7 @@ SwTwips SwTextCursor::AdjustBaseLine( const SwLineLayout& rLine,
         nPorAscent = pPor->GetAscent();
     }
 
-    SwTwips nOfst = rLine.GetRealHeight() - rLine.Height();
+    SwTwips nOfst = lcl_LineLeadingOffset(*m_pFrame, rLine);
 
     SwTextGridItem const*const pGrid(GetGridItem(m_pFrame->FindPageFrame()));
 

@@ -18,6 +18,7 @@
  */
 
 #include <hintids.hxx>
+#include <wordmacmetrics.hxx>
 
 #include <com/sun/star/i18n/ScriptType.hpp>
 #include <vcl/outdev.hxx>
@@ -915,6 +916,22 @@ bool SwSubFont::IsSymbol( SwViewShell const *pSh )
 
 bool SwSubFont::ChgFnt( SwViewShell const *pSh, OutputDevice& rOut )
 {
+    if (sw::UseWordMacMetrics() && GetEscapement() == DFLT_ESC_AUTO_SUPER && GetPropr() == 65)
+    {
+        // Automatic Word superscript uses 65% of the nominal em, quantized
+        // to half-points (18pt -> 11.5pt, 9pt -> 6pt), not font ascenders.
+        Size aSize = Font::GetFontSize();
+        const tools::Long nHeight = std::max<tools::Long>(10,
+            ((m_aSize.Height() * 65 + 500) / 1000) * 10);
+        if (aSize.Height() != nHeight)
+        {
+            if (aSize.Height())
+                aSize.setWidth(aSize.Width() * nHeight / aSize.Height());
+            aSize.setHeight(nHeight);
+            Font::SetFontSize(aSize);
+            m_nFontCacheId = nullptr;
+        }
+    }
     if ( pLastFont )
         pLastFont->Unlock();
     SwFntAccess aFntAccess( m_nFontCacheId, m_nFontIndex, this, pSh, true );
@@ -1416,6 +1433,9 @@ void SwSubFont::CalcEsc( SwDrawTextInfo const & rInf, Point& rPos )
 
         break;
     case DFLT_ESC_AUTO_SUPER :
+        if (sw::UseWordMacMetrics() && GetPropr() == 65)
+            nOfst = -(m_aSize.Height() * 28 + 50) / 100;
+        else
         nOfst = pLastFont->GetFontAscent( rInf.GetShell(), rInf.GetOut() ) -
                 m_nOrgAscent;
 

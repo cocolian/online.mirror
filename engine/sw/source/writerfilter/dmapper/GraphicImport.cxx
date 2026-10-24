@@ -18,6 +18,7 @@
  */
 
 #include <string.h>
+#include <wordmacmetrics.hxx>
 
 #include <basegfx/units/Length.hxx>
 #include <com/sun/star/awt/Size.hpp>
@@ -1983,6 +1984,19 @@ rtl::Reference<SwXTextGraphicObject> GraphicImport::createGraphicObject(uno::Ref
                 if( getXSize() && getYSize() )
                     xGraphicObject->setPropertyValue(getPropertyName(PROP_SIZE),
                         cpo::uno::Any( awt::Size( getXSize(), getYSize() )));
+                if (sw::UseWordMacMetrics() && m_rGraphicImportType == IMPORT_AS_DETECTED_INLINE)
+                {
+                    // Inline drawing effects participate in line height just as
+                    // they do for inline DrawingShape objects above.
+                    if (m_oEffectExtentLeft)
+                        m_nLeftMargin += oox::drawingml::convertEmuToHmm(*m_oEffectExtentLeft);
+                    if (m_oEffectExtentRight)
+                        m_nRightMargin += oox::drawingml::convertEmuToHmm(*m_oEffectExtentRight);
+                    if (m_oEffectExtentTop)
+                        m_nTopMargin += oox::drawingml::convertEmuToHmm(*m_oEffectExtentTop);
+                    if (m_oEffectExtentBottom)
+                        m_nBottomMargin += oox::drawingml::convertEmuToHmm(*m_oEffectExtentBottom);
+                }
                 applyMargins(xGraphicObject);
                 applyName(xGraphicObject);
                 applyHyperlink(xGraphicObject, false);

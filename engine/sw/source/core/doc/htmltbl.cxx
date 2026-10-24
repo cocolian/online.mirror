@@ -1686,6 +1686,16 @@ void SwHTMLTableLayout::Resize_( sal_uInt16 nAbsAvail, bool bRecalc )
     if( bRecalc || m_bWordMacAutoFit )
         AutoLayoutPass1();
 
+    if (m_bWordMacAutoFit && m_bPercentWidthOption && m_nWidthOption
+        && m_nWordMacPercentPadding)
+    {
+        // In the pre-2013 Word layout, an explicitly indented percentage
+        // table's outer cell padding lies outside its preferred text width.
+        // Compensate before the percentage is applied, including at 50% etc.
+        const sal_uLong nExtra = sal_uLong(m_nWordMacPercentPadding) * 100 / m_nWidthOption;
+        nAbsAvail = std::min<sal_uLong>(SAL_MAX_UINT16, sal_uLong(nAbsAvail) + nExtra);
+    }
+
     if (m_bWordMacAutoFit && m_aWordMacTokenMinima.size() == m_nCols)
     {
         std::vector<sal_uLong> aMinima;

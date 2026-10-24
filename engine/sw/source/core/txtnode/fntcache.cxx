@@ -301,10 +301,10 @@ static sal_uInt16 lcl_ApplyCjkHeightAdjustment(sal_uInt16 nBase, const SwViewShe
                     return nBase + (nMacHeight - nRawHeight) / 2;
                 return (nBase * nMacHeight) / nRawHeight;
             }
-            if (sw::UseWordMacClassicMetrics() && sw::IsWordMacModernCjkFont(rDev.GetFont())
+            if (sw::UseWordMacClassicMetrics() && sw::IsWordMacModernCjkFont(sw::WordMacResolvedFont(rDev))
                 && bAscent && nRawHeight > 0)
                 return nBase + (nRawHeight * 130 / 100 - nRawHeight) / 2;
-            return (nBase * sw::WordMacCjkMetricScale(rDev.GetFont())) / 100;
+            return (nBase * sw::WordMacCjkMetricScale(sw::WordMacResolvedFont(rDev))) / 100;
         }
     }
 
@@ -1832,7 +1832,11 @@ Size SwFntObj::GetTextSize( SwDrawTextInfo& rInf )
                 lcl_SnapToGridEdge(rInf, &aKernArray, nGridWidth, 0);
             }
 
-            aTextSize.setWidth(aKernArray[sal_Int32(nMsrLn) - 1]);
+            // Preserve fractional synthetic-bold advances at fit boundaries:
+            // 570.94twips cannot fit into a 570twip cell.
+            const double nWidth = aKernArray[sal_Int32(nMsrLn) - 1];
+            aTextSize.setWidth(sw::WordMacCjkBoldAdvance(m_aFont) > 0
+                ? std::ceil(nWidth) : nWidth);
             rInf.SetKanaDiff( 0 );
             return aTextSize;
         }
@@ -1886,7 +1890,12 @@ Size SwFntObj::GetTextSize( SwDrawTextInfo& rInf )
 
     if (nMsrLn)
     {
-        aTextSize.setWidth(aKernArray[sal_Int32(nMsrLn) - 1]);
+        // Preserve the fractional synthetic-bold advance at fit boundaries.
+        // Truncating e.g. 570.94twips to 570 incorrectly admits two bold
+        // 14pt CJK glyphs into a 570twip cell that Word wraps.
+        const double nWidth = aKernArray[sal_Int32(nMsrLn) - 1];
+        aTextSize.setWidth(sw::WordMacCjkBoldAdvance(m_aFont) > 0
+            ? std::ceil(nWidth) : nWidth);
 
         // Note that we can't simply use sal_Int(nMsrLn) - 1 as nSpaceCount
         // because a glyph may be made up of more than one characters.

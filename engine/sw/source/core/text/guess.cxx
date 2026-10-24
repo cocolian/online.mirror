@@ -161,6 +161,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                             sal_uInt16 nPropWordSpacing, sal_Int16 nSpaceWidth )
 {
     m_nCutPos = rInf.GetIdx();
+    SwTwips nTableHangingReserve = 0;
 
     // Empty strings are always 0
     if( !rInf.GetLen() || rInf.GetText().isEmpty() )
@@ -259,6 +260,21 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         && std::strcmp(pLineBudget, "1") == 0 && !rInf.IsMulti() && !rPor.InFieldGrp()
         && rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().getCharacterCompressionType()
             != CharCompressType::PunctuationAndKana;
+    const bool bModernLineBreaking = rInf.GetTextFrame()->GetDoc()
+        .getIDocumentSettingAccess().get(DocumentSettingId::WORD_2013_LINE_BREAKING);
+    // Script-gap contraction is independent only when fitting an ASCII word
+    // together with its closing CJK punctuation, not for arbitrary portions.
+    auto aAsciiWordChar = [](sal_Unicode c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+            || (c >= '0' && c <= '9');
+    };
+    TextFrameIndex nClosing = rInf.GetIdx();
+    while (bWordMacLineBudget && nClosing < rInf.GetIdx() + nMaxLen && aAsciiWordChar(rInf.GetChar(nClosing)))
+        ++nClosing;
+    const bool bClosingAsciiUnit = nClosing > rInf.GetLineStart()
+        && nClosing < TextFrameIndex(rInf.GetText().getLength())
+        && aAsciiWordChar(rInf.GetChar(nClosing - TextFrameIndex(1)))
+        && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(nClosing)) >= 0;
     SwTwips nPreviousCompression = 0;
     if (bWordMacLineBudget)
     {
@@ -266,6 +282,10 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         for (const auto* pPart = pRoot->GetNextPortion(); pPart && pPart != &rPor;
              pPart = pPart->GetNextPortion())
         {
+            // Script gaps have a separate shrink range on centered and
+            // justified lines; do not charge it to punctuation compression.
+            if (aAdjust != SvxAdjust::Left && bClosingAsciiUnit && !pPart->InTextGrp())
+                continue;
             auto nDiff = rInf.GetMaxWidthDiff(pPart);
             if (!nDiff && pPart == pRoot->GetFirstPortion())
                 nDiff = rInf.GetMaxWidthDiff(pRoot);
@@ -318,7 +338,10 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 + rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()));
         }
     }
-    const SwTwips nUncompressedLimit = nLineWidth + nWordMacAllowance - nPreviousCompression;
+    SwTwips nUncompressedLimit = nLineWidth + nWordMacAllowance - nPreviousCompression;
+    if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Left
+        && !rInf.GetTextFrame()->IsInTab() && rInf.GetLineStart() > TextFrameIndex(0))
+        nUncompressedLimit = nLineWidth - nPreviousCompression;
     auto aWithinLineBudget = [&] {
         return !bWordMacLineBudget || m_nBreakWidth + nMaxSizeDiff <= nUncompressedLimit;
     };
@@ -358,6 +381,13 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             return bRet;
         }
     }
+
+    // A wrapped, left-aligned body line must fit its uncompressed break units.
+    // A complete short paragraph can contract, but the justification allowance
+    // must not pull another glyph onto an intermediate left-aligned line.
+    if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Left
+        && !rInf.GetTextFrame()->IsInTab())
+        nUncompressedLimit = nLineWidth - nPreviousCompression;
 
     bool bHyph = rInf.IsHyphenate() && !rInf.IsHyphForbud();
 
@@ -787,9 +817,49 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         const ForbiddenCharacters aForbidden(
             *rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().getForbiddenCharacters(aLang, true));
 
-        const bool bAllowHanging = rInf.IsHanging() && ! rInf.IsMulti() &&
-                                      ! rInf.GetTextFrame()->IsInTab() &&
-                                      ! rPor.InFieldGrp();
+        bool bAllowHanging = rInf.IsHanging() && !rInf.IsMulti()
+            && (!rInf.GetTextFrame()->IsInTab() || sw::UseWordMacMetrics())
+            && !rPor.InFieldGrp();
+        if (bAllowHanging && sw::UseWordMacMetrics() && rInf.SnapToGrid()
+            && rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess().get(
+                DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID))
+        {
+            const auto* pGrid = GetGridItem(rInf.GetTextFrame()->FindPageFrame());
+            if (pGrid && (pGrid->GetGridType() == SwTextGrid::LinesAndChars
+                || (bModernLineBreaking && !rInf.GetTextFrame()->IsInTab()
+                    && pGrid->GetGridType() == SwTextGrid::LinesOnly
+                    && aAdjust == SvxAdjust::Left)))
+                bAllowHanging = false;
+        }
+
+        if (bAllowHanging && rInf.GetTextFrame()->IsInTab())
+        {
+            // Word permits only half of a closing CJK punctuation advance
+            // outside a cell's text area. Reserving the other half also keeps
+            // compression of the preceding punctuation within the cell.
+            const auto aClosing = u"，、。；：？！）］｝"_ustr;
+            if (m_nCutPos < rInf.GetIdx() + nMaxLen
+                && aClosing.indexOf(rInf.GetChar(m_nCutPos)) >= 0)
+            {
+                const auto aSize = rInf.GetTextSize(&rSI, m_nCutPos, TextFrameIndex(1));
+                nTableHangingReserve = (aSize.Width() + nLeftRightBorderSpace + 1) / 2;
+                if (nLineWidth >= nTableHangingReserve)
+                {
+                    const auto nReservedCut = rInf.GetTextBreak(
+                        nLineWidth - nTableHangingReserve, nMaxLen, nMaxComp,
+                        rInf.GetCachedVclData().get());
+                    m_nCutPos = std::min(m_nCutPos, nReservedCut);
+                }
+                else
+                    bAllowHanging = false;
+            }
+            else
+                bAllowHanging = false;
+            if (aClosing.indexOf(rInf.GetChar(m_nCutPos)) < 0)
+                bAllowHanging = false;
+            if (!bAllowHanging)
+                nTableHangingReserve = 0;
+        }
 
         LineBreakUserOptions aUserOpt(
                 aForbidden.beginLine, aForbidden.endLine,
@@ -802,9 +872,28 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
 
         // determines first possible line break from nCutPos to
         // start index of current line
+        // Some break iterators move the preceding word when its closing
+        // CJK punctuation does not fit. Retry after exactly one punctuation,
+        // preserving the physical cut for SwHangingPortion.
+        const bool bMacClosingPunctuation = sw::UseWordMacMetrics() && bAllowHanging
+            && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
+            && m_nCutPos < rInf.GetIdx() + nMaxLen
+            && aAsciiWordChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
+            && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(m_nCutPos)) >= 0;
         LineBreakResults aResult = g_pBreakIt->GetBreakIter()->getLineBreak(
             rInf.GetText(), sal_Int32(m_nCutPos), aLocale,
-            sal_Int32(rInf.GetLineStart()), aHyphOpt, aUserOpt );
+            sal_Int32(rInf.GetLineStart()), aHyphOpt, aUserOpt);
+        if (bMacClosingPunctuation && aResult.breakIndex <= sal_Int32(m_nCutPos))
+        {
+            const LineBreakUserOptions aRetryOpt(aForbidden.beginLine, aForbidden.endLine,
+                rInf.HasForbiddenChars(), false, false);
+            const sal_Int32 nRetryPos = sal_Int32(m_nCutPos) + 1;
+            const auto aRetry = g_pBreakIt->GetBreakIter()->getLineBreak(
+                rInf.GetText(), nRetryPos, aLocale, sal_Int32(rInf.GetLineStart()),
+                aHyphOpt, aRetryOpt);
+            if (aRetry.breakIndex == nRetryPos)
+                aResult = aRetry;
+        }
 
         m_nBreakPos = TextFrameIndex(aResult.breakIndex);
 
@@ -915,6 +1004,8 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             aTmpSize.Width(aTmpSize.Width() + nLeftRightBorderSpace);
             OSL_ENSURE( !m_pHanging, "A hanging portion is hanging around" );
             m_pHanging.reset( new SwHangingPortion( std::move(aTmpSize) ) );
+            if (nTableHangingReserve)
+                m_pHanging->Width(nTableHangingReserve);
             m_pHanging->SetLen( nHangingLen );
             nPorLen = m_nCutPos - rInf.GetIdx();
         }

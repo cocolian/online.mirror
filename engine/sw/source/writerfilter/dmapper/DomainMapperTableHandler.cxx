@@ -64,6 +64,8 @@
 #include <unotextrange.hxx>
 #include <doc.hxx>
 #include <swtable.hxx>
+#include <frmfmt.hxx>
+#include <fmtfsize.hxx>
 #include <tblafmt.hxx>
 #include <editeng/boxitem.hxx>
 #include <editeng/brushitem.hxx>
@@ -267,6 +269,7 @@ struct TableInfo
     /// since a role the user turned on stays on regardless of what the current style defines.
     sal_Int32 nOriginalTblLook;
     sal_Int32 nNestLevel;
+    sal_Int32 nWordMacPercentPadding = 0;
     PropertyMapPtr pTableDefaults;
     PropertyMapPtr pTableBorders;
     TableStyleSheetEntry* pTableStyle;
@@ -659,6 +662,19 @@ TableStyleSheetEntry * DomainMapperTableHandler::endTableGetTableStyle(TableInfo
         }
         lcl_adjustBorderDistance(rInfo, aLeftBorder, aRightBorder);
 
+        sal_Int32 nHoriOrient = text::HoriOrientation::LEFT_AND_WIDTH;
+        // The table style carries the alignment as a plain property.
+        if (const std::optional<PropertyMap::Property> oStyleHoriOrient
+                = m_aTableProperties->getProperty(PROP_HORI_ORIENT))
+        {
+            sal_Int16 nStyleHoriOrient{};
+            if (oStyleHoriOrient->second >>= nStyleHoriOrient)
+                nHoriOrient = nStyleHoriOrient;
+        }
+        // Direct formatting wins over it, then Horizontal Orientation in rFrameProperties.
+        if ( !m_aTableProperties->getValue( TablePropertyMap::HORI_ORIENT, nHoriOrient ) )
+            lcl_extractHoriOrient( rFrameProperties, nHoriOrient );
+
         // tdf#106742: since MS Word 2013 (compatibilityMode >= 15), top-level tables are handled the same as nested tables;
         // the default behavior when DOCX doesn't define "compatibilityMode" option is to add the cell spacing
         // but not for RTF
@@ -683,6 +699,32 @@ TableStyleSheetEntry * DomainMapperTableHandler::endTableGetTableStyle(TableInfo
                     aCellLeftBorderDistance->second >>= nLeftBorderDistance;
             }
             nLeftBorderDistance = std::max(nMinLeftBorderDistance, nLeftBorderDistance);
+            if (sw::UseWordMacMetrics()
+                && (bLeftMarginProvided || nHoriOrient == text::HoriOrientation::CENTER))
+            {
+                sal_Int32 nOuterLeftDistance = rInfo.nLeftBorderDistance;
+                if (!m_aCellProperties.empty() && !m_aCellProperties[0].empty())
+                {
+                    const auto pFirst = m_aCellProperties[0].front();
+                    if (pFirst)
+                    {
+                        if (const auto aLeft = pFirst->getProperty(PROP_LEFT_BORDER_DISTANCE))
+                            aLeft->second >>= nOuterLeftDistance;
+                    }
+                }
+                sal_Int32 nRightDistance = rInfo.nRightBorderDistance;
+                if (!m_aCellProperties.empty() && !m_aCellProperties[0].empty())
+                {
+                    const auto pLast = m_aCellProperties[0].back();
+                    if (pLast)
+                    {
+                        if (const auto aRight = pLast->getProperty(PROP_RIGHT_BORDER_DISTANCE))
+                            aRight->second >>= nRightDistance;
+                    }
+                }
+                rInfo.nWordMacPercentPadding = std::max(nMinLeftBorderDistance, nOuterLeftDistance)
+                    + std::max<sal_Int32>(aRightBorder.LineWidth / 2, nRightDistance);
+            }
             const sal_Int32 nAdjustedMargin = nLeftMargin - nLeftBorderDistance;
             m_aTableProperties->Insert( PROP_LEFT_MARGIN, cpo::uno::Any( nAdjustedMargin ) );
         }
@@ -719,18 +761,6 @@ TableStyleSheetEntry * DomainMapperTableHandler::endTableGetTableStyle(TableInfo
             m_aTableProperties->Insert( PROP_IS_WIDTH_RELATIVE, cpo::uno::Any( true ) );
         }
 
-        sal_Int32 nHoriOrient = text::HoriOrientation::LEFT_AND_WIDTH;
-        // The table style carries the alignment as a plain property.
-        if (const std::optional<PropertyMap::Property> oStyleHoriOrient
-                = m_aTableProperties->getProperty(PROP_HORI_ORIENT))
-        {
-            sal_Int16 nStyleHoriOrient{};
-            if (oStyleHoriOrient->second >>= nStyleHoriOrient)
-                nHoriOrient = nStyleHoriOrient;
-        }
-        // Direct formatting wins over it, then Horizontal Orientation in rFrameProperties.
-        if ( !m_aTableProperties->getValue( TablePropertyMap::HORI_ORIENT, nHoriOrient ) )
-            lcl_extractHoriOrient( rFrameProperties, nHoriOrient );
         m_aTableProperties->Insert( PROP_HORI_ORIENT, cpo::uno::Any( sal_Int16(nHoriOrient) ) );
 
         // tdf#88496/tdf#138020: If all rows are considered as to-be-repeated headers, then emulate
@@ -1979,6 +2009,11 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
 
                     // convert special range IDs ABOVE, BELOW, LEFT and RIGHT
                     lcl_convertFormulaRanges(xTable);
+                    if (pTable && sw::UseWordMacMetrics() && aTableInfo.nNestLevel == 1
+                        && !bConvertToFloating && pTable->GetFrameFormat()->GetFrameSize().GetWidthPercent())
+                        pTable->SetWordMacPercentPadding(sal_uInt16(std::clamp<sal_Int32>(
+                            o3tl::toTwips(aTableInfo.nWordMacPercentPadding, o3tl::Length::mm100),
+                            0, SAL_MAX_UINT16)));
                     const char* pAutoFit = std::getenv("COCOLIAN_WORD_MAC_AUTOFIT");
                     if (pTable && sw::UseWordMacMetrics() && pAutoFit && std::strcmp(pAutoFit, "1") == 0
                         && aTableInfo.nNestLevel == 1 && !bConvertToFloating

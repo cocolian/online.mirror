@@ -18,6 +18,7 @@
  */
 
 #include <algorithm>
+#include <wordmacmetrics.hxx>
 #include <optional>
 
 #include <o3tl/safeint.hxx>
@@ -185,6 +186,21 @@ void SwTextMargin::CtorInitTextMargin( SwTextFrame *pNewFrame, SwTextSizeInfo *p
                 stMetrics.m_dEmTwips = pHeight->GetHeight();
             if (const auto* pHeight = pMark->GetItemIfSet(RES_CHRATR_CJK_FONTSIZE))
                 stMetrics.m_dIcTwips = pHeight->GetHeight();
+        }
+        if (sw::UseWordMacMetrics() && !pNode->GetText().isEmpty())
+        {
+            // Word resolves character-unit indents from the first character's
+            // effective font, falling back to the paragraph for empty text.
+            SfxItemSetFixed<RES_CHRATR_FONTSIZE, RES_CHRATR_FONTSIZE,
+                            RES_CHRATR_CJK_FONTSIZE, RES_CHRATR_CJK_FONTSIZE>
+                aFirst(const_cast<SwAttrPool&>(pNode->GetDoc().GetAttrPool()));
+            if (pNode->GetParaAttr(aFirst, 0, 1))
+            {
+                if (const auto* pHeight = aFirst.GetItemIfSet(RES_CHRATR_FONTSIZE))
+                    stMetrics.m_dEmTwips = pHeight->GetHeight();
+                if (const auto* pHeight = aFirst.GetItemIfSet(RES_CHRATR_CJK_FONTSIZE))
+                    stMetrics.m_dIcTwips = pHeight->GetHeight();
+            }
         }
     }
 
