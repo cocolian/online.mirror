@@ -5860,6 +5860,86 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacNaturalLinePitch)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCjkHangingParenthesis)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr, u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr, u"COCOLIAN_WORD_MAC_AUTOFIT"_ustr,
+        u"COCOLIAN_WORD_MAC_GRID_BOTTOM"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    const OUString aTexts[] = {
+        u"系统提供文件检索的接口，授权给管理人员（一般由管理组人员来承担）使用，继续核对文件的访问规则和操作记录。"_ustr,
+        u"甲甲甲甲甲甲甲甲甲甲甲，甲甲甲甲甲甲甲（甲甲甲甲甲甲甲甲甲甲甲）使用，继续核对文件的访问规则和操作记录。"_ustr,
+        u"系统提供文件检索的接口，授权给管理人员甲一般由管理组人员来承担）使用，继续核对文件的访问规则和操作记录。"_ustr,
+        u"甲甲甲甲甲甲甲甲甲甲甲，甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲：使用，继续核对文件的访问规则和操作记录。"_ustr,
+    };
+    for (const char* pFamily : {"FangSong_GB2312", "SimSun"})
+    for (const char* pAlignment : {"both", "left"})
+    for (size_t nPattern = 0; nPattern < std::size(aTexts); ++nPattern)
+    for (bool bHanging : {false, true})
+    for (bool bKern : {false, true})
+    {
+        // The extra kerning / Latin-language control has its own Word PDF.
+        if (bKern && (nPattern != 0 || std::strcmp(pFamily, "FangSong_GB2312") != 0))
+            continue;
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            OString aRun = R"xml(<w:rPr><w:rFonts w:ascii="FONT" w:hAnsi="FONT" w:eastAsia="FONT"/><w:b w:val="0"/><w:kern w:val="KERN"/><w:sz w:val="28"/><w:lang w:val="LANG" w:eastAsia="zh-CN"/></w:rPr>)xml"_ostr;
+            aRun = aRun.replaceAll("FONT"_ostr, OString(pFamily))
+                .replaceAll("KERN"_ostr, bKern ? "2"_ostr : "0"_ostr)
+                .replaceAll("LANG"_ostr, bKern ? "en-US"_ostr : "zh-CN"_ostr);
+            OString aXml = R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:wordWrap w:val="0"/><w:autoSpaceDE/><w:autoSpaceDN/><w:adjustRightInd w:val="0"/><w:overflowPunct w:val="HANG"/><w:snapToGrid/><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/><w:ind w:firstLine="560"/><w:jc w:val="ALIGN"/>)xml"_ostr
+                + aRun + "</w:pPr><w:r>"_ostr + aRun + "<w:t>"_ostr
+                + OUStringToOString(aTexts[nPattern], RTL_TEXTENCODING_UTF8)
+                + R"xml(</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr;
+            aXml = aXml.replaceAll("HANG"_ostr, bHanging ? "1"_ostr : "0"_ostr)
+                .replaceAll("ALIGN"_ostr, OString(pAlignment));
+            writeWordMacPart(xWord, u"document.xml"_ustr, aXml);
+            writeWordMacPart(xWord, u"styles.xml"_ustr,
+                R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        for (bool bRoundTrip : {false, true})
+        {
+            if (bRoundTrip)
+                saveAndReload(TestFilter::DOCX);
+            // Actual Word keeps the closing punctuation on the first line
+            // when hanging is enabled, including repeated and unpaired text.
+            auto pXml = parseLayoutDump();
+            assertXPath(pXml, "/root/page/body/txt/SwParaPortion/SwLineLayout", 2);
+            const sal_Int32 nFirstLength = bHanging ? 32 : 30;
+            assertXPath(pXml, "/root/page/body/txt/SwParaPortion/SwLineLayout[1]",
+                "length", OUString::number(nFirstLength));
+            assertXPath(pXml, "/root/page/body/txt/SwParaPortion/SwLineLayout[2]",
+                "length", OUString::number(aTexts[nPattern].getLength() - nFirstLength));
+        }
+    }
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

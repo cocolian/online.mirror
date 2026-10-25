@@ -944,6 +944,26 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 && aWord.endPos == sal_Int32(m_nCutPos)
                 && aWord.endPos - aWord.startPos > 1;
         };
+        const auto aHasCjkHangingParenthesis = [&] {
+            if (!bWordMacLineBudget || rInf.GetChar(m_nCutPos) != u'）'
+                || aResult.breakIndex >= sal_Int32(m_nCutPos)
+                || (aAdjust != SvxAdjust::Left && aAdjust != SvxAdjust::Block)
+                || !rInf.GetTextFrame()->IsInDocBody() || rInf.GetTextFrame()->IsInTab()
+                || rInf.GetTextFrame()->IsInFly() || rInf.GetTextFrame()->IsVertical()
+                || rInf.GetFont()->GetActual() != SwFontScript::CJK)
+                return false;
+            const auto& rSettings = rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess();
+            if (rSettings.get(DocumentSettingId::DO_NOT_COMPRESS_WITH_GRID)
+                || rSettings.get(DocumentSettingId::DO_NOT_WRAP_PUNCTUATION_WITH_GRID))
+                return false;
+            const auto* pGrid = GetGridItem(rInf.GetTextFrame()->FindPageFrame());
+            // Word's ordinary horizontal body can hang one full closing
+            // parenthesis, even after a single CJK character. Grid and table
+            // hanging retain their independently measured rules.
+            return !rInf.SnapToGrid() || !pGrid
+                || (pGrid->GetGridType() != SwTextGrid::LinesOnly
+                    && pGrid->GetGridType() != SwTextGrid::LinesAndChars);
+        };
         const bool bMacClosingPunctuation = sw::UseWordMacMetrics() && bAllowHanging
             && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
             && m_nCutPos < rInf.GetIdx() + nMaxLen
@@ -951,7 +971,8 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             && (aAsciiBreakUnitChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
                 // Preserve a preceding dictionary word without hanging a
                 // colon after otherwise independently breakable CJK letters.
-                || (aResult.breakIndex < sal_Int32(m_nCutPos) && aHasCjkColonWord()));
+                || (aResult.breakIndex < sal_Int32(m_nCutPos) && aHasCjkColonWord())
+                || aHasCjkHangingParenthesis());
         if (bMacClosingPunctuation && aResult.breakIndex <= sal_Int32(m_nCutPos))
         {
             const LineBreakUserOptions aRetryOpt(aForbidden.beginLine, aForbidden.endLine,
