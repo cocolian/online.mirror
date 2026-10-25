@@ -18,6 +18,7 @@
  */
 
 #include <wordmacmetrics.hxx>
+#include <svl/asiancfg.hxx>
 #include <hintids.hxx>
 
 #include <algorithm>
@@ -395,6 +396,14 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
     OSL_ENSURE( rInf.GetText().getLength() < COMPLETE_STRING,
             "SwTextFormatter::BuildPortions: bad text length in info" );
 
+    // Table cells with disabled character compression keep full CJK/Latin
+    // spacing. Body spacing retains its independently measured hanging and
+    // line-adjustment rules.
+    const bool bWordMacFlexibleScriptGaps = sw::UseWordMacFlexibleScriptGaps()
+        && (!m_pFrame->IsInTab()
+            || rInf.GetTextFrame()->GetDoc().getIDocumentSettingAccess()
+                .getCharacterCompressionType() != CharCompressType::NONE);
+
     rInf.ChkNoHyph( CntEndHyph(), CntMidHyph() );
 
     // First NewTextPortion() decides whether pCurr ends up in pPor.
@@ -584,7 +593,7 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
 
                 nLstHeight /= sw::UseWordMacMetrics() ? 4 : 5;
                 const tools::Long nFullScriptGap = nLstHeight;
-                if (sw::UseWordMacFlexibleScriptGaps())
+                if (bWordMacFlexibleScriptGaps)
                     nLstHeight = (nLstHeight + 1) / 2;
                 // does the kerning portion still fit into the line?
                 if (bAllowBefore && fnRequireKerningAtPosition(rInf.GetIdx()) && nLstHeight
@@ -594,7 +603,7 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                         new SwKernPortion( *rInf.GetLast(), nLstHeight,
                                            pLast->InFieldGrp() && pPor->InFieldGrp() );
 
-                    if (sw::UseWordMacFlexibleScriptGaps())
+                    if (bWordMacFlexibleScriptGaps)
                     {
                         pKrn->SetScriptGapMaximum(nFullScriptGap);
                         rInf.SetMaxWidthDiff(pKrn, nFullScriptGap - nLstHeight);
@@ -736,7 +745,7 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                 {
                     const SwTwips nFullScriptGap = rInf.GetFont()->GetHeight()
                         / (sw::UseWordMacMetrics() ? 4 : 5);
-                    const SwTwips nDist = sw::UseWordMacFlexibleScriptGaps()
+                    const SwTwips nDist = bWordMacFlexibleScriptGaps
                         ? (nFullScriptGap + 1) / 2 : nFullScriptGap;
 
                     if( nDist )
@@ -751,7 +760,7 @@ void SwTextFormatter::BuildPortions( SwTextFormatInfo &rInf )
                             if ( rInf.X() + pPor->Width() + nDist <= rInf.Width() )
                             {
                                 auto* pGap = new SwKernPortion(*pPor, nDist);
-                                if (sw::UseWordMacFlexibleScriptGaps())
+                                if (bWordMacFlexibleScriptGaps)
                                 {
                                     pGap->SetScriptGapMaximum(nFullScriptGap);
                                     rInf.SetMaxWidthDiff(pGap, nFullScriptGap - nDist);

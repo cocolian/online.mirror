@@ -6074,3 +6074,82 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacOversizedFixedTableWidth)
         }
     }
 }
+
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableNoScriptGapCompression)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr, u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr, u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aNames[1].pData, aOn.pData);
+    osl_setEnvironment(aNames[2].pData, aOn.pData);
+    osl_setEnvironment(aNames[3].pData, aOn.pData);
+    for (bool bMac : {false, true})
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aNames[0].pData, aValue.pData);
+        for (const OString& rControl : {"absent"_ostr, "doNotCompress"_ostr,
+                                      "compressPunctuation"_ostr})
+        {
+            for (bool bSong : {false, true})
+            {
+                utl::TempFileNamed aFile;
+                aFile.EnableKillingFile();
+                makeWordMacPackage(aFile, false, true);
+                {
+                    auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                        ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                    auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                    OString aDocument = R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="WIDTH" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="WIDTH"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="WIDTH" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:autoSpaceDE/><w:autoSpaceDN/><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="exact"/><w:snapToGrid w:val="0"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="FONT" w:hAnsi="FONT" w:eastAsia="FONT"/><w:sz w:val="SIZE"/></w:rPr><w:t>甲1乙</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr;
+                    aDocument = aDocument.replaceAll("WIDTH"_ostr, bSong ? "820"_ostr : "700"_ostr)
+                        .replaceAll("FONT"_ostr, bSong ? "SimSun"_ostr : "FangSong_GB2312"_ostr)
+                        .replaceAll("SIZE"_ostr, bSong ? "28"_ostr : "24"_ostr);
+                    writeWordMacPart(xWord, u"document.xml"_ustr, aDocument);
+                    const OString aControl = rControl == "absent" ? OString()
+                        : "<w:characterSpacingControl w:val=\""_ostr + rControl + "\"/>"_ostr;
+                    writeWordMacPart(xWord, u"settings.xml"_ustr,
+                        R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">)xml"_ostr
+                        + aControl
+                        + R"xml(<w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+                    uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                    uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+                }
+                for (int nRound = 0; nRound < 2; ++nRound)
+                {
+                    if (!nRound)
+                        loadFromURL(aFile.GetURL());
+                    else
+                        saveAndReload(TestFilter::DOCX);
+                    const bool bNoCompression = bMac && rControl != "compressPunctuation";
+                    auto pDump = parseLayoutDump();
+                    assertXPath(pDump,
+                        "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout",
+                        bNoCompression ? 2 : 1);
+                    if (bNoCompression)
+                    {
+                        assertXPath(pDump,
+                            "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout[1]",
+                            "portion", u"甲1");
+                        assertXPath(pDump,
+                            "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout[2]",
+                            "portion", u"乙");
+                    }
+                }
+            }
+        }
+    }
+}
