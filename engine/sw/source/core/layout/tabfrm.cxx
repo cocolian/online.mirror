@@ -941,9 +941,42 @@ static bool lcl_RecalcSplitLine( SwRowFrame& rLastLine, SwRowFrame& rFollowLine,
     // 4. Check if follow flow line does not contain content:
     if ( bRet )
     {
-        if ( !rFollowLine.IsRowSpanLine() && !rFollowLine.ContainsContent() )
+        if (!rFollowLine.IsRowSpanLine())
         {
-            bRet = false;
+            SwContentFrame* pContent = rFollowLine.ContainsContent();
+            bool bHasContent = pContent != nullptr;
+            if (bHasContent && sw::UseWordMacMetrics() && rTab.IsInDocBody()
+                && !rTab.IsVertical() && !rTab.IsInFly() && !rTab.GetUpper()->IsInTab()
+                && !rLastLine.IsInFollowFlowRow()
+                && rLastLine.GetFormat()->GetFrameSize().GetHeightSizeType() == SwFrameSize::Variable
+                && nCurLastLineHeight <= lcl_GetMaxRowHeight(rTab)
+                    - lcl_GetHeightOfRows(rTab.Lower(), rTab.GetTable()->GetRowsToRepeat()))
+            {
+                // A follow at the end of a non-empty paragraph can carry only
+                // trailing spacing. It is not actual content for a split row.
+                // Preserve fields, anchored objects, genuine empty paragraphs
+                // and rows too tall to fit on a fresh page with their header.
+                bHasContent = false;
+                for (; pContent && rFollowLine.IsAnLower(pContent);
+                     pContent = pContent->GetNextContentFrame())
+                {
+                    if (!pContent->IsTextFrame())
+                    {
+                        bHasContent = true;
+                        break;
+                    }
+                    const auto* pText = static_cast<const SwTextFrame*>(pContent);
+                    if (!pText->IsFollow() || pText->IsFieldFollow() || pText->GetText().isEmpty()
+                        || pText->GetOffset() < TextFrameIndex(pText->GetText().getLength())
+                        || (pText->GetDrawObjs() && pText->GetDrawObjs()->size() > 0))
+                    {
+                        bHasContent = true;
+                        break;
+                    }
+                }
+            }
+            if (!bHasContent)
+                bRet = false;
         }
     }
 

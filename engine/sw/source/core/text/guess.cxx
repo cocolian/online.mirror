@@ -928,14 +928,30 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         // Some break iterators move the preceding word when its closing
         // CJK punctuation does not fit. Retry after exactly one punctuation,
         // preserving the physical cut for SwHangingPortion.
-        const bool bMacClosingPunctuation = sw::UseWordMacMetrics() && bAllowHanging
-            && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
-            && m_nCutPos < rInf.GetIdx() + nMaxLen
-            && aAsciiBreakUnitChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
-            && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(m_nCutPos)) >= 0;
         LineBreakResults aResult = g_pBreakIt->GetBreakIter()->getLineBreak(
             rInf.GetText(), sal_Int32(m_nCutPos), aLocale,
             sal_Int32(rInf.GetLineStart()), aHyphOpt, aUserOpt);
+        const auto aHasCjkColonWord = [&] {
+            if (rInf.GetChar(m_nCutPos) != u'：' || aAdjust != SvxAdjust::Left
+                || !rInf.GetTextFrame()->IsInDocBody() || rInf.GetTextFrame()->IsInTab()
+                || rInf.GetTextFrame()->IsInFly() || rInf.GetTextFrame()->IsVertical()
+                || rInf.GetFont()->GetActual() != SwFontScript::CJK)
+                return false;
+            const auto aWord = g_pBreakIt->GetBreakIter()->getWordBoundary(
+                rInf.GetText(), sal_Int32(m_nCutPos) - 1, aLocale,
+                WordType::DICTIONARY_WORD, true);
+            return aWord.startPos >= sal_Int32(rInf.GetLineStart())
+                && aWord.endPos == sal_Int32(m_nCutPos)
+                && aWord.endPos - aWord.startPos > 1;
+        };
+        const bool bMacClosingPunctuation = sw::UseWordMacMetrics() && bAllowHanging
+            && m_nCutPos > rInf.GetLineStart() && m_nCutPos >= rInf.GetIdx()
+            && m_nCutPos < rInf.GetIdx() + nMaxLen
+            && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(m_nCutPos)) >= 0
+            && (aAsciiBreakUnitChar(rInf.GetChar(m_nCutPos - TextFrameIndex(1)))
+                // Preserve a preceding dictionary word without hanging a
+                // colon after otherwise independently breakable CJK letters.
+                || (aResult.breakIndex < sal_Int32(m_nCutPos) && aHasCjkColonWord()));
         if (bMacClosingPunctuation && aResult.breakIndex <= sal_Int32(m_nCutPos))
         {
             const LineBreakUserOptions aRetryOpt(aForbidden.beginLine, aForbidden.endLine,

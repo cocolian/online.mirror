@@ -5579,6 +5579,123 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testTdf33687)
     assertXPath(pXmlDoc, "//page[1]/body/txt[3]/anchored/fly/section[1]/txt", 24);
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacEmptyRowContinuation)
+{
+    const OUString aEnv = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bPrevious = osl_getEnvironment(aEnv.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bPrevious)
+            osl_setEnvironment(aEnv.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aEnv.pData);
+    });
+    for (bool bMac : {false, true})
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aEnv.pData, aValue.pData);
+        for (bool bAfter : {false, true})
+        {
+            utl::TempFileNamed aFile;
+            aFile.EnableKillingFile();
+            makeWordMacPackage(aFile, false, true);
+            {
+                auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                    ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                const OString aAfter = bAfter ? "480"_ostr : "0"_ostr;
+                writeWordMacPart(xWord, u"document.xml"_ustr,
+                    R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="12900" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>Spacer</w:t></w:r></w:p>
+<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="8000"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="8000"/></w:tblGrid>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="8000"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="400" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>Header</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="8000"/></w:tcPr><w:p><w:pPr><w:widowControl w:val="0"/><w:spacing w:before="0" w:after=")xml"_ostr + aAfter + R"xml(" w:line="480" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>Body</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+<w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                writeWordMacPart(xWord, u"settings.xml"_ustr,
+                    R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+                uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+            }
+            for (int nRound = 0; nRound < 2; ++nRound)
+            {
+                if (nRound == 0)
+                    loadFromURL(aFile.GetURL());
+                else
+                    saveAndReload(TestFilter::DOCX);
+                auto pLayout = parseLayoutDump();
+                // A row continuation must contain actual content, not only a
+                // zero-length follow frame carrying paragraph trailing space.
+                assertXPath(pLayout, "/root/page[1]/body/tab", bMac && bAfter ? 0 : 1);
+                assertXPath(pLayout, "/root/page[2]/body/tab", bAfter ? 1 : 0);
+                if (bAfter)
+                    assertXPath(pLayout, "/root/page[2]/body/tab/row[2]/cell/txt/SwParaPortion/SwLineLayout[1]",
+                        "length", bMac ? u"4" : u"0");
+            }
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCjkHangingColon)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr, u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr, u"COCOLIAN_WORD_MAC_AUTOFIT"_ustr,
+        u"COCOLIAN_WORD_MAC_GRID_BOTTOM"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (bool bDictionaryWord : {false, true})
+    for (bool bHanging : {false, true})
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            const OString aHanging = bHanging ? "1"_ostr : "0"_ostr;
+            const OString aLastWord = bDictionaryWord ? "推进"_ostr : "甲甲"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="480"/><w:overflowPunct w:val=")xml"_ostr + aHanging + R"xml("/></w:pPr>
+<w:r><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:sz w:val="24"/></w:rPr><w:t>甲甲1234甲甲甲甲甲甲甲甲甲甲甲甲</w:t></w:r>
+<w:r><w:rPr><w:rFonts w:hint="eastAsia"/><w:sz w:val="24"/><w:lang w:eastAsia="zh"/></w:rPr><w:t>，</w:t></w:r>
+<w:r><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:sz w:val="24"/></w:rPr><w:t>甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲，甲甲甲甲甲甲甲甲甲甲甲甲，甲甲甲甲甲甲甲甲甲甲甲甲甲甲甲)xml"_ostr + aLastWord + R"xml(：</w:t></w:r>
+</w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1803" w:bottom="1440" w:left="1803" w:header="720" w:footer="720"/><w:docGrid w:linePitch="360" w:charSpace="0"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"styles.xml"_ustr,
+                R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault/></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="200" w:line="360" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="en-US"/></w:rPr></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:doNotExpandShiftReturn/><w:doNotWrapTextWithPunct/><w:doNotUseEastAsianBreakRules/><w:useFELayout/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="14"/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (nRound == 0)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            // A closing CJK colon may hang outside the body text boundary;
+            // moving its preceding dictionary word adds an unwanted third line.
+            assertXPath(parseLayoutDump(), "/root/page/body/txt/SwParaPortion/SwLineLayout",
+                bHanging && bDictionaryWord ? 2 : 3);
+        }
+    }
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
