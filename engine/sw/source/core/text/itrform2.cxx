@@ -2474,6 +2474,39 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
                                                    ? m_pCurr->GetLineSpacingBaseHeight()
                                                    : m_pCurr->Height();
 
+            // Word's single-line font box and repeated baseline pitch are
+            // distinct. Keep the original font box (and one-line table rows),
+            // but use the measured classic CJK pitch for subsequent natural
+            // horizontal body lines. Table, fly, explicit-height and
+            // mixed-height lines retain their existing metrics.
+            SwTwips nMacNaturalPitch64 = 0;
+            bool bRoundMacLeading = false;
+            if (sw::UseWordMacMetrics() && !m_pFrame->IsVertical() && !m_pMulti
+                && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly()
+                && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
+                && (pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Off
+                    || (pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop
+                        && pSpace->GetPropLineSpace() >= 100)))
+            {
+                const auto aFont = sw::WordMacResolvedFont(*GetInfo().GetOut());
+                const auto& rFamily = aFont.GetFamilyName();
+                const bool bClassic = sw::IsWordMacGbFont(aFont)
+                    || (sw::UseWordMacClassicMetrics() && sw::IsWordMacClassicCjkFont(aFont));
+                const bool bDengXian = sw::IsWordMacModernCjkFont(aFont)
+                    && !rFamily.equalsIgnoreAsciiCase(u"Microsoft YaHei")
+                    && rFamily != u"微软雅黑";
+                bRoundMacLeading = sw::UseWordMacClassicMetrics() && bDengXian;
+                const SwTwips nNominal = sw::WordMacCjkFontHeight(*GetInfo().GetOut());
+                if (!IsParaLine() && bClassic && nNominal > 0
+                    && nLineHeight == nNominal
+                    && m_pCurr->GetLineSpacingBaseHeight() == nNominal)
+                {
+                    // Seven-family Mac Word PDF matrices: 83/64 em.
+                    nMacNaturalPitch64 = aFont.GetFontSize().Height() * 83;
+                    nLineHeight -= nNominal - nMacNaturalPitch64 / 64;
+                }
+            }
+
             switch( pSpace->GetLineSpaceRule() )
             {
                 case SvxLineSpaceRule::Auto:
@@ -2575,9 +2608,24 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
                             pTextHeightLine = GetPrev();
                         }
                         nTmp -= 100;
-                        nTmp *= pTextHeightLine->GetLineSpacingBaseHeight();
-                        nTmp /= 100;
-                        nTmp += nLineHeight;
+                        const SwTwips nBaseHeight = pTextHeightLine->GetLineSpacingBaseHeight();
+                        if (nMacNaturalPitch64
+                            && nBaseHeight == m_pCurr->GetLineSpacingBaseHeight())
+                        {
+                            // Preserve the fractional font pitch until after
+                            // applying the proportion, then round once.
+                            nTmp = (nMacNaturalPitch64 * pSpace->GetPropLineSpace() + 3200) / 6400;
+                        }
+                        else
+                        {
+                            nTmp *= nBaseHeight;
+                            // DengXian Word exports round expanded natural
+                            // leading; truncation accumulates at e.g. 115%.
+                            if (bRoundMacLeading && !bPropLineShrinks)
+                                nTmp += 50;
+                            nTmp /= 100;
+                            nTmp += nLineHeight;
+                        }
                         if (nTmp < 1)
                             nTmp = 1;
                         nLineHeight = nTmp;

@@ -5779,6 +5779,87 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacAutoFitMissingColumnPreferences
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacNaturalLinePitch)
+{
+    const OUString aProfile = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    const OUString aClassic = u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr;
+    OUString aPrevious, aPreviousClassic;
+    const bool bHadProfile = osl_getEnvironment(aProfile.pData, &aPrevious.pData) == osl_Process_E_None;
+    const bool bHadClassic = osl_getEnvironment(aClassic.pData, &aPreviousClassic.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bHadProfile)
+            osl_setEnvironment(aProfile.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aProfile.pData);
+        if (bHadClassic)
+            osl_setEnvironment(aClassic.pData, aPreviousClassic.pData);
+        else
+            osl_clearEnvironment(aClassic.pData);
+    });
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aProfile.pData, aOn.pData);
+    osl_setEnvironment(aClassic.pData, aOn.pData);
+    // Measured Mac Word long-paragraph baselines, independently of Writer's
+    // font-height formula. Check accumulated pitch and DOCX round trips.
+    struct PitchCase
+    {
+        const char* pFamily;
+        sal_Int32 nHalfPoints;
+        sal_Int32 nLine;
+        double fWordPitch;
+        double fTolerance;
+    };
+    const PitchCase aCases[] = {
+        { "SimSun", 48, 360, 46.68, 0.04 },
+        { "FangSong_GB2312", 32, 240, 20.76, 0.025 },
+        { "KaiTi_GB2312", 20, 276, 14.92, 0.025 },
+        { "DengXian", 28, 276, 21.8021, 0.025 },
+        { "Microsoft YaHei", 24, 276, 23.68, 0.04 },
+        { "Microsoft YaHei", 48, 276, 47.34, 0.025 },
+    };
+    for (const auto& rCase : aCases)
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            OString aRun = "<w:rPr><w:rFonts w:ascii=\"FONT\" w:hAnsi=\"FONT\" w:eastAsia=\"FONT\"/><w:sz w:val=\"SIZE\"/></w:rPr>"_ostr;
+            aRun = aRun.replaceAll("FONT"_ostr, OString(rCase.pFamily))
+                .replaceAll("SIZE"_ostr, OString::number(rCase.nHalfPoints));
+            OString aLines;
+            for (int i = 0; i < 13; ++i)
+                aLines += (i ? "<w:br/>"_ostr : OString()) + "<w:t>甲</w:t>"_ostr;
+            OString aXml = "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:pPr><w:snapToGrid w:val=\"0\"/><w:spacing w:before=\"0\" w:after=\"0\" w:line=\""_ostr
+                + OString::number(rCase.nLine) + "\" w:lineRule=\"auto\"/>"_ostr + aRun
+                + "</w:pPr><w:r>"_ostr + aRun + aLines
+                + "</w:r></w:p><w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/><w:pgMar w:top=\"1440\" w:bottom=\"1440\" w:left=\"1800\" w:right=\"1800\"/></w:sectPr></w:body></w:document>"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr, aXml);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        for (bool bRoundTrip : { false, true })
+        {
+            if (bRoundTrip)
+                saveAndReload(TestFilter::DOCX);
+            CPPUNIT_ASSERT_EQUAL(1, getPages());
+            auto xMeta = getSwDocShell()->GetPreviewMetaFile();
+            MetafileXmlDump aDump;
+            auto pMeta = dumpAndParse(aDump, *xMeta);
+            assertXPath(pMeta, "//textarray", 13);
+            const double fFirst = getXPath(pMeta, "(//textarray)[1]", "y").toDouble();
+            const double fLast = getXPath(pMeta, "(//textarray)[13]", "y").toDouble();
+            // Writer preview metafiles use twips for these text baselines.
+            const double fPitch = (fLast - fFirst) / 240;
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(rCase.pFamily,
+                rCase.fWordPitch, fPitch, rCase.fTolerance);
+        }
+    }
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
