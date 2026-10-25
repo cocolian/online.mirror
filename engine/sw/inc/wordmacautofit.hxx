@@ -7,8 +7,11 @@
 #include <swdllapi.h>
 #include <vector>
 class SwTable;
+class SwFrameFormat;
 namespace sw
 {
+// Original DOCX percentage, when it still matches the table width setting.
+SW_DLLPUBLIC sal_Int32 GetWordMacTableWidthFiftieths(const SwFrameFormat& rFormat);
 SW_DLLPUBLIC bool AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     const std::vector<sal_Int32>& rColumnPercents, bool bGrowAutoFit = false);
 }

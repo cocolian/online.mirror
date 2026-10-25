@@ -2012,6 +2012,20 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
                     // convert special range IDs ABOVE, BELOW, LEFT and RIGHT
                     lcl_convertFormulaRanges(xTable);
                     if (pTable && sw::UseWordMacMetrics() && aTableInfo.nNestLevel == 1
+                        && !bConvertToFloating)
+                    {
+                        const sal_Int32 nWidth = m_rDMapper_Impl.getTableManager()
+                            .GetWordMacWidthFiftieths();
+                        if (nWidth > 0)
+                        {
+                            auto aBag = pTable->GetFrameFormat()->GetAttrSet()
+                                .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG)->GetGrabBag();
+                            aBag[u"WordMacWidthFiftieths"_ustr] <<= nWidth;
+                            pTable->GetFrameFormat()->SetFormatAttr(
+                                SfxGrabBagItem(RES_FRMATR_GRABBAG, std::move(aBag)));
+                        }
+                    }
+                    if (pTable && sw::UseWordMacMetrics() && aTableInfo.nNestLevel == 1
                         && !bConvertToFloating && pTable->GetFrameFormat()->GetFrameSize().GetWidthPercent())
                         pTable->SetWordMacPercentPadding(sal_uInt16(std::clamp<sal_Int32>(
                             o3tl::toTwips(aTableInfo.nWordMacPercentPadding, o3tl::Length::mm100),

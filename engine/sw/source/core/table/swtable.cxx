@@ -43,6 +43,7 @@
 #include <swtable.hxx>
 #include <wordmacautofit.hxx>
 #include <svl/grabbagitem.hxx>
+#include <svl/eitem.hxx>
 #include <editeng/boxitem.hxx>
 #include <ndtxt.hxx>
 #include <fmtcol.hxx>
@@ -3402,6 +3403,21 @@ SwTableLines::~SwTableLines()
         delete *it;
 }
 
+sal_Int32 sw::GetWordMacTableWidthFiftieths(const SwFrameFormat& rFormat)
+{
+    const auto* pItem = rFormat.GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG);
+    if (!pItem)
+        return 0;
+    const auto& rBag = pItem->GetGrabBag();
+    const auto it = rBag.find(u"WordMacWidthFiftieths"_ustr);
+    sal_Int32 nWidth = 0;
+    if (it != rBag.end())
+        it->second >>= nWidth;
+    // Ignore stale import data after a relative/absolute width edit.
+    return nWidth > 0 && nWidth <= 5000
+        && (nWidth + 25) / 50 == rFormat.GetFrameSize().GetWidthPercent() ? nWidth : 0;
+}
+
 bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     const std::vector<sal_Int32>& rColumnPercents, bool bGrowAutoFit)
 {
@@ -3496,7 +3512,30 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     xLayout->AutoLayoutPass1();
     // Normal-style font defaults can be applied after endTable(). Measure
     // once more when layout has the final paragraph properties available.
-    xLayout->EnableWordMacAutoFit(rTable.GetWordMacPercentPadding(), bGrowAutoFit);
+    sal_Int32 nCellSpacing = 0;
+    if (!rTable.GetFrameFormat()->GetAttrSet().Get(RES_COLLAPSING_BORDERS).GetValue())
+    {
+        bool bUniform = true;
+        for (const auto* pLine : rLines)
+        {
+            sal_Int32 nRowSpacing = 0;
+            if (const auto* pBag = pLine->GetFrameFormat()->GetAttrSet()
+                    .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG))
+            {
+                const auto& rBag = pBag->GetGrabBag();
+                const auto it = rBag.find(u"RowCellSpacingTwips"_ustr);
+                if (it != rBag.end())
+                    it->second >>= nRowSpacing;
+            }
+            if (nRowSpacing <= 0 || (nCellSpacing && nRowSpacing != nCellSpacing))
+                bUniform = false;
+            nCellSpacing = nRowSpacing;
+        }
+        if (!bUniform)
+            nCellSpacing = 0;
+    }
+    xLayout->EnableWordMacAutoFit(rTable.GetWordMacPercentPadding(), bGrowAutoFit,
+        std::clamp<sal_Int32>(nCellSpacing, 0, SAL_MAX_INT16));
     rTable.SetHTMLTableLayout(xLayout);
     return true;
 }

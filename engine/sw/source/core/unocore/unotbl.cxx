@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <svl/grabbagitem.hxx>
 #include <tuple>
 #include <utility>
 #include <memory>
@@ -242,6 +243,19 @@ static void lcl_SetSpecialProperty(SwFrameFormat* pFormat,
                 else if (aSz.GetWidthPercent() == 0) // If it's already enabled, just ignore it
                 {
                     throw lang::IllegalArgumentException(u"relative width cannot be switched on with this property"_ustr, nullptr, 0);
+                }
+            }
+            // Explicit width edits replace the original fractional import,
+            // including an edit to the same rounded UNO percentage.
+            if (pEntry->nWID != FN_TABLE_IS_RELATIVE_WIDTH || !aValue.get<bool>())
+            {
+                if (const auto* pBag = pFormat->GetAttrSet()
+                        .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG))
+                {
+                    auto aBag = pBag->GetGrabBag();
+                    if (aBag.erase(u"WordMacWidthFiftieths"_ustr))
+                        pFormat->GetDoc().SetAttr(
+                            SfxGrabBagItem(RES_FRMATR_GRABBAG, std::move(aBag)), *pFormat);
                 }
             }
             pFormat->GetDoc().SetAttr(aSz, *pFormat);

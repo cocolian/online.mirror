@@ -65,6 +65,8 @@
 #include <layact.hxx>
 #include <ndtxt.hxx>
 #include <swtable.hxx>
+#include <wordmacautofit.hxx>
+#include <wordmacmetrics.hxx>
 #include <view.hxx>
 
 // RotateFlyFrame3
@@ -3838,6 +3840,12 @@ tools::Long SwLayoutFrame::CalcRel( const SwFormatFrameSize &rSz ) const
         if (IsTabFrame())
         {
             const auto* pTable = static_cast<const SwTabFrame*>(this)->GetTable();
+            if (sw::UseWordMacMetrics())
+            {
+                const sal_Int32 nExact = sw::GetWordMacTableWidthFiftieths(*pTable->GetFrameFormat());
+                if (nExact)
+                    nRet = sal_Int64(nRel) * nExact / 5000;
+            }
             nRet += pTable->GetWordMacPercentPadding();
         }
     }

@@ -30,6 +30,7 @@
 #include <doc.hxx>
 #include <IDocumentLayoutAccess.hxx>
 #include <swtable.hxx>
+#include <wordmacautofit.hxx>
 #include <rootfrm.hxx>
 #include <flyfrm.hxx>
 #include <poolfmt.hxx>
@@ -1163,7 +1164,10 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
 
             // Let's play such games now anyway. We had a graphic in a 1% wide
             // table and it didn't fit in of course.
-            nAbsTabWidth = o3tl::narrowing<sal_uInt16>( (static_cast<sal_uLong>(nAbsAvail) * m_nWidthOption) / 100 );
+            const sal_Int32 nExact = m_bWordMacAutoFit && m_pSwTable
+                ? sw::GetWordMacTableWidthFiftieths(*m_pSwTable->GetFrameFormat()) : 0;
+            nAbsTabWidth = o3tl::narrowing<sal_uInt16>(sal_uInt64(nAbsAvail)
+                * (nExact ? nExact : m_nWidthOption * 50) / 5000);
             if( IsTopTable() &&
                 ( /*MayBeInFlyFrame() ||*/ static_cast<sal_uLong>(nAbsTabWidth) > m_nMin ) )
             {
@@ -1212,7 +1216,22 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
         // widen already constrained narrow headers and change their wrap.
         std::vector<sal_uLong> aWidths(m_nCols, 0);
         std::vector<bool> aFixed(m_nCols, false);
-        sal_uLong nRemaining = nAbsTabWidth;
+        // Percentage preferences apply to the space inside separated cell
+        // edges. Reserve the fixed gaps before the usual min-clamped split.
+        // Each column has two inside units; the first and last add one each.
+        sal_uLong nSpacing = m_nWordMacCellSpacing;
+        if (nSpacing)
+        {
+            const auto* pTableFrame = m_pSwTable
+                ? SwIterator<SwTabFrame, SwFormat>(*m_pSwTable->GetFrameFormat()).First()
+                : nullptr;
+            if (!pTableFrame || pTableFrame->IsVertical() || pTableFrame->IsRightToLeft())
+                nSpacing = 0;
+        }
+        sal_uLong nSpacingTotal = 2 * (sal_uLong(m_nCols) + 1) * nSpacing;
+        if (nSpacingTotal + m_nMin > nAbsTabWidth)
+            nSpacing = nSpacingTotal = 0;
+        sal_uLong nRemaining = nAbsTabWidth - nSpacingTotal;
         sal_uLong nWeight = 0;
         for (sal_uInt16 i = 0; i < m_nCols; ++i)
             nWeight += GetColumn(i)->GetWidthOption();
@@ -1252,6 +1271,7 @@ void SwHTMLTableLayout::AutoLayoutPass2( sal_uInt16 nAbsAvail, sal_uInt16 nRelAv
         for (sal_uInt16 i = 0; i < m_nCols; ++i)
         {
             auto* pColumn = GetColumn(i);
+            aWidths[i] += (2 + (i == 0) + (i + 1 == m_nCols)) * nSpacing;
             pColumn->SetAbsColWidth(o3tl::narrowing<sal_uInt16>(aWidths[i]));
             const sal_uLong nRelWidth = i + 1 == m_nCols ? m_nRelTabWidth - nRelUsed
                 : aWidths[i] * m_nRelTabWidth / nAbsTabWidth;
@@ -1750,13 +1770,16 @@ void SwHTMLTableLayout::Resize_( sal_uInt16 nAbsAvail, bool bRecalc )
     if( bRecalc || m_bWordMacAutoFit )
         AutoLayoutPass1();
 
+    const sal_Int32 nExact = m_bWordMacAutoFit && m_pSwTable
+        ? sw::GetWordMacTableWidthFiftieths(*m_pSwTable->GetFrameFormat()) : 0;
     if (m_bWordMacAutoFit && m_bPercentWidthOption && m_nWidthOption
         && m_nWordMacPercentPadding)
     {
         // In the pre-2013 Word layout, an explicitly indented percentage
         // table's outer cell padding lies outside its preferred text width.
         // Compensate before the percentage is applied, including at 50% etc.
-        const sal_uLong nExtra = sal_uLong(m_nWordMacPercentPadding) * 100 / m_nWidthOption;
+        const sal_uLong nExtra = sal_uLong(m_nWordMacPercentPadding) * 5000
+            / (nExact ? nExact : m_nWidthOption * 50);
         nAbsAvail = std::min<sal_uLong>(SAL_MAX_UINT16, sal_uLong(nAbsAvail) + nExtra);
     }
 
@@ -1775,7 +1798,7 @@ void SwHTMLTableLayout::Resize_( sal_uInt16 nAbsAvail, bool bRecalc )
             nMinimum += nMinimumWidth;
         }
         const sal_uLong nAvailable = m_bPercentWidthOption
-            ? sal_uLong(nAbsAvail) * m_nWidthOption / 100
+            ? sal_uInt64(nAbsAvail) * (nExact ? nExact : m_nWidthOption * 50) / 5000
             : std::min<sal_uLong>(nAbsAvail, m_nWidthOption ? m_nWidthOption : nAbsAvail);
         if (nMinimum <= nAvailable)
         {

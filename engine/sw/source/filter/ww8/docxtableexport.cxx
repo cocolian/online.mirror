@@ -33,6 +33,7 @@
 
 #include <fmtfsize.hxx>
 #include <swtable.hxx>
+#include <wordmacautofit.hxx>
 #include <unocoll.hxx>
 #include <formatflysplit.hxx>
 #include <IDocumentSettingAccess.hxx>
@@ -268,7 +269,9 @@ void DocxAttributeOutput::TableDefinition(
        * ex. If the Table width is 50% then
        * Width in Fiftieths of a percent is (50 * 50) % or 0.5 * 5000 = 2500pct
        **/
-        nPageSize = nWidthPercent * 50;
+        const sal_Int32 nExact = !pFloatingTableFrame
+            ? sw::GetWordMacTableWidthFiftieths(*pTableFormat) : 0;
+        nPageSize = nExact ? nExact : nWidthPercent * 50;
         widthType = "pct";
     }
     else
@@ -338,8 +341,9 @@ void DocxAttributeOutput::TableDefinition(
             oStyleHoriOrient = rGrabBagElement.second.get<sal_Int16>();
             continue;
         }
-        // This internal mode was already emitted as w:tblLayout above.
-        if (rGrabBagElement.first == "WordMacAutoFit")
+        // These internal hints were emitted as standard table properties above.
+        if (rGrabBagElement.first == "WordMacAutoFit"
+            || rGrabBagElement.first == "WordMacWidthFiftieths")
             continue;
         if (rGrabBagElement.first == "TableStyleName")
         {

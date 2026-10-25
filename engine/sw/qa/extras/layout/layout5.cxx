@@ -2083,6 +2083,63 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacRowCellSpacing)
             }
         }
     }
+
+    // Word's percentage columns divide the space left after reserving the
+    // separated cell gaps. Unequal columns expose a different result from
+    // applying the percentages to the frame slots themselves.
+    const OUString aAutoFitName = u"COCOLIAN_WORD_MAC_AUTOFIT"_ustr;
+    OUString aPreviousAutoFit;
+    const bool bHadAutoFit = osl_getEnvironment(aAutoFitName.pData, &aPreviousAutoFit.pData)
+        == osl_Process_E_None;
+    comphelper::ScopeGuard aRestoreAutoFit([&] {
+        if (bHadAutoFit)
+            osl_setEnvironment(aAutoFitName.pData, aPreviousAutoFit.pData);
+        else
+            osl_clearEnvironment(aAutoFitName.pData);
+    });
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    osl_setEnvironment(aAutoFitName.pData, aOn.pData);
+    for (sal_Int32 nSpacing : { 0, 15, 30 })
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            const OString aCell = R"xml(<w:tc><w:tcPr><w:tcW w:w="1000" w:type="pct"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="280" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>A</w:t></w:r></w:p></w:tc>)xml"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblInd w:w="15" w:type="dxa"/><w:tblLayout w:type="autofit"/><w:tblCellMar><w:left w:w="15" w:type="dxa"/><w:right w:w="15" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1661"/><w:gridCol w:w="6645"/></w:tblGrid><w:tr><w:trPr><w:tblCellSpacing w:w=")xml"_ostr
+                + OString::number(nSpacing) + R"xml(" w:type="dxa"/></w:trPr>)xml"_ostr
+                + aCell + aCell.replaceAll("w:w=\"1000\""_ostr, "w:w=\"4000\""_ostr)
+                + R"xml(</w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            calcLayout();
+            auto pDump = parseLayoutDump();
+            const sal_Int32 nTableWidth = getXPath(pDump,
+                "/root/page/body/tab/infos/prtBounds", "width").toInt32();
+            const sal_Int32 nFirstWidth = getXPath(pDump,
+                "/root/page/body/tab/row/cell[1]/infos/bounds", "width").toInt32();
+            // For two columns the two outside edges use 2S each and the
+            // two inside edges use S each. The first frame slot adds 3S.
+            const sal_Int32 nExpected = (nTableWidth - 6 * nSpacing) / 5 + 3 * nSpacing;
+            const OString aDiagnostic = "spacing="_ostr + OString::number(nSpacing)
+                + " round="_ostr + OString::number(nRound)
+                + " actual="_ostr + OString::number(nFirstWidth)
+                + " expected="_ostr + OString::number(nExpected);
+            CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(),
+                std::abs(nFirstWidth - nExpected) <= 2);
+            if (!nRound)
+                saveAndReload(TestFilter::DOCX);
+        }
+    }
 }
 
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacUrlBreakUnits)
@@ -3229,28 +3286,67 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacFractionalTableWidth)
         else
             osl_clearEnvironment(aName.pData);
     });
-    utl::TempFileNamed aFile;
-    aFile.EnableKillingFile();
-    makeWordMacPackage(aFile, false, true);
+    for (sal_Int32 nFiftieths : { 4934, 4998 })
     {
-        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
-            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
-        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
-        writeWordMacPart(xWord, u"document.xml"_ustr,
-            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4998" w:type="pct"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4500"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Width</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr/></w:body></w:document>)xml"_ostr);
-        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
-        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
-    }
-    for (bool bMac : {false, true})
-    {
-        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
-        osl_setEnvironment(aName.pData, aValue.pData);
-        loadFromURL(aFile.GetURL());
-        uno::Reference<text::XTextTablesSupplier> xSupplier(mxComponent, uno::UNO_QUERY_THROW);
-        uno::Reference<container::XIndexAccess> xTables(xSupplier->getTextTables(), uno::UNO_QUERY_THROW);
-        uno::Reference<text::XTextTable> xTable(xTables->getByIndex(0), uno::UNO_QUERY_THROW);
-        CPPUNIT_ASSERT_EQUAL(sal_Int16(bMac ? 100 : 99),
-                             getProperty<sal_Int16>(xTable, u"RelativeWidth"_ustr));
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4998" w:type="pct"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4500"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Width</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr/></w:body></w:document>)xml"_ostr.replaceAll("4998"_ostr, OString::number(nFiftieths)));
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        for (bool bMac : { false, true })
+        {
+            const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+            osl_setEnvironment(aName.pData, aValue.pData);
+            loadFromURL(aFile.GetURL());
+            const sal_Int16 nWholePercent = (nFiftieths + (bMac ? 25 : 0)) / 50;
+            for (int nRound = 0; nRound < 2; ++nRound)
+            {
+                calcLayout();
+                uno::Reference<text::XTextTablesSupplier> xSupplier(mxComponent, uno::UNO_QUERY_THROW);
+                uno::Reference<container::XIndexAccess> xTables(xSupplier->getTextTables(), uno::UNO_QUERY_THROW);
+                uno::Reference<text::XTextTable> xTable(xTables->getByIndex(0), uno::UNO_QUERY_THROW);
+                CPPUNIT_ASSERT_EQUAL(nWholePercent,
+                    getProperty<sal_Int16>(xTable, u"RelativeWidth"_ustr));
+                auto pDump = parseLayoutDump();
+                const sal_Int32 nBody = getXPath(pDump,
+                    "/root/page/body/infos/prtBounds", "width").toInt32();
+                const sal_Int32 nWidth = getXPath(pDump,
+                    "/root/page/body/tab/infos/prtBounds", "width").toInt32();
+                const sal_Int32 nExpected = bMac ? sal_Int64(nBody) * nFiftieths / 5000
+                    : sal_Int64(nBody) * nWholePercent / 100;
+                const OString aDiagnostic = "fiftieths="_ostr + OString::number(nFiftieths)
+                    + " mac="_ostr + OString::number(bMac)
+                    + " round="_ostr + OString::number(nRound)
+                    + " width="_ostr + OString::number(nWidth)
+                    + " expected="_ostr + OString::number(nExpected);
+                CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), std::abs(nWidth - nExpected) <= 1);
+                if (!nRound)
+                    saveAndReload(TestFilter::DOCX);
+                else
+                {
+                    assertXPath(parseExport(u"word/document.xml"_ustr),
+                        "/w:document/w:body/w:tbl/w:tblPr/w:tblW", "w",
+                        OUString::number(bMac ? nFiftieths : nWholePercent * 50));
+                    if (bMac && nFiftieths == 4934)
+                    {
+                        // An explicit edit to the rounded UNO value means
+                        // 99%, even when the UI previously displayed 99%.
+                        uno::Reference<beans::XPropertySet>(xTable, uno::UNO_QUERY_THROW)
+                            ->setPropertyValue(u"RelativeWidth"_ustr, uno::Any(sal_Int16(99)));
+                        saveAndReload(TestFilter::DOCX);
+                        assertXPath(parseExport(u"word/document.xml"_ustr),
+                            "/w:document/w:body/w:tbl/w:tblPr/w:tblW", "w", u"4950");
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -36,6 +36,7 @@ class DomainMapperTableManager : public TableManager
     typedef std::shared_ptr< std::vector<sal_Int32> > IntVectorPtr;
 
     std::vector<sal_Int32> m_aWordMacPreferredPercents;
+    sal_Int32 m_nWordMacWidthFiftieths = 0;
     sal_uInt32      m_nRow;
     ::std::vector< sal_uInt32 > m_nCell;
     sal_uInt32      m_nGridSpan;
@@ -140,6 +141,7 @@ public:
     const std::vector<sal_Int32>& GetWordMacPreferredPercents() const
     { return m_aWordMacPreferredPercents; }
     sal_uInt32 GetLayoutType() const { return m_nLayoutType; }
+    sal_Int32 GetWordMacWidthFiftieths() const { return m_nWordMacWidthFiftieths; }
     sal_Int32 GetPreferredGridWidth() const { return m_nTableWidth; }
 
     using TableManager::isInCell;

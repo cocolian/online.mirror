@@ -178,6 +178,7 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                     }
                     else
                     {
+                        m_nWordMacWidthFiftieths = 0;
                         m_nTableWidth = pMeasureHandler->getMeasureValue();
                         if( m_nTableWidth )
                         {
@@ -191,9 +192,12 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                         }
                         else if( sal::static_int_cast<Id>(pMeasureHandler->getUnit()) == NS_ooxml::LN_Value_ST_TblWidth_pct )
                         {
+                            if (sw::UseWordMacMetrics() && pMeasureHandler->getValue() > 0
+                                && pMeasureHandler->getValue() <= 5000)
+                                m_nWordMacWidthFiftieths = pMeasureHandler->getValue();
                             sal_Int32 nPercent = pMeasureHandler->getValue() / 50;
-                            // UNO stores whole percentages. Preserve the closest width
-                            // instead of shrinking 99.96% tables to 99% in the Mac profile.
+                            // UNO exposes whole percentages; retain its nearest value
+                            // while keeping the original precision for layout and DOCX.
                             if (sw::UseWordMacMetrics() && pMeasureHandler->getValue() % 50 >= 25)
                                 ++nPercent;
                             // In the Word Mac profile, keep oversized preferred widths so
@@ -527,6 +531,7 @@ void DomainMapperTableManager::startLevel( )
     m_aTmpTableProperties.push_back( pTmpProperties );
     m_nCell.push_back( 0 );
     m_nTableWidth = 0;
+    m_nWordMacWidthFiftieths = 0;
     m_nLayoutType = 0;
     TableParagraphVectorPtr pNewParagraphs = std::make_shared<std::vector<TableParagraph>>();
     m_aParagraphsToEndTable.push( pNewParagraphs );
@@ -924,6 +929,7 @@ void DomainMapperTableManager::endOfRowAction()
 void DomainMapperTableManager::clearData()
 {
     m_aWordMacPreferredPercents.clear();
+    m_nWordMacWidthFiftieths = 0;
     m_nRow = m_nHeaderRepeat = m_nTableWidth = m_nLayoutType = 0;
     m_TableLook = TableLook{};
 }
