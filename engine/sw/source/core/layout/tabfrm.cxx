@@ -220,20 +220,37 @@ static SwTwips lcl_CalcMinRowHeight( const SwRowFrame *pRow,
 static sal_uInt16 lcl_GetTopSpace( const SwRowFrame& rRow );
 static sal_uInt16 lcl_GetBottomLineDist(const SwRowFrame& rRow);
 
-SwTwips SwCellFrame::GetWordMacCellSpacing() const
+void SwCellFrame::GetWordMacCellSpacing(SwTwips& rLeft, SwTwips& rRight,
+                                      SwTwips& rTop, SwTwips& rBottom) const
 {
+    rLeft = rRight = rTop = rBottom = 0;
     if (!sw::UseWordMacMetrics() || FindTabFrame()->IsCollapsingBorders())
-        return 0;
+        return;
     const auto* pRow = static_cast<const SwRowFrame*>(GetUpper());
     const auto* pBag = pRow->GetFormat()->GetAttrSet().GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG);
     if (!pBag)
-        return 0;
+        return;
     const auto& rBag = pBag->GetGrabBag();
     const auto it = rBag.find(u"RowCellSpacingTwips"_ustr);
     sal_Int32 nSpacing = 0;
     if (it != rBag.end())
         it->second >>= nSpacing;
-    return std::clamp<sal_Int32>(nSpacing, 0, SAL_MAX_INT16);
+    nSpacing = std::clamp<sal_Int32>(nSpacing, 0, SAL_MAX_INT16);
+    rLeft = rRight = rTop = rBottom = nSpacing;
+    // Word reserves an extra spacing unit on the outside of a horizontal
+    // left-to-right table. Interior gaps still consist of one unit per cell.
+    // Keep the existing treatment for vertical and right-to-left tables.
+    if (nSpacing && !IsVertical() && !IsRightToLeft())
+    {
+        if (!GetPrev())
+            rLeft += nSpacing;
+        if (!GetNext())
+            rRight += nSpacing;
+        if (!pRow->GetPrev())
+            rTop += nSpacing;
+        if (!pRow->GetNext())
+            rBottom += nSpacing;
+    }
 }
 
 static SwTwips lcl_CalcTopAndBottomMargin( const SwLayoutFrame&, const SwBorderAttrs& );
@@ -5176,8 +5193,10 @@ static SwTwips lcl_CalcTopAndBottomMargin( const SwLayoutFrame& rCell, const SwB
         }
     }
 
-    return nTopSpace + nBottomSpace
-        + 2 * static_cast<const SwCellFrame&>(rCell).GetWordMacCellSpacing();
+    SwTwips nSpacingLeft, nSpacingRight, nSpacingTop, nSpacingBottom;
+    static_cast<const SwCellFrame&>(rCell).GetWordMacCellSpacing(
+        nSpacingLeft, nSpacingRight, nSpacingTop, nSpacingBottom);
+    return nTopSpace + nBottomSpace + nSpacingTop + nSpacingBottom;
 }
 
 // #i26945# - add parameter <_bConsiderObjs> in order to
@@ -6298,11 +6317,12 @@ void SwCellFrame::Format( vcl::RenderContext* /*pRenderContext*/, const SwBorder
                 nTopSpace    = pAttrs->CalcTop();
                 nBottomSpace = pAttrs->CalcBottom();
             }
-            const SwTwips nCellSpacing = GetWordMacCellSpacing();
-            nLeftSpace += nCellSpacing;
-            nRightSpace += nCellSpacing;
-            nTopSpace += nCellSpacing;
-            nBottomSpace += nCellSpacing;
+            SwTwips nSpacingLeft, nSpacingRight, nSpacingTop, nSpacingBottom;
+            GetWordMacCellSpacing(nSpacingLeft, nSpacingRight, nSpacingTop, nSpacingBottom);
+            nLeftSpace += nSpacingLeft;
+            nRightSpace += nSpacingRight;
+            nTopSpace += nSpacingTop;
+            nBottomSpace += nSpacingBottom;
             aRectFnSet.SetXMargins( *this, nLeftSpace, nRightSpace );
             aRectFnSet.SetYMargins( *this, nTopSpace, nBottomSpace );
         }

@@ -1255,13 +1255,17 @@ static void lcl_CalcBorderRect( SwRect &rRect, const SwFrame *pFrame,
     else if ( pFrame->IsCellFrame() )
     {
         rRect = pFrame->getFrameArea();
-        const SwTwips nSpacing = static_cast<const SwCellFrame*>(pFrame)->GetWordMacCellSpacing();
-        if (nSpacing > 0 && rRect.Width() > 2 * nSpacing && rRect.Height() > 2 * nSpacing)
+        SwTwips nSpacingLeft, nSpacingRight, nSpacingTop, nSpacingBottom;
+        static_cast<const SwCellFrame*>(pFrame)->GetWordMacCellSpacing(
+            nSpacingLeft, nSpacingRight, nSpacingTop, nSpacingBottom);
+        if ((nSpacingLeft || nSpacingRight || nSpacingTop || nSpacingBottom)
+            && rRect.Width() > nSpacingLeft + nSpacingRight
+            && rRect.Height() > nSpacingTop + nSpacingBottom)
         {
-            rRect.Left(rRect.Left() + nSpacing);
-            rRect.Right(rRect.Right() - nSpacing);
-            rRect.Top(rRect.Top() + nSpacing);
-            rRect.Bottom(rRect.Bottom() - nSpacing);
+            rRect.Left(rRect.Left() + nSpacingLeft);
+            rRect.Right(rRect.Right() - nSpacingRight);
+            rRect.Top(rRect.Top() + nSpacingTop);
+            rRect.Bottom(rRect.Bottom() - nSpacingBottom);
         }
     }
     else

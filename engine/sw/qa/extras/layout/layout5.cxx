@@ -2011,7 +2011,11 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacRowCellSpacing)
         for (bool bMerged : { false, true })
         {
             sal_Int32 nZeroHeight = 0;
-            for (sal_Int32 nSpacing : { 0, 20 })
+            sal_Int32 nFirstSpacedHeight = 0;
+            sal_Int32 nFirstSpacedLeft = 0;
+            sal_Int32 nFirstSpacedTop = 0;
+            sal_Int32 nFirstSpacedWidth = 0;
+            for (sal_Int32 nSpacing : { 0, 20, 40 })
             {
                 utl::TempFileNamed aFile;
                 aFile.EnableKillingFile();
@@ -2047,6 +2051,30 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacRowCellSpacing)
                     CPPUNIT_ASSERT_GREATER(nZeroHeight + 39, nHeight);
                 else
                     CPPUNIT_ASSERT_EQUAL(nZeroHeight, nHeight);
+                if (bMac && !bMerged && nSpacing)
+                {
+                    const OString aCellPrint = "/root/page/body/tab/row[1]/cell[1]/infos/prtBounds"_ostr;
+                    const sal_Int32 nLeft = getXPath(pDump, aCellPrint, "left").toInt32();
+                    const sal_Int32 nTop = getXPath(pDump, aCellPrint, "top").toInt32();
+                    const sal_Int32 nWidth = getXPath(pDump, aCellPrint, "width").toInt32();
+                    if (nSpacing == 20)
+                    {
+                        nFirstSpacedHeight = nHeight;
+                        nFirstSpacedLeft = nLeft;
+                        nFirstSpacedTop = nTop;
+                        nFirstSpacedWidth = nWidth;
+                    }
+                    else
+                    {
+                        // Mac Word uses two spacing units on each outside
+                        // edge and one on each inside edge. Changing 20 to 40
+                        // twips adds 40 outside plus 20 inside to a corner cell.
+                        CPPUNIT_ASSERT_EQUAL(nFirstSpacedHeight + 60, nHeight);
+                        CPPUNIT_ASSERT_EQUAL(nFirstSpacedLeft + 40, nLeft);
+                        CPPUNIT_ASSERT_EQUAL(nFirstSpacedTop + 40, nTop);
+                        CPPUNIT_ASSERT_EQUAL(nFirstSpacedWidth - 60, nWidth);
+                    }
+                }
                 saveAndReload(TestFilter::DOCX);
                 auto pXml = parseExport(u"word/document.xml"_ustr);
                 assertXPath(pXml, "/w:document/w:body/w:tbl/w:tr/w:trPr/w:tblCellSpacing[@w:type='dxa' and @w:w='"_ostr

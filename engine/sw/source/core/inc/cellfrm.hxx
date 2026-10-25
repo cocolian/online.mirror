@@ -46,7 +46,8 @@ public:
     // #i103961#
     virtual void Cut() override;
 
-    SwTwips GetWordMacCellSpacing() const;
+    void GetWordMacCellSpacing(SwTwips& rLeft, SwTwips& rRight,
+                              SwTwips& rTop, SwTwips& rBottom) const;
 
     const SwTableBox *GetTabBox() const { return m_pTabBox; }
 
