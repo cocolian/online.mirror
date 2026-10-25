@@ -6001,3 +6001,76 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableWidowControl)
         }
     }
 }
+
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacOversizedFixedTableWidth)
+{
+    const OUString aEnv = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bPrevious = osl_getEnvironment(aEnv.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bPrevious)
+            osl_setEnvironment(aEnv.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aEnv.pData);
+    });
+    for (bool bMac : {false, true})
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aEnv.pData, aValue.pData);
+        for (const OString& rCellType : {"pct"_ostr, "dxa"_ostr, "none"_ostr})
+        {
+            utl::TempFileNamed aFile;
+            aFile.EnableKillingFile();
+            makeWordMacPackage(aFile, false, true);
+            {
+                auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                    ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                OString aCells;
+                const sal_Int32 aGrid[] = {1602, 735, 1624, 2288, 3428};
+                const sal_Int32 aPercents[] = {827, 379, 839, 1182, 1771};
+                for (int i = 0; i < 5; ++i)
+                {
+                    OString aWidth;
+                    if (rCellType != "none")
+                        aWidth = "<w:tcW w:type=\""_ostr + rCellType + "\" w:w=\""_ostr
+                            + OString::number(rCellType == "pct" ? aPercents[i] : aGrid[i])
+                            + "\"/>"_ostr;
+                    aCells += "<w:tc><w:tcPr>"_ostr + aWidth
+                        + "</w:tcPr><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc>"_ostr;
+                }
+                writeWordMacPart(xWord, u"document.xml"_ustr,
+                    R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="5564" w:type="pct"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1602"/><w:gridCol w:w="735"/><w:gridCol w:w="1624"/><w:gridCol w:w="2288"/><w:gridCol w:w="3428"/></w:tblGrid><w:tr>)xml"_ostr
+                    + aCells + R"xml(</w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11904" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                writeWordMacPart(xWord, u"settings.xml"_ustr,
+                    R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+                uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+            }
+            for (int nRound = 0; nRound < 2; ++nRound)
+            {
+                if (!nRound)
+                    loadFromURL(aFile.GetURL());
+                else
+                    saveAndReload(TestFilter::DOCX);
+                auto pDump = parseLayoutDump();
+                const sal_Int32 nBody = getXPath(pDump,
+                    "/root/page/body/infos/prtBounds", "width").toInt32();
+                const sal_Int32 nWidth = getXPath(pDump,
+                    "/root/page/body/tab/infos/prtBounds", "width").toInt32();
+                const sal_Int32 nExpected = bMac ? sal_Int64(nBody) * 5564 / 5000 : nBody;
+                const OString aDiagnostic = "celltype="_ostr + rCellType
+                    + " mac="_ostr + OString::number(bMac)
+                    + " round="_ostr + OString::number(nRound)
+                    + " width="_ostr + OString::number(nWidth)
+                    + " expected="_ostr + OString::number(nExpected);
+                CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), std::abs(nWidth - nExpected) <= 1);
+                if (nRound)
+                    assertXPath(parseExport(u"word/document.xml"_ustr),
+                        "/w:document/w:body/w:tbl/w:tblPr/w:tblW", "w",
+                        bMac ? u"5564"_ustr : u"5000"_ustr);
+            }
+        }
+    }
+}

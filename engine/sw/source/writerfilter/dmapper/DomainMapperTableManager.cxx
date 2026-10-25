@@ -193,7 +193,7 @@ bool DomainMapperTableManager::sprm(Sprm & rSprm)
                         else if( sal::static_int_cast<Id>(pMeasureHandler->getUnit()) == NS_ooxml::LN_Value_ST_TblWidth_pct )
                         {
                             if (sw::UseWordMacMetrics() && pMeasureHandler->getValue() > 0
-                                && pMeasureHandler->getValue() <= 5000)
+                                && pMeasureHandler->getValue() <= 12700)
                                 m_nWordMacWidthFiftieths = pMeasureHandler->getValue();
                             sal_Int32 nPercent = pMeasureHandler->getValue() / 50;
                             // UNO exposes whole percentages; retain its nearest value

@@ -3414,7 +3414,7 @@ sal_Int32 sw::GetWordMacTableWidthFiftieths(const SwFrameFormat& rFormat)
     if (it != rBag.end())
         it->second >>= nWidth;
     // Ignore stale import data after a relative/absolute width edit.
-    return nWidth > 0 && nWidth <= 5000
+    return nWidth > 0 && nWidth <= 12700
         && (nWidth + 25) / 50 == rFormat.GetFrameSize().GetWidthPercent() ? nWidth : 0;
 }
 

@@ -2018,6 +2018,19 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
                             .GetWordMacWidthFiftieths();
                         if (nWidth > 0)
                         {
+                            // UNO limits relative widths to 100%. Modern Word's
+                            // fixed tables can have a larger preferred percentage;
+                            // retain it in the internal size rather than using
+                            // an unrelated absolute grid width.
+                            if (nWidth > 5000 && nWidth <= 12700
+                                && m_rDMapper_Impl.GetSettingsTable()->GetWordCompatibilityMode() >= 15
+                                && m_rDMapper_Impl.getTableManager().GetLayoutType()
+                                    == NS_ooxml::LN_Value_doc_ST_TblLayout_fixed)
+                            {
+                                auto aSize = pTable->GetFrameFormat()->GetFrameSize();
+                                aSize.SetWidthPercent(static_cast<sal_uInt8>((nWidth + 25) / 50));
+                                pTable->GetFrameFormat()->SetFormatAttr(aSize);
+                            }
                             auto aBag = pTable->GetFrameFormat()->GetAttrSet()
                                 .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG)->GetGrabBag();
                             aBag[u"WordMacWidthFiftieths"_ustr] <<= nWidth;
