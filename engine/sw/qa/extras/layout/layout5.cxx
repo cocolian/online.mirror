@@ -5943,3 +5943,61 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCjkHangingParenthesis)
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableWidowControl)
+{
+    const OUString aEnv = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bPrevious = osl_getEnvironment(aEnv.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bPrevious)
+            osl_setEnvironment(aEnv.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aEnv.pData);
+    });
+    for (bool bMac : {false, true})
+    {
+        const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aEnv.pData, aValue.pData);
+        for (int nCompat : {14, 15})
+        {
+            for (bool bWidows : {false, true})
+            {
+                utl::TempFileNamed aFile;
+                aFile.EnableKillingFile();
+                makeWordMacPackage(aFile, false, true);
+                {
+                    auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                        ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                    auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                    const OString aCompat = OString::number(nCompat);
+                    const OString aWidow = bWidows ? "1"_ostr : "0"_ostr;
+                    writeWordMacPart(xWord, u"document.xml"_ustr,
+                        R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+    <w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="12500" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>Spacer</w:t></w:r></w:p>
+    <w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="8000"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="8000"/></w:tblGrid>
+    <w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="8000"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="400" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>Header</w:t></w:r></w:p></w:tc></w:tr>
+    <w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="8000"/></w:tcPr><w:p><w:pPr><w:widowControl w:val=")xml"_ostr + aWidow + R"xml("/><w:spacing w:before="0" w:after="0" w:line="480" w:lineRule="exact"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:t>First</w:t><w:br/><w:t>Second</w:t><w:br/><w:t>Third</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+    <w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                    writeWordMacPart(xWord, u"settings.xml"_ustr,
+                        R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr + aCompat + R"xml("/></w:compat></w:settings>)xml"_ostr);
+                    uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                    uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+                }
+                for (int nRound = 0; nRound < 2; ++nRound)
+                {
+                    if (nRound == 0)
+                        loadFromURL(aFile.GetURL());
+                    else
+                        saveAndReload(TestFilter::DOCX);
+                    auto pLayout = parseLayoutDump();
+                    // Three lines cannot be split into two groups of at least two.
+                    // Word 2013 mode keeps the row with its repeated header on page two;
+                    // Word 2010 mode permits splitting even when widows are enabled.
+                    assertXPath(pLayout, "/root/page[1]/body/tab", bMac && bWidows && nCompat >= 15 ? 0 : 1);
+                    assertXPath(pLayout, "/root/page[2]/body/tab", 1);
+                }
+            }
+        }
+    }
+}

@@ -384,14 +384,15 @@ WidowsAndOrphans::WidowsAndOrphans(SwTextFrame* pNewFrame, const std::optional<S
     bool bResetFlags = false;
 
     bool bWordTableCell = false;
-    if (m_pFrame->IsInFly())
-    {
-        // Enable widow / orphan control in Word-style table cells in split rows, at least inside
-        // flys.
-        const SwDoc& rDoc = m_pFrame->GetTextNodeForParaProps()->GetDoc();
-        const IDocumentSettingAccess& rIDSA = rDoc.getIDocumentSettingAccess();
+    const IDocumentSettingAccess& rIDSA = m_pFrame->GetTextNodeForParaProps()
+        ->GetDoc().getIDocumentSettingAccess();
+    // Word 2013 and newer respect widow/orphan control in body table cells.
+    // Word 2010 compatibility mode still permits splitting these paragraphs.
+    const bool bMacBodyTable = sw::UseWordMacMetrics() && m_pFrame->IsInTab()
+        && m_pFrame->IsInDocBody() && !m_pFrame->IsInFly() && !m_pFrame->IsVertical()
+        && rIDSA.get(DocumentSettingId::WORD_2013_LINE_BREAKING);
+    if (m_pFrame->IsInFly() || bMacBodyTable)
         bWordTableCell = rIDSA.get(DocumentSettingId::TABLE_ROW_KEEP);
-    }
 
     if ( m_pFrame->IsInTab() && !bWordTableCell )
     {
