@@ -23,6 +23,8 @@
 
 #include <hintids.hxx>
 #include <editeng/charscaleitem.hxx>
+#include <editeng/forbiddenruleitem.hxx>
+#include <paratr.hxx>
 #include <editeng/cmapitem.hxx>
 #include <svl/itemiter.hxx>
 #include <svx/svdobj.hxx>
@@ -1007,6 +1009,8 @@ namespace {
 class SwMinMaxArgs
 {
 public:
+    SwDoc const& m_rDoc;
+    bool m_bApplyForbiddenRules = true;
     VclPtr<OutputDevice> m_pOut;
     SwViewShell const* m_pSh;
     sal_uLong& m_rMin;
@@ -1016,8 +1020,9 @@ public:
     tools::Long m_nWordAdd;
     sal_Int32 m_nNoLineBreak;
     bool m_bRoundWidths = false;
-    SwMinMaxArgs(OutputDevice* pOutI, SwViewShell const* pShI, sal_uLong& rMinI, sal_uLong& rAbsI)
-        : m_pOut(pOutI)
+    SwMinMaxArgs(SwDoc const& rDoc, OutputDevice* pOutI, SwViewShell const* pShI, sal_uLong& rMinI, sal_uLong& rAbsI)
+        : m_rDoc(rDoc)
+        , m_pOut(pOutI)
         , m_pSh(pShI)
         , m_rMin(rMinI)
         , m_rAbsMin(rAbsI)
@@ -1050,7 +1055,21 @@ static bool lcl_MinMaxString( SwMinMaxArgs& rArg, SwFont* pFnt, const OUString &
                          g_pBreakIt->GetLocale( eLang ),
                          WordType::DICTIONARY_WORD, true ) );
         nStop = aBndry.endPos;
-        if (nIdx <= aBndry.startPos && nIdx && nIdx - 1 != rArg.m_nNoLineBreak)
+        const bool bCjkLineBreaks = rArg.m_bRoundWidths
+            && pFnt->GetActual() == SwFontScript::CJK;
+        bool bDictionaryBreak = nIdx <= aBndry.startPos && nIdx
+            && nIdx - 1 != rArg.m_nNoLineBreak;
+        if (bDictionaryBreak && bCjkLineBreaks && rArg.m_bApplyForbiddenRules)
+        {
+            const auto* pForbidden = rArg.m_rDoc.getIDocumentSettingAccess()
+                .getForbiddenCharacters(eLang, true);
+            bDictionaryBreak = pForbidden->beginLine.indexOf(rText[nIdx]) < 0
+                && pForbidden->endLine.indexOf(rText[nIdx - 1]) < 0;
+        }
+        // Keep dictionary boundaries across script changes. Only forbidden
+        // punctuation binds them: dropping every boundary joins CJK words on
+        // both sides of a Latin slash and increases their intrinsic minimum.
+        if (bDictionaryBreak)
             rArg.NewWord();
         if( nStop == nIdx )
             ++nStop;
@@ -1067,6 +1086,40 @@ static bool lcl_MinMaxString( SwMinMaxArgs& rArg, SwFont* pFnt, const OUString &
         rArg.m_nRowWidth += nCurrentWidth;
         if( bClear )
             rArg.NewWord();
+        else if (bCjkLineBreaks)
+        {
+            // AutoFit may wrap a CJK dictionary word at legal line breaks.
+            // Keep max-content measurement unchanged, but measure min-content
+            // by those units, including punctuation and combining characters.
+            const lang::Locale aLocale = g_pBreakIt->GetLocale(eLang);
+            const LineBreakHyphenationOptions aHyphenation;
+            const ForbiddenCharacters aForbidden(*rArg.m_rDoc.getIDocumentSettingAccess()
+                .getForbiddenCharacters(eLang, true));
+            const LineBreakUserOptions aOptions(aForbidden.beginLine, aForbidden.endLine,
+                rArg.m_bApplyForbiddenRules, false, false);
+            const auto aCanBreak = [&](sal_Int32 nPosition) {
+                return g_pBreakIt->GetBreakIter()->getLineBreak(rText, nPosition,
+                    aLocale, 0, aHyphenation, aOptions).breakIndex == nPosition;
+            };
+            for (sal_Int32 nStart = nIdx; nStart < nStop;)
+            {
+                if (nStart && nStart - 1 != rArg.m_nNoLineBreak && aCanBreak(nStart))
+                    rArg.NewWord();
+                sal_Int32 nNext = nStart;
+                do
+                    rText.iterateCodePoints(&nNext);
+                while (nNext < nStop && !aCanBreak(nNext));
+                nNext = std::min(nNext, nStop);
+                SwDrawTextInfo aUnitInfo(rArg.m_pSh, *rArg.m_pOut,
+                    rText, nStart, nNext - nStart);
+                rArg.m_nWordWidth += pFnt->GetTextSize_(aUnitInfo).Width();
+                if (static_cast<tools::Long>(rArg.m_rAbsMin) < rArg.m_nWordWidth)
+                    rArg.m_rAbsMin = rArg.m_nWordWidth;
+                rArg.Minimum(rArg.m_nWordWidth + rArg.m_nWordAdd);
+                nStart = nNext;
+            }
+            bRet = true;
+        }
         else
         {
             rArg.m_nWordWidth += nCurrentWidth;
@@ -1300,7 +1353,8 @@ void SwTextNode::GetMinMaxSize(SwNodeOffset nIndex, sal_uLong& rMin, sal_uLong& 
     TextFrameIndex nLen(m_Text.getLength());
     tools::Long nCurrentWidth = 0;
     tools::Long nAdd = 0;
-    SwMinMaxArgs aArg( pOut, pSh, rMin, rAbsMin );
+    SwMinMaxArgs aArg( GetDoc(), pOut, pSh, rMin, rAbsMin );
+    aArg.m_bApplyForbiddenRules = GetSwAttrSet().GetForbiddenRule().GetValue();
     aArg.m_bRoundWidths = !bAddLayoutSlack;
     while( nIdx < nLen )
     {

@@ -3944,6 +3944,139 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacWesternPunctuationHint)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacAutoFitCjkBreakUnits)
+{
+    const std::array<OUString, 6> aNames = {
+        u"COCOLIAN_WORD_MAC_METRICS"_ustr, u"COCOLIAN_WORD_MAC_AUTOFIT"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr, u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr, u"COCOLIAN_WORD_MAC_GRID_BOTTOM"_ustr };
+    std::array<OUString, 6> aPrevious;
+    std::array<bool, 6> aHadPrevious;
+    for (size_t i = 0; i < aNames.size(); ++i)
+        aHadPrevious[i] = osl_getEnvironment(aNames[i].pData, &aPrevious[i].pData)
+            == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+        {
+            if (aHadPrevious[i])
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+        }
+    });
+    const OUString aOn = u"1"_ustr;
+    for (const auto& rName : aNames)
+        osl_setEnvironment(rName.pData, aOn.pData);
+    for (const OUString& rText : { u"类型"_ustr, u"类，"_ustr, u"（类"_ustr })
+    for (bool bNoWrap : { false, true })
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            const OString aXml = R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4998" w:type="pct"/><w:tblInd w:w="0" w:type="dxa"/><w:tblLayout w:type="autofit"/></w:tblPr><w:tblGrid><w:gridCol w:w="1518"/><w:gridCol w:w="868"/><w:gridCol w:w="6307"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="873" w:type="pct"/><w:noWrap/><w:tcMar><w:left w:w="195" w:type="dxa"/><w:right w:w="195" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:pPr><w:ind w:left="0" w:right="0"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:eastAsia="SimSun"/><w:b/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr><w:t>参数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="499" w:type="pct"/>NO_WRAP<w:tcMar><w:left w:w="195" w:type="dxa"/><w:right w:w="195" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:pPr><w:ind w:left="0" w:right="0"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:eastAsia="SimSun"/><w:b/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr><w:t>CJK_TEXT</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3627" w:type="pct"/><w:tcMar><w:left w:w="195" w:type="dxa"/><w:right w:w="195" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:pPr><w:ind w:left="0" w:right="0"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:eastAsia="SimSun"/><w:b/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr><w:t>说明</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/></w:sectPr></w:body></w:document>)xml"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                aXml.replaceAll("NO_WRAP"_ostr, bNoWrap ? "<w:noWrap/>"_ostr : ""_ostr)
+                    .replaceAll("CJK_TEXT"_ostr, OUStringToOString(rText, RTL_TEXTENCODING_UTF8)));
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        Scheduler::ProcessEventsToIdle();
+        calcLayout();
+        auto pLayout = parseLayoutDump();
+        // CJK line-break opportunities, not a multi-character dictionary word,
+        // set an AutoFit column minimum. Explicit noWrap keeps that word intact.
+        const auto nLines = countXPathNodes(pLayout,
+            "/root/page[1]/body/tab/row/cell[2]/txt/SwParaPortion/SwLineLayout");
+        const auto nWidth = getXPath(pLayout,
+            "/root/page[1]/body/tab/row/cell[2]/infos/bounds", "width").toInt32();
+        const OString aDiagnostic = "noWrap="_ostr + (bNoWrap ? "1"_ostr : "0"_ostr)
+            + " width="_ostr + OString::number(nWidth)
+            + " text="_ostr + OUStringToOString(rText, RTL_TEXTENCODING_UTF8);
+        const bool bCanSplit = !bNoWrap && rText == u"类型";
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aDiagnostic.getStr(), bCanSplit ? 2 : 1, nLines);
+        if (bCanSplit)
+            CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), nWidth < 860);
+        else
+            CPPUNIT_ASSERT_MESSAGE(aDiagnostic.getStr(), nWidth >= 870);
+    }
+
+    // A mixed CJK/Latin header must keep its existing dictionary boundaries.
+    // Joining both sides of the slash used to widen this column and collapse
+    // the four-line Word header to two lines.
+    utl::TempFileNamed aMixedFile;
+    aMixedFile.EnableKillingFile();
+    makeWordMacPackage(aMixedFile, false, true);
+    {
+        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+            ZIP_STORAGE_FORMAT_STRING, aMixedFile.GetURL(), embed::ElementModes::READWRITE);
+        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+        const std::array<int, 5> aWeights = { 711, 499, 499, 875, 2413 };
+        const std::array<OString, 5> aHeaders = {
+            "参数"_ostr, "类型"_ostr, "必填/选填"_ostr, "示例"_ostr, "说明"_ostr };
+        const std::array<OString, 5> aValues = {
+            "content-type"_ostr, "string"_ostr, "必填"_ostr,
+            "\"application/json\""_ostr, "application/json"_ostr };
+        OStringBuffer aRows;
+        for (bool bHeader : { true, false })
+        {
+            aRows.append("<w:tr>");
+            if (bHeader)
+                aRows.append("<w:trPr><w:tblHeader/></w:trPr>");
+            for (size_t i = 0; i < aWeights.size(); ++i)
+            {
+                aRows.append(R"xml(<w:tc><w:tcPr><w:tcW w:type="pct" w:w=")xml"_ostr
+                    + OString::number(aWeights[i]) + "\"/>"_ostr);
+                if (!bHeader && i < 4)
+                    aRows.append("<w:noWrap/>");
+                aRows.append(R"xml(<w:tcMar><w:left w:w="195" w:type="dxa"/><w:right w:w="195" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:pPr>)xml"_ostr
+                    + (bHeader ? "<w:snapToGrid/>"_ostr : "<w:snapToGrid w:val=\"0\"/>"_ostr)
+                    + R"xml(<w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="exact"/>)xml"_ostr);
+                if (bHeader)
+                    aRows.append("<w:jc w:val=\"center\"/>");
+                aRows.append("</w:pPr>");
+                const auto appendRun = [&](const OString& rText, bool bAsian) {
+                    aRows.append(R"xml(<w:r><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:eastAsia="SimSun" w:hint=")xml"_ostr
+                        + (bAsian ? "eastAsia"_ostr : "default"_ostr)
+                        + R"xml("/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/>)xml"_ostr);
+                    if (bHeader)
+                        aRows.append("<w:b/>");
+                    aRows.append("</w:rPr><w:t>"_ostr + rText + "</w:t></w:r>"_ostr);
+                };
+                if (bHeader && i == 2)
+                {
+                    appendRun("必填"_ostr, true);
+                    appendRun("/"_ostr, false);
+                    appendRun("选填"_ostr, true);
+                }
+                else
+                    appendRun(bHeader ? aHeaders[i] : aValues[i], bHeader || i == 2);
+                aRows.append("</w:p></w:tc>");
+            }
+            aRows.append("</w:tr>");
+        }
+        writeWordMacPart(xWord, u"document.xml"_ustr,
+            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4998" w:type="pct"/><w:tblInd w:w="0" w:type="dxa"/><w:tblLayout w:type="autofit"/></w:tblPr><w:tblGrid><w:gridCol w:w="1711"/><w:gridCol w:w="977"/><w:gridCol w:w="870"/><w:gridCol w:w="2215"/><w:gridCol w:w="2920"/></w:tblGrid>)xml"_ostr
+            + aRows.makeStringAndClear()
+            + R"xml(</w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+    }
+    loadFromURL(aMixedFile.GetURL());
+    for (int nRound = 0; nRound < 2; ++nRound)
+    {
+        auto pLayout = parseLayoutDump();
+        CPPUNIT_ASSERT_EQUAL(4, countXPathNodes(pLayout,
+            "/root/page/body/tab/row[1]/cell[3]/txt/SwParaPortion/SwLineLayout"));
+        if (!nRound)
+            saveAndReload(TestFilter::DOCX);
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacYaHeiGridHeight)
 {
     const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
@@ -3969,6 +4102,50 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacYaHeiGridHeight)
         // two grid rows and ignores that multiplier.
         assertXPath(parseLayoutDump(), "/root/page[1]/body/txt[1]/infos/bounds",
                     "height", nSize == 9 ? u"1404" : u"1872");
+    }
+
+    // Actual Mac Word print-PDF probes: a large proportional pitch is a
+    // lower bound even when the glyphs already occupy several grid rows.
+    struct GridPitchCase { const char* pFont; int nSize; int nLine; int nHeight; };
+    for (const auto& rCase : {
+        GridPitchCase{ "SimSun", 22, 576, 748 },
+        GridPitchCase{ "SimSun", 22, 720, 936 },
+        GridPitchCase{ "SimSun", 22, 360, 624 },
+        GridPitchCase{ "SimHei", 16, 576, 748 },
+        GridPitchCase{ "SimHei", 16, 413, 624 },
+        GridPitchCase{ "Microsoft YaHei", 12, 576, 748 },
+        GridPitchCase{ "Microsoft YaHei", 12, 360, 624 },
+        GridPitchCase{ "Microsoft YaHei", 9, 360, 468 } })
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            const OString aFont(rCase.pFont);
+            const OString aRunProperties = R"xml(<w:rFonts w:ascii=")xml"_ostr + aFont
+                + R"xml(" w:hAnsi=")xml"_ostr + aFont + R"xml(" w:eastAsia=")xml"_ostr + aFont
+                + R"xml(" w:hint="eastAsia"/><w:b/><w:sz w:val=")xml"_ostr
+                + OString::number(rCase.nSize * 2) + R"xml("/><w:lang w:eastAsia="zh-CN"/>)xml"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:snapToGrid/><w:spacing w:before="0" w:after="0" w:line=")xml"_ostr
+                + OString::number(rCase.nLine) + R"xml(" w:lineRule="auto"/><w:rPr>)xml"_ostr
+                + aRunProperties + R"xml(</w:rPr></w:pPr><w:r><w:rPr>)xml"_ostr
+                + aRunProperties + R"xml(</w:rPr><w:t>标题行距验证</w:t></w:r></w:p><w:p><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="exact"/></w:pPr><w:r><w:t>Marker</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1800" w:bottom="1800" w:left="1800" w:right="1800"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        loadFromURL(aFile.GetURL());
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            auto pDump = parseLayoutDump();
+            CPPUNIT_ASSERT_EQUAL(sal_Int32(rCase.nHeight), getXPath(pDump,
+                "/root/page/body/txt[1]/infos/bounds", "height").toInt32());
+            if (!nRound)
+                saveAndReload(TestFilter::DOCX);
+        }
     }
 }
 

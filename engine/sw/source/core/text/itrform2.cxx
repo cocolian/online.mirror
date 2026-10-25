@@ -2384,16 +2384,19 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             && (m_pFrame->IsInTab()
                 || (!m_pFrame->IsVertical() && m_pFrame->IsInDocBody()
                     && !m_pFrame->IsInFly()))
-            && nAmpRatio == 1
+            && (nAmpRatio == 1 || (nAmpRatio > 1 && !m_pFrame->IsInTab()))
             && rIDSA.get(DocumentSettingId::MS_WORD_COMP_GRID_METRICS)
             && pSpace && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
             && pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop;
         if (bMacProportionalGrid)
         {
-            // Word centers a single grid row's glyphs in the full proportional
-            // pitch, including the first line of a horizontal body paragraph.
-            // Keep that pitch from being multiplied a second time below.
-            nLineHeight = nLineHeight * std::max<sal_uInt16>(100, pSpace->GetPropLineSpace()) / 100;
+            // In a horizontal body paragraph, Word treats the proportional
+            // single-grid pitch as a lower bound, even when the font needs
+            // several grid rows. Center glyphs in the final pitch, including
+            // the first line, and avoid multiplying it again below.
+            const SwTwips nProportionalPitch = (SwTwips(nGridWidth) + nRubyHeight)
+                * std::max<sal_uInt16>(100, pSpace->GetPropLineSpace()) / 100;
+            nLineHeight = std::max(nLineHeight, nProportionalPitch);
         }
 
         // Fixed-height Word lines keep the baseline at 80% of the specified
@@ -2411,9 +2414,9 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
         m_pCurr->SetAscent( nAsc );
         m_pInf->GetParaPortion()->SetFixLineHeight();
 
-        // Mac Word ignores proportional leading only when text spans multiple
-        // grid rows. Text fitting one row retains its multiplier in both body
-        // paragraphs and table cells. Keep the legacy table rule off-profile.
+        // The body pitch above already includes proportional leading.
+        // Preserve the existing multi-row table rule and the off-profile
+        // behavior; single-row cells still use the proportional pitch.
         const bool bKeepGridHeight
             = bMacProportionalGrid
               || ((sw::UseWordMacMetrics() ? nAmpRatio > 1 : m_pFrame->IsInTab())
