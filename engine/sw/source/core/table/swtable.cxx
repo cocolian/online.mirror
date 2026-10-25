@@ -3432,7 +3432,12 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     const bool bHavePercents = rColumnPercents.size() == rFirstBoxes.size()
         && std::all_of(rColumnPercents.begin(), rColumnPercents.end(),
             [](sal_Int32 nWidth) { return nWidth > 0 && nWidth <= 5000; });
-    if (!bHavePercents && !bGrowAutoFit)
+    // In percentage-width tables without cell width preferences, Word uses
+    // content widths; a grid alone is only an initial column-size hint.
+    const bool bContentAutoFit = !bGrowAutoFit && !bHavePercents
+        && rColumnPercents.empty()
+        && rTable.GetFrameFormat()->GetFrameSize().GetWidthPercent() > 0;
+    if (!bHavePercents && !bGrowAutoFit && !bContentAutoFit)
         return false;
     for (const auto* pLine : rLines)
     {
@@ -3448,7 +3453,7 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
     if (nModelWidth <= 0)
         return false;
     std::vector<sal_Int32> aPreferredPercents(rColumnPercents);
-    if (!bHavePercents)
+    if (!bHavePercents && !bContentAutoFit)
     {
         // DOCX export can store measured cell widths as dxa. Explicit
         // growAutofit must still honor content minima after reopening it.
@@ -3484,8 +3489,8 @@ bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,
         nPercent != 0, 0, nPadding, 0, eAdjust, 0, 0, nBorder, nBorder, nBorder);
     for (sal_uInt16 nCol = 0; nCol < nCols; ++nCol)
     {
-        const sal_uInt16 nPreferred = aPreferredPercents[nCol];
-        xLayout->SetColumn(std::make_unique<SwHTMLTableLayoutColumn>(nPreferred, true,
+        const sal_uInt16 nPreferred = bContentAutoFit ? 0 : aPreferredPercents[nCol];
+        xLayout->SetColumn(std::make_unique<SwHTMLTableLayoutColumn>(nPreferred, !bContentAutoFit,
             rFirstBoxes[nCol]->GetFrameFormat()->GetBox().GetLeft() != nullptr), nCol);
     }
     for (sal_uInt16 nRow = 0; nRow < nRows; ++nRow)

@@ -5696,6 +5696,89 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCjkHangingColon)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacAutoFitMissingColumnPreferences)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_AUTOFIT"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aNames[1].pData, aOn.pData);
+    for (bool bMac : {false, true})
+    for (int nPreference : {0, 1, 2, 3, 4})
+    {
+        const OUString aMode = bMac ? u"1"_ustr : u"0"_ustr;
+        osl_setEnvironment(aNames[0].pData, aMode.pData);
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            OString aTable = R"xml(<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/></w:tblPr>)xml"_ostr;
+            if (nPreference == 4)
+                aTable = R"xml(<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblLayout w:type="fixed"/></w:tblPr>)xml"_ostr;
+            if (nPreference == 1)
+                aTable += R"xml(<w:tblGrid><w:gridCol w:w="2076"/><w:gridCol w:w="2076"/><w:gridCol w:w="2076"/><w:gridCol w:w="2076"/></w:tblGrid>)xml"_ostr;
+            for (int nRow = 0; nRow < 2; ++nRow)
+            {
+                aTable += "<w:tr>"_ostr;
+                for (int nCol = 0; nCol < 4; ++nCol)
+                {
+                    aTable += "<w:tc><w:tcPr>"_ostr;
+                    if (nPreference == 2)
+                        aTable += R"xml(<w:tcW w:w="1250" w:type="pct"/>)xml"_ostr;
+                    if (nPreference == 3)
+                        aTable += R"xml(<w:tcW w:w="2076" w:type="dxa"/>)xml"_ostr;
+                    aTable += R"xml(</w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:sz w:val="24"/></w:rPr><w:t>)xml"_ostr;
+                    aTable += nRow == 1 && nCol == 0 ? "甲乙丙丁戊己庚辛壬癸子丑"_ostr : "甲乙丙丁"_ostr;
+                    aTable += "</w:t></w:r></w:p></w:tc>"_ostr;
+                }
+                aTable += "</w:tr>"_ostr;
+            }
+            aTable += "</w:tbl>"_ostr;
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>)xml"_ostr + aTable
+                + R"xml(<w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (nRound == 0)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            auto pLayout = parseLayoutDump();
+            const sal_Int32 nFirst = getXPath(pLayout,
+                "/root/page/body/tab/row[1]/cell[1]/infos/bounds", "width").toInt32();
+            const sal_Int32 nSecond = getXPath(pLayout,
+                "/root/page/body/tab/row[1]/cell[2]/infos/bounds", "width").toInt32();
+            const bool bContentFit = bMac && (nPreference == 0 || nPreference == 1);
+            if (bContentFit)
+                CPPUNIT_ASSERT_GREATER(nSecond * 3 / 2, nFirst);
+            else
+                CPPUNIT_ASSERT(std::abs(nFirst - nSecond) < 5);
+            assertXPath(pLayout,
+                "/root/page/body/tab/row[2]/cell[1]/txt/SwParaPortion/SwLineLayout",
+                bContentFit ? 1 : 2);
+        }
+    }
+}
+
 CPPUNIT_PLUGIN_IMPLEMENT();
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
