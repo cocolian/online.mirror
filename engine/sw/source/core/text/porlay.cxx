@@ -21,9 +21,12 @@
 #include <pagedesc.hxx>
 #include <tgrditem.hxx>
 #include <editeng/lspcitem.hxx>
+#include <editeng/frmdiritem.hxx>
 #include <sal/config.h>
 
 #include <string_view>
+#include <cstdlib>
+#include <cstring>
 
 #include "porlay.hxx"
 #include "itrform2.hxx"
@@ -1443,6 +1446,33 @@ void SwScriptInfo::InitScriptInfo(const SwTextNode& rNode,
             aCompEnum = CharCompressType::NONE;
     }
 
+    // A single paired Chinese quotation in ordinary fixed-line body text
+    // contracts like the other CJK delimiters. Restrict this to the Asian
+    // script scan below; Latin quotations and table/floating text retain the
+    // original classification.
+    const char* pLineBudget = std::getenv("COCOLIAN_WORD_MAC_LINE_BUDGET");
+    const sal_Int32 nQuoteOpen = rText.indexOf(u'“');
+    const sal_Int32 nQuoteClose = rText.indexOf(u'”');
+    const bool bMacBodyQuotes = sw::UseWordMacMetrics() && pLineBudget
+        && std::strcmp(pLineBudget, "1") == 0 && !bRTL
+        && !rNode.FindTableNode() && !rNode.FindFlyStartNode()
+        && rParaItems.GetLineSpacing().GetLineSpaceRule() == SvxLineSpaceRule::Fix
+        && aCompEnum != CharCompressType::PunctuationAndKana
+        && [&] {
+            const SwPageDesc* pPage = rNode.FindPageDesc();
+            if (!pPage)
+                return false;
+            const auto eDirection = pPage->GetMaster().GetFrameDir().GetValue();
+            return (eDirection == SvxFrameDirection::Horizontal_LR_TB
+                    || eDirection == SvxFrameDirection::Environment)
+                && (!rParaItems.GetParaGrid().GetValue()
+                    || pPage->GetMaster().GetTextGrid().GetGridType()
+                        != SwTextGrid::LinesAndChars);
+        }()
+        && nQuoteOpen >= 0 && nQuoteClose > nQuoteOpen
+        && rText.indexOf(u'“', nQuoteOpen + 1) < 0
+        && rText.indexOf(u'”', nQuoteClose + 1) < 0;
+
     // justification type
     m_bAdjustBlock = (SvxAdjust::Block == rParaItems.GetAdjust().GetAdjust());
 
@@ -1562,6 +1592,12 @@ void SwScriptInfo::InitScriptInfo(const SwTextNode& rNode,
                 // examine current character
                 switch ( cChar )
                 {
+                case 0x201C:
+                    eState = bMacBodyQuotes ? SPECIAL_LEFT : NONE;
+                    break;
+                case 0x201D:
+                    eState = bMacBodyQuotes ? SPECIAL_RIGHT : NONE;
+                    break;
                 // Left punctuation found
                 case 0x3008: case 0x300A: case 0x300C: case 0x300E:
                 case 0x3010: case 0x3014: case 0x3016: case 0x3018:
