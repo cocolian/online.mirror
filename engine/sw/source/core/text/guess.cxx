@@ -359,7 +359,10 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             --nStart;
         }
         const TextFrameIndex nLength = rInf.GetIdx() - nStart;
-        if (nLength > TextFrameIndex(1))
+        // In a cell, the larger ASCII allowance belongs only to its closing
+        // mark, not to CJK letters following that mark in the same portion.
+        if (nLength > TextFrameIndex(1)
+            && (!rInf.GetTextFrame()->IsInTab() || nMaxLen == TextFrameIndex(1)))
         {
             SwTwips nWidth = 0, nAscent = 0, nDescent = 0;
             tools::Long nDiff = 0;

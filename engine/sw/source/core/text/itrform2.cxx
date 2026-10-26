@@ -2709,6 +2709,10 @@ void SwTextFormatter::FeedInf( SwTextFormatInfo &rInf ) const
 
 void SwTextFormatter::FormatReset( SwTextFormatInfo &rInf )
 {
+    // Portion addresses can be reused after a line is truncated. Its new
+    // portions must not inherit compression widths from an earlier line.
+    if (sw::UseWordMacMetrics())
+        rInf.ResetMaxWidthDiff();
     m_pFirstOfBorderMerge = nullptr;
     m_pCurr->Truncate();
     m_pCurr->Init();

@@ -17,6 +17,7 @@
  *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
  */
 
+#include <wordmacmetrics.hxx>
 #include <hintids.hxx>
 #include <viewopt.hxx>
 #include <tools/multisel.hxx>
@@ -626,7 +627,11 @@ void SwTextPainter::DrawTextLine(const SwRect& rPaint, SwSaveClip& rClip, const 
         if( pPor->IsArrowPortion() && GetInfo().OnWin() && !pArrow )
             pArrow = static_cast<SwArrowPortion*>(pPor);
 
+        // A hanging punctuation portion has zero layout width and is allowed
+        // in the margin. Rounding or script-gap adjustment can place its
+        // origin just past the line edge; do not skip its glyph at PDF paint.
         pPor = bDrawInWindow || GetInfo().X() <= nMaxRight ||
+               (sw::UseWordMacMetrics() && pNext && pNext->IsHangingPortion()) ||
                // #i16816# tagged pdf support
                ( GetInfo().GetVsh() &&
                  GetInfo().GetVsh()->GetViewOptions()->IsPDFExport() &&

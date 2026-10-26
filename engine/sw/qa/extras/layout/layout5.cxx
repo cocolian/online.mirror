@@ -6153,3 +6153,125 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableNoScriptGapCompression)
         }
     }
 }
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacHangingPunctuationPaint)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+
+    for (bool bHanging : { false, true })
+    {
+        for (const OString& rCompression : { "doNotCompress"_ostr, "compressPunctuation"_ostr })
+        {
+            utl::TempFileNamed aFile;
+            aFile.EnableKillingFile();
+            makeWordMacPackage(aFile, false, true);
+            {
+                auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                    ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                OString aDocument = R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:wordWrap w:val="0"/><w:autoSpaceDE/><w:autoSpaceDN/><w:adjustRightInd w:val="0"/><w:overflowPunct w:val="HANG"/><w:snapToGrid/><w:spacing w:before="0" w:after="0" w:line="276" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="both"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="DengXian" w:hAnsi="DengXian" w:eastAsia="DengXian"/><w:sz w:val="24"/><w:lang w:val="zh-CN" w:eastAsia="zh-CN"/></w:rPr><w:t>TEXT</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr;
+                aDocument = aDocument.replaceAll("HANG"_ostr, bHanging ? "1"_ostr : "0"_ostr)
+                    .replaceAll("TEXT"_ostr, "“甲”甲甲AI乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙乙，丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙丙。"_ostr);
+                writeWordMacPart(xWord, u"document.xml"_ustr, aDocument);
+                writeWordMacPart(xWord, u"settings.xml"_ustr,
+                    R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val=")xml"_ostr
+                    + rCompression
+                    + R"xml("/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+                uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+            }
+            for (int nRound = 0; nRound < 2; ++nRound)
+            {
+                if (!nRound)
+                    loadFromURL(aFile.GetURL());
+                else
+                    saveAndReload(TestFilter::DOCX);
+                save(TestFilter::PDF_WRITER);
+                auto pPdf = parsePDFExport();
+                CPPUNIT_ASSERT(pPdf);
+                CPPUNIT_ASSERT_EQUAL(1, pPdf->getPageCount());
+                auto pPage = pPdf->openPage(0);
+                auto pText = pPage->getTextPage();
+                OUString aRendered;
+                for (int i = 0; i < pPage->getObjectCount(); ++i)
+                    aRendered += pPage->getObject(i)->getText(pText);
+                // The hanging comma is present in layout but used to be
+                // skipped by the PDF paint loop after script-gap adjustment.
+                CPPUNIT_ASSERT_MESSAGE("Hanging comma must reach PDF paint",
+                    aRendered.indexOf(u'，') >= 0);
+                CPPUNIT_ASSERT_MESSAGE("Final punctuation must also be painted",
+                    aRendered.indexOf(u'。') >= 0);
+            }
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacClosingUnitTrailingCjk)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, false, true);
+    {
+        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+        writeWordMacPart(xWord, u"document.xml"_ustr,
+            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="1270" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1270"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="1270" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:rFonts w:hint="eastAsia" w:ascii="FangSong_GB2312" w:hAnsi="DengXian" w:eastAsia="FangSong_GB2312"/><w:b/><w:kern w:val="0"/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr><w:t>甲乙丙丁（AB）戊己</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+        writeWordMacPart(xWord, u"settings.xml"_ustr,
+            R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val="compressPunctuation"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="14"/></w:compat></w:settings>)xml"_ostr);
+        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+    }
+    for (int nRound = 0; nRound < 2; ++nRound)
+    {
+        if (!nRound)
+            loadFromURL(aFile.GetURL());
+        else
+            saveAndReload(TestFilter::DOCX);
+        auto pDump = parseLayoutDump();
+        assertXPath(pDump, "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout", 3);
+        assertXPath(pDump, "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout[2]",
+            "portion", u"（AB）戊");
+        assertXPath(pDump, "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout[3]",
+            "portion", u"己");
+    }
+}
