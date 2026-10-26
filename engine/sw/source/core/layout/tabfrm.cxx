@@ -309,7 +309,8 @@ static SwTwips lcl_GetHeightOfRows( const SwFrame* pStart, tools::Long nCount )
 }
 
 // Word applies a fitting minimum independently to ordinary row fragments.
-// Keep merged, nested, floating and oversized rows on their existing paths.
+// Covered cells may share an ordinary continuation row; merging starts,
+// nested, floating and oversized rows retain their existing paths.
 static bool lcl_UseWordMacFragmentMinimum(const SwRowFrame& rRow)
 {
     if (!sw::UseWordMacMetrics() || rRow.IsRowSpanLine())
@@ -323,7 +324,7 @@ static bool lcl_UseWordMacFragmentMinimum(const SwRowFrame& rRow)
         || pTab->IsInSct())
         return false;
     for (const SwTableBox* pBox : pLine->GetTabBoxes())
-        if (!pBox->GetSttNd() || pBox->getRowSpan() != 1)
+        if (!pBox->GetSttNd() || pBox->getRowSpan() == 0 || pBox->getRowSpan() > 1)
             return false;
     return rSize.GetHeight() <= lcl_GetMaxRowHeight(*pTab)
         - lcl_GetHeightOfRows(pTab->Lower(), pTab->GetTable()->GetRowsToRepeat());

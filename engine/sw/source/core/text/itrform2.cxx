@@ -2309,6 +2309,7 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             return;
         }
 
+        bool bMacInlineImageGrid = false;
         const auto* pLineSpace = m_aLineInf.GetLineSpacing();
         if (sw::UseWordMacMetrics() && pLineSpace
             && pLineSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto)
@@ -2335,6 +2336,7 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             {
                 m_pCurr->Height(pInline->Height(), false);
                 m_pCurr->SetAscent(pInline->GetAscent());
+                bMacInlineImageGrid = true;
             }
         }
 
@@ -2353,7 +2355,11 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
             nGridContentHeight = sw::WordMacGridHeight(nGridContentHeight, *GetInfo().GetOut(),
                 rIDSA.get(DocumentSettingId::ADD_EXT_LEADING));
         }
-        const auto nAmpRatio = (nGridContentHeight + nLineHeight - 1) / nLineHeight;
+        // Word advances an image that exactly fills grid rows to the next
+        // row. Keep its natural bounds for centering: adding a paragraph
+        // mark's descent would also expand images just below the boundary.
+        const auto nAmpRatio = (nGridContentHeight + nLineHeight
+            - (bMacInlineImageGrid ? 0 : 1)) / nLineHeight;
         nLineHeight *= nAmpRatio;
 
         // tdf#164871: Handle all types of line spacing in grid layout.
