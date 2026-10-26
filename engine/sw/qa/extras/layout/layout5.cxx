@@ -6275,3 +6275,152 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacClosingUnitTrailingCjk)
             "portion", u"己");
     }
 }
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacMinimumRowFragments)
+{
+    const OUString aEnv = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bPrevious = osl_getEnvironment(aEnv.pData, &aPrevious.pData) == osl_Process_E_None;
+    comphelper::ScopeGuard aRestore([&] {
+        if (bPrevious)
+            osl_setEnvironment(aEnv.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aEnv.pData);
+    });
+    for (const auto& [nCompat, bRepeat] : std::vector<std::pair<int, bool>>{
+             {14, false}, {14, true}, {15, false}, {15, true}})
+    {
+        for (bool bMac : { false, true })
+        {
+            const OUString aValue = bMac ? u"1"_ustr : u"0"_ustr;
+            osl_setEnvironment(aEnv.pData, aValue.pData);
+            for (bool bMinimum : { false, true })
+            {
+                for (int nSlots : { 1, 2, 3 })
+                {
+                    utl::TempFileNamed aFile;
+                    aFile.EnableKillingFile();
+                    makeWordMacPackage(aFile, false, true);
+                    {
+                        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                        const OString aSpacer = OString::number(13958 - 400 - 480 * nSlots - 50);
+                        const OString aRow = bMinimum
+                            ? "<w:trPr><w:trHeight w:val=\"1140\" w:hRule=\"atLeast\"/></w:trPr>"_ostr
+                            : OString();
+                        const OString aHeader = bRepeat
+                            ? "<w:trPr><w:tblHeader/></w:trPr>"_ostr : OString();
+                        writeWordMacPart(xWord, u"document.xml"_ustr,
+                            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+    <w:p><w:pPr><w:keepNext w:val="0"/><w:widowControl w:val="0"/><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line=")xml"_ostr + aSpacer + R"xml(" w:lineRule="exact"/></w:pPr><w:r><w:t>Spacer</w:t></w:r></w:p>
+    <w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="8000"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="8000"/></w:tblGrid>
+    <w:tr>)xml"_ostr + aHeader + R"xml(<w:tc><w:tcPr><w:tcW w:type="dxa" w:w="8000"/></w:tcPr><w:p><w:pPr><w:keepNext w:val="0"/><w:widowControl w:val="0"/><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="400" w:lineRule="exact"/></w:pPr><w:r><w:t>Header</w:t></w:r></w:p></w:tc></w:tr>
+    <w:tr>)xml"_ostr + aRow + R"xml(<w:tc><w:tcPr><w:tcW w:type="dxa" w:w="8000"/><w:vAlign w:val="center"/></w:tcPr>
+    <w:p><w:pPr><w:keepNext w:val="0"/><w:keepLines w:val="0"/><w:widowControl w:val="0"/><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="480" w:lineRule="exact"/></w:pPr><w:r><w:t>Heading</w:t></w:r></w:p>
+    <w:p><w:pPr><w:keepNext w:val="0"/><w:keepLines w:val="0"/><w:widowControl w:val="0"/><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="480" w:lineRule="exact"/></w:pPr><w:r><w:t>First</w:t><w:br/><w:t>Second</w:t><w:br/><w:t>Third</w:t></w:r></w:p>
+    </w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                        writeWordMacPart(xWord, u"settings.xml"_ustr,
+                            R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr + OString::number(nCompat) + R"xml("/></w:compat></w:settings>)xml"_ostr);
+                        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+                    }
+                    for (int nRound = 0; nRound < 2; ++nRound)
+                    {
+                        if (!nRound)
+                            loadFromURL(aFile.GetURL());
+                        else
+                            saveAndReload(TestFilter::DOCX);
+                        auto pDump = parseLayoutDump();
+                        // The first fragment must have room for the declared minimum;
+                        // a variable row or a larger available area may still split.
+                        const bool bMove = bMac && bMinimum && nSlots < 3;
+                        if (bMove && bRepeat && nCompat >= 15)
+                            assertXPath(pDump, "/root/page[1]/body/tab", 0);
+                        else
+                            assertXPath(pDump, "/root/page[1]/body/tab/row", bMove ? 1 : 2);
+                        assertXPath(pDump, "/root/page[2]/body/tab/row", bRepeat ? 2 : 1);
+                        // Word preserves the minimum on the short final fragment too.
+                        if (nSlots == 3)
+                        {
+                            assertXPath(pDump, "/root/page[2]/body/tab/row[last()]/infos/bounds",
+                                "height", bMac && bMinimum ? u"1140" : u"480");
+                            if (bMac && bMinimum)
+                            {
+                                const sal_Int32 nRowTop = getXPath(pDump,
+                                    "/root/page[2]/body/tab/row[last()]/infos/bounds", "top").toInt32();
+                                const sal_Int32 nTextTop = getXPath(pDump,
+                                    "/root/page[2]/body/tab/row[last()]/cell/txt[last()]/infos/bounds",
+                                    "top").toInt32();
+                                CPPUNIT_ASSERT_EQUAL_MESSAGE("Word top-aligns continued cell text",
+                                    nRowTop, nTextTop);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableHangingPrefix)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (int nCompat : {14, 15})
+    {
+        for (const OString& rAlign : {"left"_ostr, "both"_ostr})
+        {
+            for (const OString& rPrefix : {"1"_ostr, "A"_ostr, "AB"_ostr, "10"_ostr})
+            {
+                utl::TempFileNamed aFile;
+                aFile.EnableKillingFile();
+                makeWordMacPackage(aFile, false, true);
+                {
+                    auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                        ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+                    auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+                    writeWordMacPart(xWord, u"document.xml"_ustr,
+                        R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="4856" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="4856"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4856" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val=")xml"_ostr + rAlign + R"xml("/><w:overflowPunct/><w:autoSpaceDE/><w:autoSpaceDN/><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:left="0" w:right="0"/></w:pPr><w:r><w:rPr><w:rFonts w:hint="eastAsia" w:ascii="FangSong_GB2312" w:hAnsi="FangSong" w:eastAsia="FangSong_GB2312"/><w:sz w:val="24"/><w:lang w:eastAsia="zh"/></w:rPr><w:t>)xml"_ostr + rPrefix + R"xml(、甲乙丙丁戊己庚辛壬癸子，丑寅卯辰巳午未，申酉戌亥甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未；</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+                    writeWordMacPart(xWord, u"settings.xml"_ustr,
+                        R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val="compressPunctuation"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr + OString::number(nCompat) + R"xml("/></w:compat></w:settings>)xml"_ostr);
+                    uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+                    uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+                }
+                for (int nRound = 0; nRound < 2; ++nRound)
+                {
+                    if (!nRound)
+                        loadFromURL(aFile.GetURL());
+                    else
+                        saveAndReload(TestFilter::DOCX);
+                    const bool bHanging = rPrefix.getLength() == 1
+                        && (nCompat == 14 || rAlign == "both");
+                    const OUString aExpected = OUString::fromUtf8(rPrefix)
+                        + u"、甲乙丙丁戊己庚辛壬癸子，丑寅卯辰巳午"_ustr
+                        + (bHanging ? u"未，"_ustr : OUString());
+                    assertXPath(parseLayoutDump(),
+                        "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout[1]",
+                        "portion", aExpected);
+                }
+            }
+        }
+    }
+}

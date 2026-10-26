@@ -901,10 +901,28 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 nTableHangingReserve = (aSize.Width() + nLeftRightBorderSpace + 1) / 2;
                 if (nLineWidth >= nTableHangingReserve)
                 {
-                    const auto nReservedCut = rInf.GetTextBreak(
-                        nLineWidth - nTableHangingReserve, nMaxLen, nMaxComp,
-                        rInf.GetCachedVclData().get());
-                    m_nCutPos = std::min(m_nCutPos, nReservedCut);
+                    bool bCompressedPrefixFits = false;
+                    if (bWordMacLineBudget && nMaxComp
+                        && (!bModernLineBreaking || aAdjust == SvxAdjust::Block))
+                    {
+                        // The whole-line budget already bounds this candidate.
+                        // Re-breaking at the reduced width also reduces the font's
+                        // look-ahead limit and can lose a physically fitting glyph.
+                        SwTwips nPrefixWidth = 0, nAscent = 0, nDescent = 0;
+                        tools::Long nPrefixDiff = 0;
+                        rInf.GetTextSize(&rSI, rInf.GetIdx(), m_nCutPos - rInf.GetIdx(),
+                            std::nullopt, nMaxComp, nPrefixWidth, nPrefixDiff,
+                            nAscent, nDescent, rInf.GetCachedVclData().get());
+                        bCompressedPrefixFits = nPrefixWidth
+                            <= nLineWidth - nTableHangingReserve;
+                    }
+                    if (!bCompressedPrefixFits)
+                    {
+                        const auto nReservedCut = rInf.GetTextBreak(
+                            nLineWidth - nTableHangingReserve, nMaxLen, nMaxComp,
+                            rInf.GetCachedVclData().get());
+                        m_nCutPos = std::min(m_nCutPos, nReservedCut);
+                    }
                 }
                 else
                     bAllowHanging = false;

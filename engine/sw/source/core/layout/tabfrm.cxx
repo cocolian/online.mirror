@@ -308,6 +308,27 @@ static SwTwips lcl_GetHeightOfRows( const SwFrame* pStart, tools::Long nCount )
     return nRet;
 }
 
+// Word applies a fitting minimum independently to ordinary row fragments.
+// Keep merged, nested, floating and oversized rows on their existing paths.
+static bool lcl_UseWordMacFragmentMinimum(const SwRowFrame& rRow)
+{
+    if (!sw::UseWordMacMetrics() || rRow.IsRowSpanLine())
+        return false;
+    const SwFormatFrameSize& rSize = rRow.GetFormat()->GetFrameSize();
+    const SwTabFrame* pTab = rRow.FindTabFrame();
+    const SwTableLine* pLine = rRow.GetTabLine();
+    if (rSize.GetHeightSizeType() != SwFrameSize::Minimum || rSize.GetHeight() <= 0
+        || !pTab || !pLine || !pTab->FindPageFrame() || !pTab->IsInDocBody()
+        || pTab->IsVertical() || pTab->IsInFly() || pTab->GetUpper()->IsInTab()
+        || pTab->IsInSct())
+        return false;
+    for (const SwTableBox* pBox : pLine->GetTabBoxes())
+        if (!pBox->GetSttNd() || pBox->getRowSpan() != 1)
+            return false;
+    return rSize.GetHeight() <= lcl_GetMaxRowHeight(*pTab)
+        - lcl_GetHeightOfRows(pTab->Lower(), pTab->GetTable()->GetRowsToRepeat());
+}
+
 // Local helper function to insert a new follow flow line
 static SwRowFrame* lcl_InsertNewFollowFlowLine( SwTabFrame& rTab, const SwFrame& rTmpRow, bool bRowSpanLine )
 {
@@ -1310,7 +1331,9 @@ bool SwTabFrame::Split(const SwTwips nCutPos, bool bTryToSplit, bool bTableRowKe
     }
 
     SwFlyFrame* pFly = FindFlyFrame();
-    if (bSplitRowAllowed && pFly && pFly->IsFlySplitAllowed())
+    const bool bMacMinimumBodyRow = lcl_UseWordMacFragmentMinimum(*pRow);
+    bool bMacMinimumRowMoved = false;
+    if (bSplitRowAllowed && ((pFly && pFly->IsFlySplitAllowed()) || bMacMinimumBodyRow))
     {
         // The remaining size is less than the minimum row height, then don't even try to split the
         // row, just move it forward.
@@ -1321,6 +1344,11 @@ bool SwTabFrame::Split(const SwTwips nCutPos, bool bTryToSplit, bool bTableRowKe
             if (nMinHeight > nRemainingSpaceForLastRow)
             {
                 bSplitRowAllowed = false;
+                // Legacy Word may leave a fitting repeated header behind;
+                // modern Word keeps that header with the body row.
+                bMacMinimumRowMoved = bMacMinimumBodyRow
+                    && !GetFormat()->getIDocumentSettingAccess().get(
+                        DocumentSettingId::WORD_2013_LINE_BREAKING);
 
                 if (!pRow->GetPrev() && aRectFnSet.GetHeight(pRow->getFrameArea()) > nRemainingSpaceForLastRow)
                 {
@@ -1467,7 +1495,7 @@ bool SwTabFrame::Split(const SwTwips nCutPos, bool bTryToSplit, bool bTableRowKe
     if (!bSplitRowAllowed && !bOmitHeadline)
     {
         SwRowFrame* pFirstNonHeadlineRow = GetFirstNonHeadlineRow();
-        if ( pRow == pFirstNonHeadlineRow )
+        if (pRow == pFirstNonHeadlineRow && !(bMacMinimumRowMoved && nRepeat))
         {
             // The first row cannot be handed to a follow: that would leave this table without rows.
             // It can still get the space of a footnote, and then it is not cut off here after all.
@@ -1482,7 +1510,7 @@ bool SwTabFrame::Split(const SwTwips nCutPos, bool bTryToSplit, bool bTableRowKe
         {
             pTmpRow = static_cast<SwRowFrame*>(pTmpRow->GetNext());
         }
-        if ( !pTmpRow || pRow == pTmpRow )
+        if (!pTmpRow || (pRow == pTmpRow && !(bMacMinimumRowMoved && nRepeat)))
         {
             if (pTmpRow)
                 rRescue = lcl_GetFootnoteRescue(*pRow);
@@ -5514,6 +5542,8 @@ static SwTwips lcl_calcHeightOfRowBeforeThisFrame(const SwRowFrame& rRow)
     const SwTabFrame* pTab = rRow.FindTabFrame();
     if (!pLine || !pTab || !pTab->IsFollow())
         return 0;
+    if (lcl_UseWordMacFragmentMinimum(rRow))
+        return 0;
     SwTwips nResult = 0;
     SwIterator<SwRowFrame, SwFormat> aIter(*pLine->GetFrameFormat());
     for (const SwRowFrame* pCurRow = aIter.First(); pCurRow; pCurRow = aIter.Next())
@@ -6501,8 +6531,12 @@ void SwCellFrame::Format( vcl::RenderContext* /*pRenderContext*/, const SwBorder
     // From now on, all operations are related to the table cell.
     aRectFnSet.Refresh(*this);
 
+    // Continued Word cells start at the top of the fragment. Reapplying
+    // center/bottom alignment would shift short final text inside the minimum.
+    const bool bMacContinuedMinimumCell = IsInFollowFlowRow()
+        && lcl_UseWordMacFragmentMinimum(*static_cast<const SwRowFrame*>(GetUpper()));
     SwPageFrame* pPg = nullptr;
-    if ( !FindTabFrame()->IsRebuildLastLine() && text::VertOrientation::NONE != rOri.GetVertOrient() &&
+    if ( !bMacContinuedMinimumCell && !FindTabFrame()->IsRebuildLastLine() && text::VertOrientation::NONE != rOri.GetVertOrient() &&
     // #158225# no vertical alignment of covered cells
          !IsCoveredCell() &&
          (pPg = FindPageFrame())!=nullptr )
