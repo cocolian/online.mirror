@@ -2011,6 +2011,15 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
 
                     // convert special range IDs ABOVE, BELOW, LEFT and RIGHT
                     lcl_convertFormulaRanges(xTable);
+                    const bool bMacFixedPercentColumns = pTable && sw::UseWordMacMetrics()
+                        && aTableInfo.nNestLevel == 1 && !bConvertToFloating
+                        && m_rDMapper_Impl.GetSettingsTable()->GetWordCompatibilityMode() < 15
+                        && m_rDMapper_Impl.getTableManager().GetWordMacWidthFiftieths() > 0
+                        && m_rDMapper_Impl.getTableManager().GetWordMacWidthFiftieths() <= 12700
+                        && m_rDMapper_Impl.getTableManager().GetLayoutType()
+                            == NS_ooxml::LN_Value_doc_ST_TblLayout_fixed
+                        && sw::ApplyWordMacFixedPercentColumns(*pTable,
+                            m_rDMapper_Impl.getTableManager().GetWordMacPreferredPercents());
                     if (pTable && sw::UseWordMacMetrics() && aTableInfo.nNestLevel == 1
                         && !bConvertToFloating)
                     {
@@ -2023,7 +2032,8 @@ void DomainMapperTableHandler::endTable(unsigned int nestedTableLevel)
                             // retain it in the internal size rather than using
                             // an unrelated absolute grid width.
                             if (nWidth > 5000 && nWidth <= 12700
-                                && m_rDMapper_Impl.GetSettingsTable()->GetWordCompatibilityMode() >= 15
+                                && (m_rDMapper_Impl.GetSettingsTable()->GetWordCompatibilityMode() >= 15
+                                    || bMacFixedPercentColumns)
                                 && m_rDMapper_Impl.getTableManager().GetLayoutType()
                                     == NS_ooxml::LN_Value_doc_ST_TblLayout_fixed)
                             {

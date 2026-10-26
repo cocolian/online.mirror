@@ -6419,8 +6419,40 @@ void SwCellFrame::Format( vcl::RenderContext* /*pRenderContext*/, const SwBorder
             const tools::Long nPrtWidth = aRectFnSet.GetWidth(pTab->getFramePrintArea());
             if ( nWish != nPrtWidth )
             {
+                bool bMacPercentRounding = false;
+                if (sw::UseWordMacMetrics() && pTab->IsInDocBody()
+                    && !pTab->IsInFly() && !pTab->IsVertical() && !pTab->IsRightToLeft())
+                {
+                    const auto* pBag = pTab->GetFormat()->GetAttrSet()
+                        .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG);
+                    if (pBag)
+                    {
+                        const auto& rBag = pBag->GetGrabBag();
+                        const auto it = rBag.find(u"WordMacFixedPercentColumns"_ustr);
+                        if (it != rBag.end())
+                            it->second >>= bMacPercentRounding;
+                    }
+                    if (bMacPercentRounding)
+                    {
+                        const auto& rBoxes = GetTabBox()->GetUpper()->GetTabBoxes();
+                        sal_Int64 nRounded = 0;
+                        for (size_t i = 0; i + 1 < rBoxes.size(); ++i)
+                            nRounded += (sal_Int64(rBoxes[i]->GetFrameFormat()
+                                ->GetFrameSize().GetWidth()) * nPrtWidth + nWish / 2) / nWish;
+                        // Keep the existing path when independent rounding
+                        // would leave no room for the final cell.
+                        bMacPercentRounding = nRounded < nPrtWidth;
+                    }
+                }
+                if (bMacPercentRounding)
+                {
+                    // Round each preferred width before assigning the last
+                    // cell's remainder. Cumulative truncation can change a
+                    // narrow CJK cell by one twip and alter its line breaks.
+                    nWidth = (sal_Int64(nWidth) * nPrtWidth + nWish / 2) / nWish;
+                }
                 // Avoid rounding problems, at least for the new table model
-                if ( pTab->GetTable()->IsNewModel() )
+                else if ( pTab->GetTable()->IsNewModel() )
                 {
                     // 1. sum of widths of cells up to this cell (in model)
                     const SwTableLine* pTabLine = GetTabBox()->GetUpper();

@@ -5149,9 +5149,33 @@ void DocxAttributeOutput::TableCellProperties( ww8::WW8TableNodeInfoInner::Point
     SwTwips nWidth = GetGridCols( pTableTextNodeInfoInner )->at( nCell );
     if ( nCell )
         nWidth = nWidth - GetGridCols( pTableTextNodeInfoInner )->at( nCell - 1 );
+    const char* pWidthType = "dxa";
+    const SwTable* pPercentTable = pTableTextNodeInfoInner->getTable();
+    const auto& rPercentSize = pPercentTable->GetFrameFormat()->GetFrameSize();
+    if (rPercentSize.GetWidthPercent() && rPercentSize.GetWidth() == 5000)
+    {
+        const auto* pBag = pPercentTable->GetFrameFormat()->GetAttrSet()
+            .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG);
+        bool bFixedPercents = false;
+        if (pBag)
+        {
+            const auto& rBag = pBag->GetGrabBag();
+            const auto it = rBag.find(u"WordMacFixedPercentColumns"_ustr);
+            if (it != rBag.end())
+                it->second >>= bFixedPercents;
+        }
+        const auto nModelWidth = pTableBox->GetFrameFormat()->GetFrameSize().GetWidth();
+        if (bFixedPercents && nModelWidth > 0 && nModelWidth <= 5000)
+        {
+            // Retain the live percentage model. Legacy Word would otherwise
+            // prefer a rounded export grid when reopening an oversized table.
+            nWidth = nModelWidth;
+            pWidthType = "pct";
+        }
+    }
     m_pSerializer->singleElementNS( XML_w, XML_tcW,
            FSNS( XML_w, XML_w ), OString::number(nWidth),
-           FSNS( XML_w, XML_type ), "dxa" );
+           FSNS( XML_w, XML_type ), pWidthType );
 
     // Horizontal spans
     const SwWriteTableRows& rRows = m_xTableWrt->GetRows( );

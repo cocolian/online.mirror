@@ -24,6 +24,7 @@
 #include <editeng/lrspitem.hxx>
 #include <editeng/shaditem.hxx>
 #include <editeng/adjustitem.hxx>
+#include <editeng/frmdiritem.hxx>
 #include <editeng/colritem.hxx>
 #include <osl/diagnose.h>
 #include <sfx2/linkmgr.hxx>
@@ -42,6 +43,7 @@
 #include <frame.hxx>
 #include <swtable.hxx>
 #include <wordmacautofit.hxx>
+#include <wordmacmetrics.hxx>
 #include <svl/grabbagitem.hxx>
 #include <svl/eitem.hxx>
 #include <editeng/boxitem.hxx>
@@ -3416,6 +3418,73 @@ sal_Int32 sw::GetWordMacTableWidthFiftieths(const SwFrameFormat& rFormat)
     // Ignore stale import data after a relative/absolute width edit.
     return nWidth > 0 && nWidth <= 12700
         && (nWidth + 25) / 50 == rFormat.GetFrameSize().GetWidthPercent() ? nWidth : 0;
+}
+
+bool sw::ApplyWordMacFixedPercentColumns(SwTable& rTable,
+    const std::vector<sal_Int32>& rColumnPercents)
+{
+    const auto& rLines = rTable.GetTabLines();
+    if (!sw::UseWordMacMetrics() || rLines.empty() || rColumnPercents.size() < 2
+        || !std::all_of(rColumnPercents.begin(), rColumnPercents.end(),
+            [](sal_Int32 nWidth) { return nWidth > 0 && nWidth <= 5000; }))
+        return false;
+    const auto eDirection = rTable.GetFrameFormat()->GetFrameDir().GetValue();
+    if (eDirection != SvxFrameDirection::Horizontal_LR_TB
+        && eDirection != SvxFrameDirection::Environment)
+        return false;
+    const auto& rFirstBoxes = rLines.front()->GetTabBoxes();
+    if (rFirstBoxes.size() != rColumnPercents.size())
+        return false;
+    for (const auto* pLine : rLines)
+    {
+        if (pLine->GetTabBoxes().size() != rFirstBoxes.size())
+            return false;
+        for (const auto* pBox : pLine->GetTabBoxes())
+            if (!pBox->GetSttNd() || pBox->getRowSpan() != 1)
+                return false;
+    }
+    // Percentage coordinates must not inherit rounding from an unrelated
+    // imported grid. One model unit is one DOCX fiftieth of a percent.
+    constexpr sal_Int64 nModelWidth = 5000;
+    sal_Int64 nPercentSum = 0;
+    for (sal_Int32 nPercent : rColumnPercents)
+        nPercentSum += nPercent;
+    std::vector<sal_Int64> aWidths;
+    sal_Int64 nAssigned = 0;
+    for (sal_Int32 nPercent : rColumnPercents)
+    {
+        const sal_Int64 nWidth = nPercentSum < nModelWidth
+            ? (sal_Int64(nPercent) * nModelWidth + nPercentSum / 2) / nPercentSum
+            : nPercent;
+        aWidths.push_back(nWidth);
+        nAssigned += nWidth;
+    }
+    if (nPercentSum <= nModelWidth)
+        aWidths.front() += nModelWidth - nAssigned;
+    else
+        aWidths.back() += nModelWidth - nAssigned;
+    if (std::any_of(aWidths.begin(), aWidths.end(),
+            [](sal_Int64 nWidth) { return nWidth <= 0; }))
+        return false;
+    auto aTableSize = rTable.GetFrameFormat()->GetFrameSize();
+    aTableSize.SetWidth(nModelWidth);
+    rTable.GetFrameFormat()->SetFormatAttr(aTableSize);
+    auto aBag = rTable.GetFrameFormat()->GetAttrSet()
+        .GetItem<SfxGrabBagItem>(RES_FRMATR_GRABBAG)->GetGrabBag();
+    aBag[u"WordMacFixedPercentColumns"_ustr] <<= true;
+    rTable.GetFrameFormat()->SetFormatAttr(
+        SfxGrabBagItem(RES_FRMATR_GRABBAG, std::move(aBag)));
+    for (auto* pLine : rLines)
+    {
+        for (size_t i = 0; i < aWidths.size(); ++i)
+        {
+            auto* pFormat = pLine->GetTabBoxes()[i]->ClaimFrameFormat();
+            auto aSize = pFormat->GetFrameSize();
+            aSize.SetWidth(aWidths[i]);
+            pFormat->SetFormatAttr(aSize);
+        }
+    }
+    return true;
 }
 
 bool sw::AttachWordMacAutoFit(SwTable& rTable, sal_Int32 nGridWidthTwips,

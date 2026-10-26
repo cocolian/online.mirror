@@ -343,6 +343,7 @@ void DocxAttributeOutput::TableDefinition(
         }
         // These internal hints were emitted as standard table properties above.
         if (rGrabBagElement.first == "WordMacAutoFit"
+            || rGrabBagElement.first == "WordMacFixedPercentColumns"
             || rGrabBagElement.first == "WordMacWidthFiftieths")
             continue;
         if (rGrabBagElement.first == "TableStyleName")

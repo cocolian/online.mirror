@@ -399,7 +399,26 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             nUncompressedLimit = nLineWidth - nPreviousCompression;
     }
     auto aWithinLineBudget = [&] {
-        return !bWordMacLineBudget || m_nBreakWidth + nMaxSizeDiff <= nUncompressedLimit;
+        if (!bWordMacLineBudget)
+            return true;
+        SwTwips nLimit = nUncompressedLimit;
+        if (!bModernLineBreaking && nMaxComp && !nPreviousCompression
+            && rInf.GetIdx() == rInf.GetLineStart()
+            && rInf.GetFont()->GetActual() == SwFontScript::CJK
+            && rInf.GetTextFrame()->IsInTab() && !rInf.GetTextFrame()->IsVertical()
+            && nMaxLen > TextFrameIndex(2))
+        {
+            // A complete legacy cell tail can contract both parentheses.
+            // The physical compressed width must still fit; wrapped prefixes
+            // and unmatched or nested parentheses keep the usual budget.
+            const OUString aUnit = rInf.GetText().copy(sal_Int32(rInf.GetIdx()),
+                                                      sal_Int32(nMaxLen));
+            const sal_Int32 nOpen = aUnit.indexOf(u'（');
+            if (nOpen >= 0 && aUnit.indexOf(u'（', nOpen + 1) < 0
+                && aUnit.indexOf(u'）') == aUnit.getLength() - 1)
+                nLimit += rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()) / 2;
+        }
+        return m_nBreakWidth + nMaxSizeDiff <= nLimit;
     };
     // first check if everything fits to line
     if ( ( nLineWidth * 2 > SwTwips(sal_Int32(nMaxLen)) * nPorHeight ) ||
@@ -707,6 +726,28 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         const auto nBudgetCut = rInf.GetTextBreak(std::max<SwTwips>(0, nUncompressedLimit),
             nMaxLen, 0, rInf.GetCachedVclData().get());
         m_nCutPos = std::min(m_nCutPos, nBudgetCut);
+    }
+
+    if (bWordMacLineBudget && rInf.GetTextFrame()->IsInTab()
+        && !rInf.GetTextFrame()->IsVertical()
+        && rInf.GetFont()->GetActual() == SwFontScript::CJK
+        && sw::WordMacCjkBoldAdvance(rInf.GetFont()->GetActualFont()) > 0
+        && m_nCutPos <= rInf.GetIdx() + nMaxLen)
+    {
+        // A rounded break array can admit a bold CJK prefix whose fractional
+        // advance exceeds the cell by less than one twip. Measure the prefix
+        // with the same compression and upward rounding as a complete portion.
+        while (m_nCutPos > rInf.GetIdx())
+        {
+            SwTwips nPrefixWidth = 0, nAscent = 0, nDescent = 0;
+            tools::Long nDiff = 0;
+            rInf.GetTextSize(&rSI, rInf.GetIdx(), m_nCutPos - rInf.GetIdx(),
+                std::nullopt, nMaxComp, nPrefixWidth, nDiff, nAscent, nDescent,
+                rInf.GetCachedVclData().get());
+            if (nPrefixWidth <= nLineWidth)
+                break;
+            --m_nCutPos;
+        }
     }
 
     if( m_nCutPos > rInf.GetIdx() + nMaxLen )
