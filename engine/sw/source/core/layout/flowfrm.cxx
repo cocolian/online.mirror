@@ -19,6 +19,10 @@
 
 #include <sal/config.h>
 #include <sal/log.hxx>
+#include <wordmacmetrics.hxx>
+#include <editeng/lspcitem.hxx>
+#include "../text/itratr.hxx"
+#include "../text/porlay.hxx"
 #include <osl/diagnose.h>
 #include <svx/svdobj.hxx>
 
@@ -1949,6 +1953,53 @@ SwTwips SwFlowFrame::CalcLowerSpace( const SwBorderAttrs* _pAttrs ) const
     return nLowerSpace;
 }
 
+static SwTwips lcl_WordMacTableEndLeading(const SwFrame* pFrame, SwTwips nFallback)
+{
+    if (!sw::UseWordMacMetrics() || !pFrame || !pFrame->IsTextFrame()
+        || !pFrame->IsInDocBody() || !pFrame->IsInTab()
+        || pFrame->IsInFly() || pFrame->IsVertical())
+        return nFallback;
+    const auto* pText = static_cast<const SwTextFrame*>(pFrame);
+    if (!pText->HasPara() || pText->GetText().isEmpty())
+        return nFallback;
+    const auto& rSpacing = pText->GetTextNodeForParaProps()->GetSwAttrSet().GetLineSpacing();
+    if (rSpacing.GetLineSpaceRule() != SvxLineSpaceRule::Auto
+        || rSpacing.GetInterLineSpaceRule() != SvxInterLineSpaceRule::Prop
+        || rSpacing.GetPropLineSpace() <= 100)
+        return nFallback;
+    const SwLineLayout* pLine = pText->GetPara();
+    while (pLine->GetNext())
+        pLine = pLine->GetNext();
+    if (pLine->GetLen() <= TextFrameIndex(0))
+        return nFallback;
+    for (const auto* pPart = pLine->GetNextPortion(); pPart; pPart = pPart->GetNextPortion())
+        if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion()
+            || pPart->IsMultiPortion() || pPart->InFieldGrp())
+            return nFallback;
+    const sal_Unicode cLast = pText->GetText()[pText->GetText().getLength() - 1];
+    if (!(cLast >= 0x2e80 && cLast <= 0x9fff)
+        && u"，、。；：？！）］｝」』】》〉"_ustr.indexOf(cLast) < 0)
+        return nFallback;
+    SwScriptInfo aScript;
+    // Attribute iteration populates caches but does not edit the text node.
+    SwAttrIter aAttrs(*const_cast<SwTextNode*>(pText->GetTextNodeFirst()), aScript, pText);
+    aAttrs.Seek(TextFrameIndex(pText->GetText().getLength() - 1));
+    const auto* pFont = aAttrs.GetFnt();
+    vcl::Font aCjkFont;
+    aCjkFont.SetFamilyName(pFont->GetName(SwFontScript::CJK));
+    const SwTwips nSize = pFont->GetHeight(SwFontScript::CJK);
+    if (nSize <= 0 || pLine->Height() != nSize * 130 / 100
+        || !(sw::IsWordMacGbFont(aCjkFont)
+            || (sw::UseWordMacClassicMetrics() && sw::IsWordMacClassicCjkFont(aCjkFont))))
+        return nFallback;
+    // The legacy 1.15 * paragraph-default-size estimate can exceed the
+    // actual cell text's pitch. Bound only that added trailing leading,
+    // keeping explicit paragraph spacing, text boxes and grid rules intact.
+    const SwTwips nLeading = (sal_Int64(nSize) * 83
+        * (rSpacing.GetPropLineSpace() - 100) + 3200) / 6400;
+    return std::min(nFallback, nLeading);
+}
+
 /** calculation of the additional space to be considered, if flow frame
     is the last inside a table cell
 
@@ -2011,7 +2062,7 @@ SwTwips SwFlowFrame::CalcAddLowerSpaceAsLastInTableCell(
             if (rIDSA.get(DocumentSettingId::ADD_PARA_LINE_SPACING_TO_TABLE_CELLS)
                 && !bWordTableGrid)
             {
-                nAdditionalLowerSpace += _pAttrs->CalcLineSpacing();
+                nAdditionalLowerSpace += lcl_WordMacTableEndLeading(pFrame, _pAttrs->CalcLineSpacing());
             }
         }
     }

@@ -6944,3 +6944,160 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCellOpeningPunctuationBudget)
         }
     }
 }
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableLastLineGap)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (int nCompat : {14, 15})
+    for (const OString& rFamily : {"SimSun"_ostr, "FangSong_GB2312"_ostr})
+    for (int nMark : {0, 20, 24})
+    for (bool bBold : {false, true})
+    for (int nProp : {100, 125, 150})
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        const auto aFont = [](const OString& rName, int nSize, bool bWeight) -> OString {
+            return R"xml(<w:rFonts w:ascii=")xml"_ostr + rName + R"xml(" w:hAnsi=")xml"_ostr
+                + rName + R"xml(" w:eastAsia=")xml"_ostr + rName + R"xml("/><w:sz w:val=")xml"_ostr
+                + OString::number(nSize) + "\"/>"_ostr + (bWeight ? "<w:b/>"_ostr : OString());
+        };
+        const OString aBorders = R"xml(<w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/>)xml"_ostr;
+        OString aRows;
+        for (int nLines : {1, 2, 3})
+        {
+            OString aText;
+            for (int i = 0; i < nLines; ++i)
+                aText += (i ? "<w:br/>"_ostr : OString()) + u"<w:t>甲乙丙丁戊己</w:t>"_ustr.toUtf8();
+            const OString aMark = nMark
+                ? OString("<w:rPr>"_ostr + aFont(rFamily, nMark, bBold) + "</w:rPr>"_ostr) : OString();
+            aRows += R"xml(<w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="2400"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line=")xml"_ostr
+                + OString::number(nProp * 240 / 100) + R"xml(" w:lineRule="auto"/><w:snapToGrid w:val="0"/>)xml"_ostr
+                + aMark + "</w:pPr><w:r><w:rPr>"_ostr + aFont(rFamily, 20, bBold)
+                + "</w:rPr>"_ostr + aText + "</w:r></w:p></w:tc></w:tr>"_ostr;
+        }
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="2400"/><w:tblLayout w:type="fixed"/><w:tblBorders>)xml"_ostr
+                + aBorders + R"xml(</w:tblBorders><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid>)xml"_ostr
+                + aRows + R"xml(</w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"styles.xml"_ustr,
+                R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr>)xml"_ostr
+                + aFont("SimSun"_ostr, 24, false) + R"xml(</w:rPr></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:doNotWrapTextWithPunct/><w:doNotUseEastAsianBreakRules/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr
+                + OString::number(nCompat) + R"xml("/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        const double aWordHeights[3][3] = {
+            {13.44, 26.40, 39.60}, {16.80, 32.88, 49.20}, {19.92, 39.36, 59.04}
+        };
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (!nRound)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            auto pDump = parseLayoutDump();
+            for (int i = 0; i < 3; ++i)
+            {
+                const OString aPath = "/root/page/body/tab/row["_ostr + OString::number(i + 1) + "]/infos/bounds"_ostr;
+                const double fHeight = getXPath(pDump, aPath, "height").toInt32() / 20.0;
+                // 72 independent repaginated Mac Word controls: frame edges
+                // differ from painted border centers by at most a few twips.
+                CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("Mac Word cell row height",
+                    aWordHeights[(nProp - 100) / 25][i], fHeight, 0.20);
+            }
+        }
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableProportionalPageEnd)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (const OString& rFamily : {"SimSun"_ostr, "FangSong_GB2312"_ostr})
+    for (int nRemaining : {1540, 1570, 1580, 1600, 1620, 1640, 1660, 1800})
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        OString aText;
+        for (int i = 0; i < 6; ++i)
+            aText += (i ? "<w:br/>"_ostr : OString()) + u"<w:t>甲乙丙丁戊己</w:t>"_ustr.toUtf8();
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line=")xml"_ostr
+                + OString::number(13958 - nRemaining)
+                + R"xml(" w:lineRule="exact"/></w:pPr><w:r><w:t>Page-end control</w:t></w:r></w:p><w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="4800"/><w:tblLayout w:type="fixed"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/></w:tblBorders><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="4800"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="4800"/></w:tcPr><w:p><w:pPr><w:widowControl w:val="0"/><w:spacing w:before="0" w:after="0" w:line="300" w:lineRule="auto"/><w:snapToGrid w:val="0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii=")xml"_ostr
+                + rFamily + R"xml(" w:hAnsi=")xml"_ostr + rFamily
+                + R"xml(" w:eastAsia=")xml"_ostr + rFamily
+                + R"xml("/><w:sz w:val="20"/></w:rPr>)xml"_ostr + aText
+                + R"xml(</w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"styles.xml"_ustr,
+                R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="SimSun" w:hAnsi="SimSun" w:eastAsia="SimSun"/><w:sz w:val="24"/></w:rPr></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:doNotWrapTextWithPunct/><w:doNotUseEastAsianBreakRules/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (!nRound)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            auto pDump = parseLayoutDump();
+            // Independent Mac Word exports retain the full proportional
+            // pitch at the page end: a fifth line needs at least 83 pt.
+            assertXPath(pDump, "/root/page", 2);
+            assertXPath(pDump,
+                "/root/page[1]/body/tab/row/cell/txt/SwParaPortion/SwLineLayout",
+                nRemaining < 1660 ? 4 : 5);
+        }
+    }
+}

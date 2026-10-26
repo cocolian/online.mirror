@@ -164,6 +164,35 @@ bool SwTextFrameBreak::IsInside(SwTextMargin const& rLine, SwResizeLimitReason& 
     nLineHeight += aRectFnSet.GetBottomMargin(*m_pFrame);
     nLineHeight -= GetGridBottomPadding(rLine);
 
+    SwTwips nMacTableLeading = 0;
+    if (sw::UseWordMacMetrics() && m_pFrame->IsInTab()
+        && !m_pFrame->IsVertical() && m_pFrame->IsInDocBody() && !m_pFrame->IsInFly()
+        && rLine.GetEnd() < TextFrameIndex(m_pFrame->GetText().getLength()))
+    {
+        const auto& rNode = *m_pFrame->GetTextNodeForParaProps();
+        const auto& rSet = rNode.GetSwAttrSet();
+        const auto& rSpacing = rSet.GetLineSpacing();
+        const auto* pPage = rNode.FindPageDesc();
+        const bool bGrid = rSet.GetParaGrid().GetValue() && pPage
+            && pPage->GetMaster().GetTextGrid().GetGridType() != SwTextGrid::NONE;
+        if (!bGrid && rSpacing.GetLineSpaceRule() == SvxLineSpaceRule::Auto
+            && rSpacing.GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop
+            && rSpacing.GetPropLineSpace() > 100
+            && rNode.getIDocumentSettingAccess()->get(
+                DocumentSettingId::LINE_SPACING_AS_GAP_BELOW)
+            && rNode.getIDocumentSettingAccess()->get(
+                DocumentSettingId::ADD_PARA_LINE_SPACING_TO_TABLE_CELLS))
+        {
+            // A split cell fragment retains the leading after its last
+            // visible line, just as a complete proportional paragraph does.
+            // Its first line has no leading above it, so checking only the
+            // painted text heights would fit one extra line at the page end.
+            nMacTableLeading = (SwTwips(rLine.GetCurr()->GetLineSpacingBaseHeight())
+                * (rSpacing.GetPropLineSpace() - 100) + 50) / 100;
+            nLineHeight += nMacTableLeading;
+        }
+    }
+
 
     // cool#15942: when checking if a follow can be merged back, the checked line (currently part
     // of the follow) could be the last line of a cell, and then it might need additional lower
@@ -249,7 +278,11 @@ bool SwTextFrameBreak::IsInside(SwTextMargin const& rLine, SwResizeLimitReason& 
             {
                 // add additional space taken as lower space as last content in a table
                 // for all text lines except the last one.
-                nHeight += m_pFrame->CalcAddLowerSpaceAsLastInTableCell();
+                SwTwips nRefund = m_pFrame->CalcAddLowerSpaceAsLastInTableCell();
+                // Explicit paragraph spacing can still be refunded, but
+                // the pitch reserved above remains part of this fragment.
+                nRefund = std::max<SwTwips>(0, nRefund - nMacTableLeading);
+                nHeight += nRefund;
                 bFit = nHeight >= nLineHeight;
             }
         }
