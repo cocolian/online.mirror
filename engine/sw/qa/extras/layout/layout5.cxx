@@ -6874,3 +6874,73 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacClosingUnitPunctuationRun)
         }
     }
 }
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacCellOpeningPunctuationBudget)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (int nCompat : {14, 15})
+    for (const OString& rAlign : {"left"_ostr, "center"_ostr, "both"_ostr})
+    for (bool bGrid : {false, true})
+    for (int nToken : {0, 1, 2})
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        const OUString aPrefix = nToken == 2
+            ? u"甲乙丙丁戊己庚辛壬癸子丑寅子丑"_ustr
+            : u"甲乙：丙丁戊己庚辛，壬癸子丑寅"_ustr;
+        const OUString aOpen = nToken == 1 ? u"（"_ustr : u"“"_ustr;
+        const OUString aClose = nToken == 1 ? u"）"_ustr : u"”"_ustr;
+        const OUString aText = aPrefix + aOpen + u"卯辰"_ustr + aClose
+            + u"巳午未申酉戌亥甲乙丙丁。"_ustr;
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="4140"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="4140"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="4140"/></w:tcPr><w:p><w:pPr><w:keepNext w:val="0"/><w:keepLines w:val="0"/><w:widowControl w:val="0"/><w:wordWrap/><w:overflowPunct/><w:autoSpaceDE/><w:autoSpaceDN/><w:snapToGrid w:val=")xml"_ostr
+                + OString::number(int(bGrid)) + R"xml("/><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:jc w:val=")xml"_ostr
+                + rAlign + R"xml("/></w:pPr><w:r><w:rPr><w:rFonts w:hint="eastAsia" w:ascii="FangSong_GB2312" w:hAnsi="FangSong_GB2312" w:eastAsia="FangSong_GB2312"/><w:sz w:val="24"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr><w:t>)xml"_ostr
+                + aText.toUtf8() + R"xml(</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:characterSpacingControl w:val="compressPunctuation"/><w:compat><w:adjustLineHeightInTable/><w:doNotWrapTextWithPunct/><w:doNotUseEastAsianBreakRules/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr
+                + OString::number(nCompat) + R"xml("/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (!nRound)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            auto pDump = parseLayoutDump();
+            // Measured Mac Word 16.114: a prior colon and comma can
+            // contract together with an opening delimiter and its first Han.
+            // Modern left/center and the single-delimiter control stay bounded.
+            const OUString aExpected = nToken != 2 && (nCompat == 14 || rAlign == "both")
+                ? aPrefix + aOpen + u"卯"_ustr : aPrefix;
+            assertXPath(pDump, "/root/page/body/tab/row/cell/txt/SwParaPortion/SwLineLayout[1]",
+                "portion", aExpected);
+        }
+    }
+}

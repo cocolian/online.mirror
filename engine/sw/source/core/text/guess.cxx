@@ -476,10 +476,49 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 return 0;
         return rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual());
     };
+    auto aOpeningCellAllowance = [&](TextFrameIndex nLength) -> SwTwips {
+        if (!bWordMacLineBudget || !nMaxComp || nPreviousCompression
+            || !rInf.GetTextFrame()->IsInTab() || rInf.GetTextFrame()->IsVertical()
+            || rInf.GetTextFrame()->IsInFly() || rInf.GetIdx() != rInf.GetLineStart()
+            || rInf.GetFont()->GetActual() != SwFontScript::CJK
+            || (bModernLineBreaking && aAdjust != SvxAdjust::Block)
+            || rInf.GetTextFrame()->GetTextNodeForParaProps()->GetSwAttrSet()
+                .GetLineSpacing().GetLineSpaceRule() != SvxLineSpaceRule::Auto
+            || nLength < TextFrameIndex(4) || nLength > nMaxLen)
+            return 0;
+        const auto* pGrid = GetGridItem(rInf.GetTextFrame()->FindPageFrame());
+        if (rInf.SnapToGrid() && pGrid && pGrid->GetGridType() == SwTextGrid::LinesAndChars)
+            return 0;
+        const OUString aUnit = rInf.GetText().copy(sal_Int32(rInf.GetIdx()), sal_Int32(nLength));
+        const OUString aOpens = u"（“"_ustr;
+        const OUString aCloses = u"）”"_ustr;
+        const sal_Int32 nOpen = aUnit.getLength() - 2;
+        const sal_Int32 nPair = aOpens.indexOf(aUnit[nOpen]);
+        const sal_Unicode cLast = aUnit[aUnit.getLength() - 1];
+        if (nPair < 0 || cLast < 0x4e00 || cLast > 0x9fff
+            || rInf.GetText().indexOf(aCloses[nPair], sal_Int32(rInf.GetIdx()) + nOpen + 2) < 0)
+            return 0;
+        sal_Int32 nMarks = 0;
+        for (sal_Int32 i = 0; i < nOpen; ++i)
+        {
+            if (u"《（“〈》）”〉"_ustr.indexOf(aUnit[i]) >= 0)
+                return 0;
+            if (u"，、。；：？！"_ustr.indexOf(aUnit[i]) >= 0)
+                ++nMarks;
+        }
+        // A partial opening unit can share contraction with earlier marks.
+        // The extra half-em ends after its first Han; physical fit is checked
+        // below, and a lone delimiter retains the ordinary line budget.
+        return nMarks >= 2
+            ? rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()) / 2 : 0;
+    };
+    auto aExtraPunctuationAllowance = [&](TextFrameIndex nLength) -> SwTwips {
+        return std::max(aPairedBodyAllowance(nLength), aOpeningCellAllowance(nLength));
+    };
     auto aWithinLineBudget = [&] {
         if (!bWordMacLineBudget)
             return true;
-        SwTwips nLimit = nUncompressedLimit + aPairedBodyAllowance(nMaxLen);
+        SwTwips nLimit = nUncompressedLimit + aExtraPunctuationAllowance(nMaxLen);
         if (bCellClosingBudget && nCellClosingEnd == rInf.GetIdx() + nMaxLen)
             nLimit = std::max(nLimit, nCellClosingLimit);
         if (!bModernLineBreaking && nMaxComp && !nPreviousCompression
@@ -804,13 +843,13 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         // A font or script boundary must not grant another allowance for
         // extending the line into the next break unit.
         SwTwips nBodyPairAllowance = 0;
-        if (nMaxComp && !nPreviousCompression && !rInf.GetTextFrame()->IsInTab()
+        if (nMaxComp && !nPreviousCompression
             && rInf.GetIdx() == rInf.GetLineStart()
             && rInf.GetFont()->GetActual() == SwFontScript::CJK)
         {
             // The break array can stop inside the closing pair before the
             // compressed prefix has been measured. Probe only the bounded
-            // paired budget and accept an extension solely when it fits.
+            // punctuation budget and accept an extension solely when it fits.
             const auto nProbeEnd = std::min(rInf.GetIdx() + nMaxLen,
                 rInf.GetTextBreak(nUncompressedLimit
                     + rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()),
@@ -818,7 +857,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
             for (auto nProbe = nProbeEnd; nProbe > m_nCutPos; --nProbe)
             {
                 const TextFrameIndex nLength = nProbe - rInf.GetIdx();
-                if (!aPairedBodyAllowance(nLength))
+                if (!aExtraPunctuationAllowance(nLength))
                     continue;
                 SwTwips nPrefixWidth = 0, nAscent = 0, nDescent = 0;
                 tools::Long nDiff = 0;
@@ -835,7 +874,7 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         if (m_nCutPos > rInf.GetIdx() && m_nCutPos <= rInf.GetIdx() + nMaxLen)
         {
             const TextFrameIndex nPrefixLength = m_nCutPos - rInf.GetIdx();
-            nBodyPairAllowance = aPairedBodyAllowance(nPrefixLength);
+            nBodyPairAllowance = aExtraPunctuationAllowance(nPrefixLength);
             if (nBodyPairAllowance)
             {
                 SwTwips nPrefixWidth = 0, nAscent = 0, nDescent = 0;
