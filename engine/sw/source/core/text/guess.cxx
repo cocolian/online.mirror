@@ -373,6 +373,33 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                 + rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()));
         }
     }
+    TextFrameIndex nCellClosingEnd = rInf.GetIdx();
+    SwTwips nCellClosingAllowance = 0;
+    if (bWordMacLineBudget && rInf.GetTextFrame()->IsInTab()
+        && (!bModernLineBreaking || aAdjust == SvxAdjust::Block)
+        && rInf.GetIdx() > rInf.GetLineStart()
+        && u"）］｝"_ustr.indexOf(rInf.GetChar(rInf.GetIdx())) >= 0)
+    {
+        while (nCellClosingEnd < rInf.GetIdx() + nMaxLen
+            && u"，、。；：？！）］｝"_ustr.indexOf(rInf.GetChar(nCellClosingEnd)) >= 0)
+            ++nCellClosingEnd;
+        if (nCellClosingEnd > rInf.GetIdx() + TextFrameIndex(1))
+        {
+            TextFrameIndex nStart = rInf.GetIdx();
+            while (nStart > rInf.GetLineStart()
+                && aAsciiBreakUnitChar(rInf.GetChar(nStart - TextFrameIndex(1))))
+                --nStart;
+            if (rInf.GetIdx() - nStart > TextFrameIndex(1))
+            {
+                SwTwips nWidth = 0, nAscent = 0, nDescent = 0;
+                tools::Long nDiff = 0;
+                rInf.GetTextSize(&rSI, nStart, rInf.GetIdx() - nStart,
+                    rInf.GetLayoutContext(), 0, nWidth, nDiff, nAscent, nDescent);
+                nCellClosingAllowance = std::max(nWordMacAllowance, nWidth / 2
+                    + rInf.GetFont()->GetHeight(rInf.GetFont()->GetActual()));
+            }
+        }
+    }
     SwTwips nUncompressedLimit = nLineWidth + nWordMacAllowance - nPreviousCompression;
     if (bWordMacLineBudget && bModernLineBreaking && aAdjust == SvxAdjust::Left
         && !rInf.GetTextFrame()->IsInTab() && rInf.GetLineStart() > TextFrameIndex(0))
@@ -399,6 +426,25 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         if (pGrid && pGrid->GetGridType() == SwTextGrid::LinesOnly)
             nUncompressedLimit = nLineWidth - nPreviousCompression;
     }
+    if (bWordMacLineBudget && bModernLineBreaking && nMaxComp
+        && rInf.IsUnderflow() && rInf.Width() < rInf.RealWidth()
+        && rInf.GetTextFrame()->IsInTab() && rInf.SnapToGrid()
+        && (aAdjust == SvxAdjust::Left || aAdjust == SvxAdjust::Center)
+        && rInf.GetFont()->GetActual() == SwFontScript::CJK
+        && nUncompressedLimit == nLineWidth - nPreviousCompression)
+    {
+        // Underflow deliberately reduces the prior portion's width by one
+        // twip to force a new cut. Do not charge that sentinel to the raw
+        // punctuation budget; the physical compressed width is still bounded.
+        ++nUncompressedLimit;
+    }
+    // A bracket followed by punctuation belongs to the preceding ASCII
+    // unit. Its larger budget ends at that punctuation run, never at later
+    // Chinese letters. Preserve any stricter grid/compatibility limit above.
+    const bool bCellClosingBudget = nCellClosingAllowance > nWordMacAllowance
+        && nUncompressedLimit == nLineWidth + nWordMacAllowance - nPreviousCompression;
+    const SwTwips nCellClosingLimit = bCellClosingBudget
+        ? nLineWidth + nCellClosingAllowance - nPreviousCompression : nUncompressedLimit;
     auto aPairedBodyAllowance = [&](TextFrameIndex nLength) -> SwTwips {
         if (!bWordMacLineBudget || !nMaxComp || nPreviousCompression
             || rInf.GetIdx() != rInf.GetLineStart()
@@ -434,6 +480,8 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
         if (!bWordMacLineBudget)
             return true;
         SwTwips nLimit = nUncompressedLimit + aPairedBodyAllowance(nMaxLen);
+        if (bCellClosingBudget && nCellClosingEnd == rInf.GetIdx() + nMaxLen)
+            nLimit = std::max(nLimit, nCellClosingLimit);
         if (!bModernLineBreaking && nMaxComp && !nPreviousCompression
             && rInf.GetIdx() == rInf.GetLineStart()
             && rInf.GetFont()->GetActual() == SwFontScript::CJK
@@ -799,9 +847,28 @@ bool SwTextGuess::Guess( const SwTextPortion& rPor, SwTextFormatInfo &rInf,
                     nBodyPairAllowance = 0;
             }
         }
-        const auto nBudgetCut = rInf.GetTextBreak(
+        auto nBudgetCut = rInf.GetTextBreak(
             std::max<SwTwips>(0, nUncompressedLimit + nBodyPairAllowance),
             nMaxLen, 0, rInf.GetCachedVclData().get());
+        if (bCellClosingBudget)
+        {
+            const auto nUnitCut = std::min(nCellClosingEnd,
+                rInf.GetTextBreak(std::max<SwTwips>(0, nCellClosingLimit),
+                    nMaxLen, 0, rInf.GetCachedVclData().get()));
+            if (nUnitCut > nBudgetCut)
+            {
+                SwTwips nPrefixWidth = 0, nAscent = 0, nDescent = 0;
+                tools::Long nDiff = 0;
+                rInf.GetTextSize(&rSI, rInf.GetIdx(), nUnitCut - rInf.GetIdx(),
+                    std::nullopt, nMaxComp, nPrefixWidth, nDiff, nAscent, nDescent,
+                    rInf.GetCachedVclData().get());
+                if (nPrefixWidth <= nLineWidth)
+                {
+                    nBudgetCut = nUnitCut;
+                    m_nCutPos = std::max(m_nCutPos, nUnitCut);
+                }
+            }
+        }
         m_nCutPos = std::min(m_nCutPos, nBudgetCut);
     }
 
