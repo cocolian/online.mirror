@@ -62,8 +62,13 @@ class Proxy(BaseHTTPRequestHandler):
  def log_message(self,fmt,*args):
   # Never log Authorization, query strings, or Registry signed upload states.
   print(self.command,self.path.split('?')[0],args[1] if len(args)>1 else '',flush=True)
+class RegistryServer(ThreadingHTTPServer):
+ # Docker checks every image layer concurrently; the default backlog of five
+ # can reset connections on large, many-layer images.
+ request_queue_size=256
+
 if __name__=='__main__':
- server=ThreadingHTTPServer(('127.0.0.1',15444),Proxy)
+ server=RegistryServer(('127.0.0.1',15444),Proxy)
  context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
  context.load_cert_chain('/home/codex/.config/cocolian-devops/local-registry-tls/cert.pem','/home/codex/.config/cocolian-devops/local-registry-tls/key.pem')
  server.socket=context.wrap_socket(server.socket,server_side=True)

@@ -103,6 +103,8 @@ class ReleaseTests(unittest.TestCase):
     self.assertEqual(args[args.index('--cpus')+1],str(expected))
     self.assertEqual(args[args.index('--memory')+1],'12g')
     self.assertIn('make -j'+str(expected),args[-1])
+    self.assertIn('PARALLELISM='+str(expected),args[-1])
+    self.assertIn('LOADLIMIT='+str(expected+1),args[-1])
 
  def test_reuse_requires_identical_layers_and_config(self):
   source={'rootfs':{'diff_ids':['sha256:layer']},'config':{'User':'1001'},'os':'linux','architecture':'amd64'}
