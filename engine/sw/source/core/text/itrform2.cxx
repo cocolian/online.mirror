@@ -2489,6 +2489,33 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
                                                    ? m_pCurr->GetLineSpacingBaseHeight()
                                                    : m_pCurr->Height();
 
+            // Word's YaHei bold line metrics add approximately 1/80 em to
+            // the natural pitch. Carry it into the spacing base so automatic
+            // proportional leading uses the same increased bold metrics.
+            if (sw::UseWordMacMetrics() && !m_pMulti && !m_pFrame->IsVertical()
+                && m_pFrame->IsInDocBody() && !m_pFrame->IsInTab() && !m_pFrame->IsInFly()
+                && (!pGrid || pGrid->GetGridType() == SwTextGrid::NONE)
+                && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto)
+            {
+                const auto aFont = sw::WordMacResolvedFont(*GetInfo().GetOut());
+                const auto& rFamily = aFont.GetFamilyName();
+                bool bPlainText = true;
+                for (const auto* pPart = m_pCurr->GetNextPortion(); pPart;
+                     pPart = pPart->GetNextPortion())
+                    if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion()
+                        || pPart->IsMultiPortion() || pPart->InFieldGrp())
+                        bPlainText = false;
+                if (bPlainText && aFont.GetWeight() >= WEIGHT_SEMIBOLD
+                    && (rFamily.equalsIgnoreAsciiCase(u"Microsoft YaHei")
+                        || rFamily == u"微软雅黑") && aFont.GetFontSize().Height() >= 210
+                    && aFont.GetFontSize().Height() <= 280)
+                {
+                    const SwTwips nExtra = (aFont.GetFontSize().Height() + 40) / 80;
+                    nLineHeight += nExtra;
+                    m_pCurr->SetLineSpacingBaseHeight(nSpacingBaseHeight + nExtra);
+                }
+            }
+
             // The current baseline follows the previous line. If that line
             // exposes a shorter Latin text box than its CJK spacing base,
             // restore the missing gap above this line, not above the Latin

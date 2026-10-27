@@ -7173,3 +7173,45 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableWrappedLatinPitch)
         }
     }
 }
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacYaHeiBoldBodyPitch)
+{
+    const OUString aName = u"COCOLIAN_WORD_MAC_METRICS"_ustr;
+    OUString aPrevious;
+    const bool bSet = osl_getEnvironment(aName.pData, &aPrevious.pData) == osl_Process_E_None;
+    const OUString aOn = u"1"_ustr;
+    osl_setEnvironment(aName.pData, aOn.pData);
+    comphelper::ScopeGuard aRestore([&] {
+        if (bSet)
+            osl_setEnvironment(aName.pData, aPrevious.pData);
+        else
+            osl_clearEnvironment(aName.pData);
+    });
+    utl::TempFileNamed aFile;
+    aFile.EnableKillingFile();
+    makeWordMacPackage(aFile, false, true);
+    {
+        auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+            ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+        auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+        OString aBody;
+        for (int i = 0; i < 12; ++i)
+            aBody += R"xml(<w:p><w:pPr><w:spacing w:after="120" w:line="300" w:lineRule="auto"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Microsoft YaHei" w:hAnsi="Microsoft YaHei" w:eastAsia="Microsoft YaHei"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:b/></w:rPr><w:t>通用内容</w:t></w:r></w:p>)xml"_ostr;
+        writeWordMacPart(xWord, u"document.xml"_ustr,
+            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>)xml"_ostr + aBody
+            + R"xml(<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1120" w:bottom="1040" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+        writeWordMacPart(xWord, u"styles.xml"_ustr,
+            R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>)xml"_ostr);
+        uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+        uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+    }
+    loadFromURL(aFile.GetURL());
+    auto xMeta = getSwDocShell()->GetPreviewMetaFile();
+    MetafileXmlDump aDumper;
+    auto pMeta = dumpAndParse(aDumper, *xMeta);
+    const int nFirst = getXPath(pMeta, "(//textarray)[1]", "y").toInt32();
+    const int nLast = getXPath(pMeta, "(//textarray)[last()]", "y").toInt32();
+    // The QA font setup's reference span includes four extra twips per step.
+    // Word PDF measurements for the production font are checked separately.
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("Word body bold paragraph pitch", 6886.0, double(nLast - nFirst), 4.0);
+}
