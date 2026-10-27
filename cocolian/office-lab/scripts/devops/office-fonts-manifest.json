@@ -165,6 +165,22 @@
     {
       "file": "TahomaBold.ttf",
       "sha256": "01b32af2fba9b28cebb2031bbcbbecab1762a6221a426a133104ebad373ea29b"
+    },
+    {
+      "file": "FZFangSong_GBK.ttf",
+      "sha256": "7ed45a65864425a0e4e9b00bdf09e39578fb953686310f6bf67cc76a82b1f77e"
+    },
+    {
+      "file": "FZXiaoBiaoSong_GBK.ttf",
+      "sha256": "071768c8b8e2ade4e739814bc863418c090bfe3a6f61c85992d4234ecb468ec8"
+    },
+    {
+      "file": "FZKaiTi_GBK.ttf",
+      "sha256": "651e0e479ef15b6fa50125c6d79554ea59842c0cf29dff3e5dbdb78c87ff2a03"
+    },
+    {
+      "file": "FZHeiTi_GBK.ttf",
+      "sha256": "451062e0133cd05a33f817f63ea82e8c45bb3130a652318289bc62a25f7b5c43"
     }
   ]
 }

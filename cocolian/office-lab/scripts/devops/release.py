@@ -261,6 +261,9 @@ def candidate(old,image,name):
    for family in ('FangSong_GB2312','KaiTi_GB2312','SimSun','Microsoft YaHei','FangSong','STZhongsong','Times New Roman','Tahoma','Courier New'):
     matched=k('-n','office-lab','exec',podname,'--','fc-match','-f','%{family[0]}',family)
     assert matched==family,'Unexpected font substitution: '+family+' -> '+matched
+   for family,expected in (('方正仿宋_GBK','FZFangSong-Z02'),('方正小标宋_GBK','FZXiaoBiaoSong-B05'),('方正楷体_GBK','FZKai-Z03'),('方正黑体_GBK','FZHei-B01')):
+    matched=k('-n','office-lab','exec',podname,'--','fc-match','-f','%{family[0]}',family)
+    assert matched==expected,'Unexpected font substitution: '+family+' -> '+matched
   ip=json.loads(k('-n','office-lab','get','pod',podname,'-o','json'))['status']['podIP']
   script=Path(__file__).with_name('verify.py').read_bytes()
   k('-n','office-lab','exec','-i','deployment/wopi','-c','wopi','--','python3','-','--candidate',name,ip,input=script,timeout=120)
