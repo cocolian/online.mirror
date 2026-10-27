@@ -1,0 +1,15 @@
+[Unit]
+Description=TLS for the private codex-dev registry tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=codex
+ExecStart=/usr/bin/python3 -u /home/codex/.local/lib/cocolian-devops/registry_tls_proxy.py
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

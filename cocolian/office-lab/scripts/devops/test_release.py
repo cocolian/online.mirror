@@ -89,6 +89,21 @@ class ReleaseTests(unittest.TestCase):
                                           Path(paths['cocolian-office']))
    self.assertEqual(json.loads(built.read_text()),{'online.mirror':'current'})
 
+ def test_compile_reserves_cpu_and_applies_limit_to_both_test_profiles(self):
+  for cpus,expected in [(1,1),(4,3),(6,5),(16,5)]:
+   commands=[]
+   def command(args,**kwargs):
+    commands.append(args)
+    return ''
+   with patch.object(r.os,'cpu_count',return_value=cpus),patch.object(r,'sync_source'),patch.object(r,'run',side_effect=command):
+    r.compile_source(Path('/source'),True,True,Path('/office'))
+   builds=[a for a in commands if a[:2]==['docker','run']]
+   self.assertEqual(len(builds),2)
+   for args in builds:
+    self.assertEqual(args[args.index('--cpus')+1],str(expected))
+    self.assertEqual(args[args.index('--memory')+1],'12g')
+    self.assertIn('make -j'+str(expected),args[-1])
+
  def test_reuse_requires_identical_layers_and_config(self):
   source={'rootfs':{'diff_ids':['sha256:layer']},'config':{'User':'1001'},'os':'linux','architecture':'amd64'}
   local={'RootFS':{'Layers':['sha256:layer']},'Config':{'User':'1001'},'Os':'linux','Architecture':'amd64'}
@@ -133,6 +148,29 @@ class ReleaseTests(unittest.TestCase):
       with self.assertRaisesRegex(AssertionError,'mismatch'):r.publish('cocolian/test:tag','test',Path(root))
     self.assertTrue(directories);self.assertTrue(all(not x.exists()for x in directories))
     self.assertEqual(list(Path(root).iterdir()),[])
+
+ def test_native_publish_checks_digest_and_image_identity(self):
+  digest='sha256:'+'a'*64
+  source={'Id':'immutable','RootFS':{'Layers':['layer']},'Config':{'User':'1001'},'Os':'linux','Architecture':'amd64'}
+  for mismatch in (None,'digest','config','push'):
+   with tempfile.TemporaryDirectory() as directory:
+    root=Path(directory);auth=root/'auth.json';auth.write_text(json.dumps({'auths':{'res.cocolian.cn':{'auth':'dTpw'}}}))
+    def command(args,**kw):
+     if args[:3]==['docker','image','inspect']:return json.dumps([source])
+     if args[:2]==['docker','tag'] or args[:3]==['docker','image','rm']:return ''
+     if args[:2]==['docker','--config']:
+      self.assertEqual(args[3],'push');self.assertTrue((Path(args[2])/'config.json').exists())
+      return 'digest: '+digest if mismatch!='push' else 'no digest'
+     if args[:2]==['skopeo','inspect']:
+      if '--config' in args:return json.dumps({'rootfs':{'diff_ids':['layer']},'config':{'User':'0' if mismatch=='config' else '1001'},'os':'linux','architecture':'amd64'})
+      return digest if mismatch!='digest' else 'sha256:'+'b'*64
+     raise AssertionError(args)
+    with patch.object(r,'AUTH',auth),patch.object(r,'registry_transport',return_value=('127.0.0.1:15444',[],[],[])),patch.object(r,'run',side_effect=command) as runner:
+     if mismatch is None:self.assertEqual(r.publish('cocolian/test:tag','test',root),'res.cocolian.cn/cocolian/test@'+digest)
+     else:
+      with self.assertRaises((AssertionError,RuntimeError)):r.publish('cocolian/test:tag','test',root)
+     self.assertTrue(any(c.args[0][:3]==['docker','image','rm'] for c in runner.call_args_list))
+    self.assertEqual([p.name for p in root.iterdir()],['auth.json'])
 
  def test_private_font_hash_gate(self):
   import hashlib

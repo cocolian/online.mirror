@@ -305,3 +305,6 @@ check may examine the remaining characters when the font attributes and script
 stay uniform; it still checks that the whole word fits a new line. Generated
 native-font cases cover normal and explicit character wrapping through DOCX
 save/reload, and bundled-font cases cover both left and justified alignment.
+
+
+原生 Docker 推送可选使用 VM 的 `127.0.0.1:15444`：`cocolian-registry-local-tls.service` 只监听回环，并通过原有加密 SSH 隧道转发到宿主机仓库。Docker 和 Skopeo 均校验该端点专用证书（`/etc/docker/certs.d/127.0.0.1:15444/ca.crt`），不改公网证书或关闭全局 TLS 校验。私钥保存在 VM 私有配置目录，证书需到期前更换并同步受信 CA；系统服务自动重启。选择该端点时，私有认证文件需要包含该地址的同一仓库凭据，发布脚本使用权限受限的临时 Docker 配置并验证推送摘要、镜像配置及层；公网镜像引用仍固定到 `registry.example.invalid` 摘要。旧的 15000 HTTP 隧道方案仍作为回退。

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Image-only, immutable office-lab release. Run only through the serialized watcher."""
-import base64,copy,fcntl,hashlib,json,os,shutil,subprocess,sys,tempfile,time
+import base64,copy,fcntl,hashlib,json,os,re,shutil,subprocess,sys,tempfile,time
 from pathlib import Path
 HOME=Path.home();CACHE=HOME/'projects/cocolian-office/build/source-19b4efae7fb8'
 AUTH=HOME/'.config/cocolian-devops/registry-auth.json'
@@ -65,13 +65,16 @@ def compile_source(repo,engine,online,office_config):
  if any(line.split(None,1)[0] in ('make','gmake','ninja') for line in processes.splitlines() if line.split()):
   raise RuntimeError('An existing make/ninja process is running; retry after it completes')
  sync_source(repo)
+ # Keep one virtual CPU available for the guest OS, tunnel and watcher.
+ jobs=max(1,min(5,(os.cpu_count() or 1)-1))
+ print('Build parallelism:',jobs,flush=True)
  commands=['set -euo pipefail','export CCACHE_DIR=/workspace/cache/ccache','export CCACHE_MAXSIZE=8G']
  if engine:
-  commands += ['cd /workspace/engine','make -j3 build',
-   'make -j3 CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallBodyGridProportional testWordMacAutoFitPageWidth testWordMacUrlBreakUnits testWordMacRowCellSpacing testWordMacWordWrap testWordMacInlineImageGridLeading testWordMacFirstCharacterIndentFont testWordMacGridOverflowSetting testWordMacLegacyPercentTablePadding testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacFixedLayoutNoAutoFit testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
+  commands += ['cd /workspace/engine',f'make -j{jobs} build',
+   f'make -j{jobs} CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallBodyGridProportional testWordMacAutoFitPageWidth testWordMacUrlBreakUnits testWordMacRowCellSpacing testWordMacWordWrap testWordMacInlineImageGridLeading testWordMacFirstCharacterIndentFont testWordMacGridOverflowSetting testWordMacLegacyPercentTablePadding testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacFixedLayoutNoAutoFit testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
    'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log']
- if online:commands += ['cd /workspace/source','make -j3','DESTDIR=/workspace/stage make install']
- run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus','3','--memory','12g','--user','1000:1000',
+ if online:commands += ['cd /workspace/source',f'make -j{jobs}','DESTDIR=/workspace/stage make install']
+ run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus',str(jobs),'--memory','12g','--user','1000:1000',
       '-v',str(CACHE)+':/workspace','-v',str(HOME/'projects/cocolian-office/artifacts/render-fidelity-20261019/qa-fonts')+':/usr/local/share/fonts/fidelity-test:ro',
       BUILDER,'bash','-lc','\n'.join(commands)],timeout=18000)
 
@@ -79,18 +82,21 @@ def compile_source(repo,engine,online,office_config):
   # Only this real-font test allows fonts outside the bundled QA set. The
   # private font hashes are also gated before image creation and deployment.
   run(['docker','run','--rm','--name','cocolian-devops-gb-font-test','--network','none',
-       '--cpus','3','--memory','12g','--user','1000:1000','-v',str(CACHE)+':/workspace',
+       '--cpus',str(jobs),'--memory','12g','--user','1000:1000','-v',str(CACHE)+':/workspace',
        '-v',str(HOME/'.local/share/cocolian-devops/fonts/office')+':/usr/local/share/fonts/word-mac:ro',
        '-v',str(office_config/'deploy/source-build/word-mac-fontconfig.xml')+':/etc/fonts/word-mac-fontconfig.xml:ro',
        '-e','FONTCONFIG_FILE=/etc/fonts/word-mac-fontconfig.xml','-e','NON_APPLICATION_FONT_USE=allow',
        '-e','CCACHE_DIR=/workspace/cache/ccache',BUILDER,'bash','-lc',
-       'cd /workspace/engine && make -j3 CppunitTest_sw_layoutwriter5 NON_APPLICATION_FONT_USE=allow CPPUNIT_TEST_NAME="testWordMacTableProportionalPageEnd testWordMacTableLastLineGap testWordMacCellOpeningPunctuationBudget testWordMacClosingUnitPunctuationRun testWordMacInlineImageExactGrid testWordMacCoveredRowMinimum testWordMacBodyPairedDelimiters testWordMacFixedPercentColumns testWordMacLegacyPairedParentheses testWordMacTableHangingPrefix testWordMacMinimumRowFragments testWordMacClosingUnitTrailingCjk testWordMacHangingPunctuationPaint testWordMacTableNoScriptGapCompression testWordMacOversizedFixedTableWidth testWordMacTableWidowControl testWordMacCjkHangingParenthesis testWordMacNaturalLinePitch testWordMacAutoFitMissingColumnPreferences testWordMacCjkHangingColon testWordMacEmptyRowContinuation testWordMacAutoFitCjkBreakUnits testWordMacCachedGridBottom testWordMacPdfFallbackBold testWordMacStrictGridTablePunctuation testWordMacCenteredGridHeading testWordMacGridFloatingTableTitle testWordMacTableHalfHanging testWordMacAutomaticSuperscript testWordMacGbBoldFractionalFit testWordMacResolvedFontGrid testWordMacClosingUnitBudget testWordMacPercentageClosingUnit testWordMacLeftAlignedLineBudget testWordMacClassicBoldAdvance testWordMacCjkBaseline testWordMacMultiplePunctuationBudget testWordMacMixedScriptLineBudget testWordMacFlexibleScriptGap testWordMacGbBoldTableWrap testWordMacGridBottomPadding testWordMacDengXianPitch testWordMacMissingThemeFonts testWordMacPunctuationWrap testWordMacAutomaticScriptSpacing testWordMacGridPunctuationCompression testWordMacYaHeiGridHeight testWordMacWesternPunctuationHint" '
+       f'cd /workspace/engine && make -j{jobs} CppunitTest_sw_layoutwriter5 NON_APPLICATION_FONT_USE=allow CPPUNIT_TEST_NAME="testWordMacTableProportionalPageEnd testWordMacTableLastLineGap testWordMacCellOpeningPunctuationBudget testWordMacClosingUnitPunctuationRun testWordMacInlineImageExactGrid testWordMacCoveredRowMinimum testWordMacBodyPairedDelimiters testWordMacFixedPercentColumns testWordMacLegacyPairedParentheses testWordMacTableHangingPrefix testWordMacMinimumRowFragments testWordMacClosingUnitTrailingCjk testWordMacHangingPunctuationPaint testWordMacTableNoScriptGapCompression testWordMacOversizedFixedTableWidth testWordMacTableWidowControl testWordMacCjkHangingParenthesis testWordMacNaturalLinePitch testWordMacAutoFitMissingColumnPreferences testWordMacCjkHangingColon testWordMacEmptyRowContinuation testWordMacAutoFitCjkBreakUnits testWordMacCachedGridBottom testWordMacPdfFallbackBold testWordMacStrictGridTablePunctuation testWordMacCenteredGridHeading testWordMacGridFloatingTableTitle testWordMacTableHalfHanging testWordMacAutomaticSuperscript testWordMacGbBoldFractionalFit testWordMacResolvedFontGrid testWordMacClosingUnitBudget testWordMacPercentageClosingUnit testWordMacLeftAlignedLineBudget testWordMacClassicBoldAdvance testWordMacCjkBaseline testWordMacMultiplePunctuationBudget testWordMacMixedScriptLineBudget testWordMacFlexibleScriptGap testWordMacGbBoldTableWrap testWordMacGridBottomPadding testWordMacDengXianPitch testWordMacMissingThemeFonts testWordMacPunctuationWrap testWordMacAutomaticScriptSpacing testWordMacGridPunctuationCompression testWordMacYaHeiGridHeight testWordMacWesternPunctuationHint" '
        '&& cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-gb-font-tests.log'],timeout=1200)
 
 def registry_transport():
  config=json.loads((HOME/'.config/cocolian-devops/config.json').read_text())
  endpoint=config.get('registry_endpoint','res.cocolian.cn')
- assert endpoint in ('res.cocolian.cn','127.0.0.1:15000'),'Unexpected registry destination'
+ assert endpoint in ('res.cocolian.cn','127.0.0.1:15000','127.0.0.1:15444'),'Unexpected registry destination'
+ if endpoint=='127.0.0.1:15444':
+  cert='/etc/docker/certs.d/'+endpoint
+  return endpoint,['--cert-dir',cert],['--src-cert-dir',cert],['--dest-cert-dir',cert]
  # TLS is bypassed only inside the authenticated SSH loopback tunnel.
  return endpoint,(['--tls-verify=false'] if endpoint=='127.0.0.1:15000' else []),(['--src-tls-verify=false'] if endpoint=='127.0.0.1:15000' else []),(['--dest-tls-verify=false'] if endpoint=='127.0.0.1:15000' else [])
 
@@ -132,11 +138,24 @@ def publish(tag,component,out):
  destination='docker://'+endpoint+'/cocolian/'+component+':'+tag.split(':')[-1]
  with tempfile.TemporaryDirectory(prefix='publish-',dir=out) as directory:
   digestfile=Path(directory)/'digest'
-  archive=Path(directory)/(component+'.docker.tar')
-  run(['docker','save','-o',archive,tag],timeout=900)
-  run(['skopeo','copy','--authfile',AUTH,*dest_tls,'--format','oci',
-   '--digestfile',digestfile,'docker-archive:'+str(archive),destination],timeout=1200)
-  expected=digestfile.read_text().strip()
+  if endpoint=='127.0.0.1:15444':
+   # Credentials stay in a private ephemeral Docker config, never the command line.
+   creds=json.loads(AUTH.read_text())['auths']['res.cocolian.cn']
+   config=Path(directory)/'config.json';config.write_text(json.dumps({'auths':{endpoint:creds}}));config.chmod(0o600)
+   local_target=destination.removeprefix('docker://')
+   run(['docker','tag',tag,local_target])
+   try:
+    output=run(['docker','--config',directory,'push',local_target],timeout=1200)
+    matches=re.findall(r'digest:\s*(sha256:[0-9a-f]{64})',output)
+    if not matches:raise RuntimeError('Docker push did not report an immutable digest')
+    expected=matches[-1]
+   finally:run(['docker','image','rm',local_target])
+  else:
+   archive=Path(directory)/(component+'.docker.tar')
+   run(['docker','save','-o',archive,tag],timeout=900)
+   run(['skopeo','copy','--authfile',AUTH,*dest_tls,'--format','oci',
+    '--digestfile',digestfile,'docker-archive:'+str(archive),destination],timeout=1200)
+   expected=digestfile.read_text().strip()
  actual=run(['skopeo','inspect','--authfile',AUTH,*inspect_tls,'--format','{{.Digest}}',destination])
  assert expected==actual,'Published digest mismatch'
  remote=json.loads(run(['skopeo','inspect','--config','--authfile',AUTH,*inspect_tls,destination]))
