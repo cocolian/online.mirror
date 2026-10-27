@@ -7101,3 +7101,75 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableProportionalPageEnd)
         }
     }
 }
+
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableWrappedLatinPitch)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (int nCompat : {14, 15})
+    for (const OString& rFont : {"SimSun"_ostr, "FangSong_GB2312"_ostr})
+    for (bool bManual : {false, true})
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            OString aRuns = bManual
+                ? u"<w:t>甲乙丙丁戊己</w:t><w:br/><w:t>example_software</w:t><w:br/><w:t>release_2026</w:t>"_ustr.toUtf8()
+                : u"<w:t>样例内容版本至example_software_build_v1.0.20260101</w:t>"_ustr.toUtf8();
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="2400"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="2400"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:rFonts w:hint="eastAsia" w:ascii=")xml"_ostr + rFont
+                + R"xml(" w:hAnsi=")xml"_ostr + rFont + R"xml(" w:eastAsia=")xml"_ostr + rFont
+                + R"xml("/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>)xml"_ostr + aRuns
+                + R"xml(</w:r></w:p></w:tc></w:tr></w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"styles.xml"_ustr,
+                R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:sz w:val="21"/></w:rPr></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:useFELayout/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr + OString::number(nCompat) + R"xml("/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (!nRound)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            auto xMeta = getSwDocShell()->GetPreviewMetaFile();
+            MetafileXmlDump aDumper;
+            auto pMeta = dumpAndParse(aDumper, *xMeta);
+            const int nFirst = getXPath(pMeta, "(//textarray)[1]", "y").toInt32();
+            const int nMiddle = getXPath(pMeta, "(//textarray)[2]", "y").toInt32();
+            const int nLast = getXPath(pMeta, "(//textarray)[last()]", "y").toInt32();
+            CPPUNIT_ASSERT_MESSAGE("Word table first-to-second line pitch",
+                std::abs(nMiddle - nFirst - 312) <= 8);
+            CPPUNIT_ASSERT_MESSAGE("Word table second-to-third line pitch",
+                std::abs(nLast - nMiddle - 312) <= 8);
+            // Word's actual mixed-script table PDFs retain 15.6pt between
+            // successive 12pt lines, including automatic ASCII wraps.
+            CPPUNIT_ASSERT_MESSAGE("Word table CJK/Latin three-line pitch",
+                std::abs(nLast - nFirst - 624) <= 8);
+        }
+    }
+}

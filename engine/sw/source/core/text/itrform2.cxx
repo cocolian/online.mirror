@@ -2489,6 +2489,38 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
                                                    ? m_pCurr->GetLineSpacingBaseHeight()
                                                    : m_pCurr->Height();
 
+            // The current baseline follows the previous line. If that line
+            // exposes a shorter Latin text box than its CJK spacing base,
+            // restore the missing gap above this line, not above the Latin
+            // line itself. Keep explicit spacing and object lines unchanged.
+            SwTwips nMacPreviousLineDeficit = 0;
+            if (sw::UseWordMacMetrics() && m_pFrame->IsInTab()
+                && m_pFrame->IsInDocBody() && !m_pFrame->IsInFly()
+                && !m_pFrame->IsVertical() && !m_pMulti && !IsParaLine()
+                && pSpace->GetLineSpaceRule() == SvxLineSpaceRule::Auto
+                && (pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Off
+                    || (pSpace->GetInterLineSpaceRule() == SvxInterLineSpaceRule::Prop
+                        && pSpace->GetPropLineSpace() == 100))
+                && rIDSA.get(DocumentSettingId::LINE_SPACING_AS_GAP_BELOW))
+            {
+                const auto aFont = sw::WordMacResolvedFont(*GetInfo().GetOut());
+                const SwTwips nNominal = sw::WordMacCjkFontHeight(*GetInfo().GetOut());
+                const SwLineLayout* pPrevious = GetPrev();
+                bool bPlainText = pPrevious != nullptr;
+                if (pPrevious)
+                    for (const auto* pPart = pPrevious->GetNextPortion(); pPart;
+                         pPart = pPart->GetNextPortion())
+                        if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion()
+                            || pPart->IsMultiPortion() || pPart->InFieldGrp())
+                            bPlainText = false;
+                if (bPlainText && nNominal > 0
+                    && pPrevious->GetLineSpacingBaseHeight() == nNominal
+                    && pPrevious->Height() < nNominal
+                    && (sw::IsWordMacGbFont(aFont)
+                        || (sw::UseWordMacClassicMetrics() && sw::IsWordMacClassicCjkFont(aFont))))
+                    nMacPreviousLineDeficit = nNominal - pPrevious->Height();
+            }
+
             // Word's single-line font box and repeated baseline pitch are
             // distinct. Keep the original font box (and one-line table rows),
             // but use the measured classic CJK pitch for subsequent natural
@@ -2672,6 +2704,7 @@ void SwTextFormatter::CalcRealHeight( bool bNewLine )
                     }
                     default: OSL_FAIL( ": unknown InterLineSpaceRule" );
                 }
+            nLineHeight += nMacPreviousLineDeficit;
         }
 
         if( IsRegisterOn() )
