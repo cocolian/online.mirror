@@ -3073,13 +3073,14 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacResolvedFontGrid)
             auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
             OString aXml = R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:snapToGrid/><w:rPr><w:rFonts w:ascii="FONT" w:hAnsi="FONT" w:eastAsia="FONT"/><w:sz w:val="44"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="FONT" w:hAnsi="FONT" w:eastAsia="FONT"/><w:sz w:val="44"/></w:rPr><w:t>标题测试</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr;
             aXml = aXml.replaceAll("FONT"_ostr,
-                bMissing ? OUStringToOString(u"方正小标宋_GBK"_ustr, RTL_TEXTENCODING_UTF8)
+                bMissing ? OUStringToOString(u"方正小标宋简体"_ustr, RTL_TEXTENCODING_UTF8)
                          : "Microsoft YaHei"_ostr);
             writeWordMacPart(xWord, u"document.xml"_ustr, aXml);
             uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
             uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
         }
         loadFromURL(aFile.GetURL());
+        // The GBK face is installed now; use the separate missing-face alias.
         // The private native fontconfig matches Word's actual fallback to
         // YaHei. Both requests require three 15.6pt rows at 22pt, not two.
         assertXPath(parseLayoutDump(), "/root/page/body/txt/SwParaPortion/SwLineLayout",
@@ -3663,7 +3664,7 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacGridFloatingTableTitle)
             ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
         auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
         writeWordMacPart(xWord, u"document.xml"_ustr,
-            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblpPr w:vertAnchor="page" w:horzAnchor="margin" w:tblpY="2281" w:leftFromText="180" w:rightFromText="180"/><w:tblW w:w="8306" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="8306"/></w:tblGrid><w:tr><w:trPr><w:trHeight w:val="2000" w:hRule="exact"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="8306" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Table</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:snapToGrid/><w:rPr><w:rFonts w:ascii="方正小标宋_GBK" w:hAnsi="方正小标宋_GBK" w:eastAsia="方正小标宋_GBK"/><w:sz w:val="40"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="方正小标宋_GBK" w:hAnsi="方正小标宋_GBK" w:eastAsia="方正小标宋_GBK"/><w:sz w:val="40"/></w:rPr><w:t>甲乙丙丁戊己庚辛壬癸子丑寅卯辰</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblpPr w:vertAnchor="page" w:horzAnchor="margin" w:tblpY="2281" w:leftFromText="180" w:rightFromText="180"/><w:tblW w:w="8306" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="8306"/></w:tblGrid><w:tr><w:trPr><w:trHeight w:val="2000" w:hRule="exact"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="8306" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Table</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0" w:line="360" w:lineRule="auto"/><w:snapToGrid/><w:rPr><w:rFonts w:ascii="方正小标宋简体" w:hAnsi="方正小标宋简体" w:eastAsia="方正小标宋简体"/><w:sz w:val="40"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="方正小标宋简体" w:hAnsi="方正小标宋简体" w:eastAsia="方正小标宋简体"/><w:sz w:val="40"/></w:rPr><w:t>甲乙丙丁戊己庚辛壬癸子丑寅卯辰</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800"/><w:docGrid w:type="lines" w:linePitch="312"/></w:sectPr></w:body></w:document>)xml"_ostr);
         uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
         uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
     }
