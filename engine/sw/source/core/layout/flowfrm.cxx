@@ -1976,14 +1976,27 @@ static SwTwips lcl_WordMacTableEndLeading(const SwFrame* pFrame, SwTwips nFallba
         if (pPart->IsFlyCntPortion() || pPart->IsFlyPortion()
             || pPart->IsMultiPortion() || pPart->InFieldGrp())
             return nFallback;
-    const sal_Unicode cLast = pText->GetText()[pText->GetText().getLength() - 1];
-    if (!(cLast >= 0x2e80 && cLast <= 0x9fff)
-        && u"，、。；：？！）］｝」』】》〉"_ustr.indexOf(cLast) < 0)
-        return nFallback;
+    const auto& rText = pText->GetText();
+    const sal_Int32 nEnd = rText.getLength();
+    const sal_Unicode cLast = rText[nEnd - 1];
+    const bool bClassicEnd = (cLast >= 0x2e80 && cLast <= 0x9fff)
+        || u"，、。；：？！）］｝」』】》〉"_ustr.indexOf(cLast) >= 0;
+    sal_Int32 nFontIndex = nEnd - 1;
+    if (!bClassicEnd)
+    {
+        // A Latin suffix does not remove the CJK line box. Find the CJK
+        // font on this last line, while leaving wholly Latin lines alone.
+        const sal_Int32 nStart = std::max<sal_Int32>(0, nEnd - sal_Int32(pLine->GetLen()));
+        while (nFontIndex >= nStart
+               && !(rText[nFontIndex] >= 0x2e80 && rText[nFontIndex] <= 0x9fff))
+            --nFontIndex;
+        if (nFontIndex < nStart)
+            return nFallback;
+    }
     SwScriptInfo aScript;
     // Attribute iteration populates caches but does not edit the text node.
     SwAttrIter aAttrs(*const_cast<SwTextNode*>(pText->GetTextNodeFirst()), aScript, pText);
-    aAttrs.Seek(TextFrameIndex(pText->GetText().getLength() - 1));
+    aAttrs.Seek(TextFrameIndex(nFontIndex));
     const auto* pFont = aAttrs.GetFnt();
     vcl::Font aCjkFont;
     aCjkFont.SetFamilyName(pFont->GetName(SwFontScript::CJK));
@@ -1995,7 +2008,7 @@ static SwTwips lcl_WordMacTableEndLeading(const SwFrame* pFrame, SwTwips nFallba
         // last line's font box, not the paragraph's default font size.
         return (sal_Int64(pLine->Height()) * (rSpacing.GetPropLineSpace() - 100) + 50) / 100;
     }
-    if (nSize <= 0 || pLine->Height() != nSize * 130 / 100
+    if (!bClassicEnd || nSize <= 0 || pLine->Height() != nSize * 130 / 100
         || !(sw::IsWordMacGbFont(aCjkFont)
             || (sw::UseWordMacClassicMetrics() && sw::IsWordMacClassicCjkFont(aCjkFont))))
         return nFallback;
