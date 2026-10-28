@@ -181,6 +181,22 @@
     {
       "file": "FZHeiTi_GBK.ttf",
       "sha256": "451062e0133cd05a33f817f63ea82e8c45bb3130a652318289bc62a25f7b5c43"
+    },
+    {
+      "file": "Consola.ttf",
+      "sha256": "b1dc8633f1cca6a74b84a26e04d61dad05cb8151ee094964fdd30d4852386a6b"
+    },
+    {
+      "file": "Consolab.ttf",
+      "sha256": "ee7e1ee08ad5cc2e292f77aebb7fdd8b11ddb58d3968707e850d94168554d67e"
+    },
+    {
+      "file": "Consolai.ttf",
+      "sha256": "ad1158c5608b2f0f03a7e78e0181626ddebb6c49bd2385141027e2e827ca8f6a"
+    },
+    {
+      "file": "Consolaz.ttf",
+      "sha256": "fddcbcd483d3f60781b68fa74f763e20c0858570e81090ac8af62b460aa8f838"
     }
   ]
 }

@@ -258,7 +258,7 @@ def candidate(old,image,name):
   k('-n','office-lab','create','-f','-',input=json.dumps(pod).encode());created=True
   k('-n','office-lab','wait','--for=condition=Ready','pod/'+podname,'--timeout=240s',timeout=260)
   if name!='wopi':
-   for family in ('FangSong_GB2312','KaiTi_GB2312','SimSun','Microsoft YaHei','FangSong','STZhongsong','Times New Roman','Tahoma','Courier New'):
+   for family in ('FangSong_GB2312','KaiTi_GB2312','SimSun','Microsoft YaHei','FangSong','STZhongsong','Times New Roman','Tahoma','Courier New','Consolas'):
     matched=k('-n','office-lab','exec',podname,'--','fc-match','-f','%{family[0]}',family)
     assert matched==family,'Unexpected font substitution: '+family+' -> '+matched
    for family,expected in (('方正仿宋_GBK','FZFangSong-Z02'),('方正小标宋_GBK','FZXiaoBiaoSong-B05'),('方正楷体_GBK','FZKai-Z03'),('方正黑体_GBK','FZHei-B01')):
