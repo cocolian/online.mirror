@@ -1,5 +1,8 @@
 # main 合并版本发布（2026-10-20）
 
+> 地址和目录均为通用示例，实际部署值应由自己的私有配置提供。
+
+
 引擎源码提交：053c8491238（main）。在 build-host 中使用既有 Debian 13 构建容器和匹配的编译缓存，增量执行 `make -j2 sw oox`，随后执行 `CppunitTest_sw_layoutwriter5` 的 `testWordImportTypography` 和 `testWordTableGridProportional`。构建容器限制 2 CPU、10 GiB 内存。测试使用已有 Liberation、Calibri 和中文字体副本；字体二进制不提交 Git。
 
 编译及测试完成后复制 libmergedlo.so、libswlo.so、libsw_writerfilterlo.so，检查 ELF 头和文件大小，再打包。不能在链接任务运行时复制引擎库。构建和部署入口见 scripts/releases。

@@ -1,5 +1,8 @@
 # 中文开源字体
 
+> 地址和目录均为通用示例，实际部署值应由自己的私有配置提供。
+
+
 添加 Adobe 官方思源宋体、思源黑体简体中文常规和粗体，保留 Noto CJK。4 个 OTF 总计约 80 MiB，字体不放入 Git；来源提交、SHA256、大小见 fonts-lock.json，保留 OFL 许可证。
 
 开发机字体及构建上下文：<workspace>/cocolian-office/artifacts/fonts-20261017/fonts。下载脚本 scripts/download-source-han-fonts.py 可使用该目录现有 fonts-lock.json 锁定下载；复现时先将本目录 fonts-lock.json 复制到该构建目录。

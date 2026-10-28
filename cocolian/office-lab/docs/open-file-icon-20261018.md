@@ -1,5 +1,8 @@
 # 打开文件图标
 
+> 地址和目录均为通用示例，实际部署值应由自己的私有配置提供。
+
+
 将门户 `file-open.svg` 替换为现有 Collabora 官方图标 `upstream/collabora-engine/browser/images/lc_open.svg`，保留原 SVG 内容。上游版权及许可遵循 Collabora 源码中的相应声明。打开按钮、上传及知识库逻辑未修改。
 
 发布版本：office-ui-v2026.10.18-open-icon。
