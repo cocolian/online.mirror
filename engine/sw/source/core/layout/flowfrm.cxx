@@ -1988,6 +1988,13 @@ static SwTwips lcl_WordMacTableEndLeading(const SwFrame* pFrame, SwTwips nFallba
     vcl::Font aCjkFont;
     aCjkFont.SetFamilyName(pFont->GetName(SwFontScript::CJK));
     const SwTwips nSize = pFont->GetHeight(SwFontScript::CJK);
+    if (nSize > 0 && (aCjkFont.GetFamilyName().equalsIgnoreAsciiCase(u"Microsoft YaHei")
+                      || aCjkFont.GetFamilyName() == u"微软雅黑"))
+    {
+        // Word computes the trailing proportional leading from the actual
+        // last line's font box, not the paragraph's default font size.
+        return (sal_Int64(pLine->Height()) * (rSpacing.GetPropLineSpace() - 100) + 50) / 100;
+    }
     if (nSize <= 0 || pLine->Height() != nSize * 130 / 100
         || !(sw::IsWordMacGbFont(aCjkFont)
             || (sw::UseWordMacClassicMetrics() && sw::IsWordMacClassicCjkFont(aCjkFont))))

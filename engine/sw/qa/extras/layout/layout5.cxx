@@ -7035,6 +7035,100 @@ CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableLastLineGap)
     }
 }
 
+CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacYaHeiTableProportionalPitch)
+{
+    const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_CLASSIC_METRICS"_ustr,
+        u"COCOLIAN_WORD_MAC_FLEX_SCRIPT_GAPS"_ustr,
+        u"COCOLIAN_WORD_MAC_LINE_BUDGET"_ustr};
+    std::vector<std::pair<bool, OUString>> aPrevious;
+    for (const auto& rName : aNames)
+    {
+        OUString aValue;
+        const bool bSet = osl_getEnvironment(rName.pData, &aValue.pData) == osl_Process_E_None;
+        aPrevious.emplace_back(bSet, aValue);
+        const OUString aOn = u"1"_ustr;
+        osl_setEnvironment(rName.pData, aOn.pData);
+    }
+    comphelper::ScopeGuard aRestore([&] {
+        for (size_t i = 0; i < aNames.size(); ++i)
+            if (aPrevious[i].first)
+                osl_setEnvironment(aNames[i].pData, aPrevious[i].second.pData);
+            else
+                osl_clearEnvironment(aNames[i].pData);
+    });
+    for (int nCompat : {14, 15})
+    for (const OString& rFamily : {"Microsoft YaHei"_ostr})
+    for (int nMark : {0})
+    for (bool bBold : {false})
+    for (int nProp : {100, 125, 150})
+    for (int nSize : {17, 21, 24, 28})
+    {
+        utl::TempFileNamed aFile;
+        aFile.EnableKillingFile();
+        makeWordMacPackage(aFile, false, true);
+        const auto aFont = [](const OString& rName, int nSize, bool bWeight) -> OString {
+            return R"xml(<w:rFonts w:ascii=")xml"_ostr + rName + R"xml(" w:hAnsi=")xml"_ostr
+                + rName + R"xml(" w:eastAsia=")xml"_ostr + rName + R"xml("/><w:sz w:val=")xml"_ostr
+                + OString::number(nSize) + "\"/>"_ostr + (bWeight ? "<w:b/>"_ostr : OString());
+        };
+        const OString aBorders = R"xml(<w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/>)xml"_ostr;
+        OString aRows;
+        for (int nLines : {1})
+        {
+            OString aText;
+            for (int i = 0; i < nLines; ++i)
+                aText += (i ? "<w:br/>"_ostr : OString()) + u"<w:t>甲乙丙丁戊己</w:t>"_ustr.toUtf8();
+            const OString aMark = nMark
+                ? OString("<w:rPr>"_ostr + aFont(rFamily, nMark, bBold) + "</w:rPr>"_ostr) : OString();
+            aRows += R"xml(<w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="2400"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="40" w:line=")xml"_ostr
+                + OString::number(nProp * 240 / 100) + R"xml(" w:lineRule="auto"/><w:snapToGrid w:val="0"/>)xml"_ostr
+                + aMark + "</w:pPr><w:r><w:rPr>"_ostr + aFont(rFamily, nSize, bBold)
+                + "</w:rPr>"_ostr + aText + "</w:r></w:p></w:tc></w:tr>"_ostr;
+        }
+        {
+            auto xRoot = comphelper::OStorageHelper::GetStorageOfFormatFromURL(
+                ZIP_STORAGE_FORMAT_STRING, aFile.GetURL(), embed::ElementModes::READWRITE);
+            auto xWord = xRoot->openStorageElement(u"word"_ustr, embed::ElementModes::WRITE);
+            writeWordMacPart(xWord, u"document.xml"_ustr,
+                R"xml(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="2400"/><w:tblLayout w:type="fixed"/><w:tblBorders>)xml"_ostr
+                + aBorders + R"xml(</w:tblBorders><w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="2400"/></w:tblGrid>)xml"_ostr
+                + aRows + R"xml(</w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>)xml"_ostr);
+            writeWordMacPart(xWord, u"styles.xml"_ustr,
+                R"xml(<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr>)xml"_ostr
+                + aFont("SimSun"_ostr, 24, false) + R"xml(</w:rPr></w:style></w:styles>)xml"_ostr);
+            writeWordMacPart(xWord, u"settings.xml"_ustr,
+                R"xml(<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:doNotWrapTextWithPunct/><w:doNotUseEastAsianBreakRules/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val=")xml"_ostr
+                + OString::number(nCompat) + R"xml("/></w:compat></w:settings>)xml"_ostr);
+            uno::Reference<embed::XTransactedObject>(xWord, uno::UNO_QUERY_THROW)->commit();
+            uno::Reference<embed::XTransactedObject>(xRoot, uno::UNO_QUERY_THROW)->commit();
+        }
+        // Eight-row Mac Word 16.114 controls; each row has 4pt top and
+        // bottom margins and 2pt paragraph spacing below its text.
+        const double aWordHeights[4][3] = {
+            {24.96, 28.80, 32.40}, {28.56, 33.12, 37.44},
+            {30.96, 36.24, 41.28}, {34.56, 40.56, 46.56}
+        };
+        const int nSizeIndex = nSize == 17 ? 0 : nSize == 21 ? 1 : nSize == 24 ? 2 : 3;
+        for (int nRound = 0; nRound < 2; ++nRound)
+        {
+            if (!nRound)
+                loadFromURL(aFile.GetURL());
+            else
+                saveAndReload(TestFilter::DOCX);
+            auto pDump = parseLayoutDump();
+            for (int i = 0; i < 1; ++i)
+            {
+                const OString aPath = "/root/page/body/tab/row["_ostr + OString::number(i + 1) + "]/infos/bounds"_ostr;
+                const double fHeight = getXPath(pDump, aPath, "height").toInt32() / 20.0;
+                // Check the row after both import and save/reload.
+                CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("Mac Word cell row height",
+                    aWordHeights[nSizeIndex][(nProp - 100) / 25], fHeight, 0.45);
+            }
+        }
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwLayoutWriter5, testWordMacTableProportionalPageEnd)
 {
     const std::vector<OUString> aNames{u"COCOLIAN_WORD_MAC_METRICS"_ustr,
