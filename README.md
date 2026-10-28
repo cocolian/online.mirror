@@ -1,4 +1,57 @@
-# Collabora Online and Collabora Office
+# Cocolian Office 国产化文档渲染与云文档中台
+
+Cocolian Office 的目标是构建国产化的 LibreOffice，建设可自主构建、可私有部署的云文档中台，让中文文档在在线编辑、预览和 PDF 转换时，获得与 Microsoft Office Word 尽可能一致的渲染效果。
+
+项目基于 LibreOffice 和 Collabora Online 持续开发，重点改进中文字体、行距、换行、分页、表格和中英文混排。我们追求最佳的中文文档与 Word 渲染一致性，并以对照文档和回归测试逐项推进。
+
+**本项目开源，可按各组件许可证免费使用、部署和接入。欢迎贡献代码、接入业务系统，也欢迎捐款支持持续维护。**
+
+## 项目能力与兼容性
+
+- 通过浏览器在线编辑和协同，通过 WOPI 对接文档存储、鉴权和保存。
+- 预览 DOCX 和转换 PDF，为业务应用提供文档处理能力。
+- 持续修复中文字体、GB2312 和 GBK 字体匹配、段落行距、网格、表格跨页和混排规则。
+- 从源码构建渲染引擎与在线服务，使用容器部署，并通过自动检查验证发布。
+
+当前以 Mac 版 Microsoft Word 导出的 PDF 为主要对照，核对字体、文字位置、换行和分页。复杂文档仍可能存在布局差异，兼容性工作会持续推进。
+
+## 开始使用与接入
+
+```bash
+git clone --filter=blob:none --branch main https://github.com/cocolian/online.mirror.git
+cd online.mirror
+```
+
+- `engine/`：配套文档渲染引擎，承载主要中文排版修复。
+- `browser/`、`wsd/`：在线编辑前端与服务端。
+- [cocolian/office-lab](cocolian/office-lab/README.md)：项目集成、构建和部署资料。
+- [office-portal](cocolian/office-lab/apps/office-portal)：文档门户与 WOPI Host 实现。
+- [源码构建配方](cocolian/office-lab/deploy/source-build/)：源码构建及容器部署说明。
+
+欢迎文档管理系统、知识库和业务平台接入。可以通过 WOPI 集成文档打开、编辑与保存，通过转换接口集成 DOCX 转 PDF。源码构建使用 Linux 环境；文档中的部署配置需按自己的环境调整。
+
+第三方字体不随本仓库分发。部署时请提供有权使用的字体，并保持对照环境和服务端字体版本一致。
+
+## 贡献与支持
+
+欢迎贡献排版修复、合成测试、文档和系统集成。反馈渲染差异时，请说明字体、Word 版本、页面设置和复现步骤，优先提供可公开的最小合成案例。
+
+真实业务文档、私有字体、生成的 PDF、构建产物和凭据应保存在仓库外。提交前请确认文件名和内容具备公开权限。
+
+**欢迎捐款支持，可通过 [GitHub Issue](https://github.com/cocolian/online.mirror/issues) 联系项目维护者。** 捐款将支持中文排版兼容性开发、回归测试和构建资源；也欢迎提供算力、测试环境和集成反馈。捐款不影响按许可证免费使用开源代码。
+
+## 项目介绍
+
+- [项目介绍文章](cocolian/office-lab/docs/community/introduction-zh.md)
+- [X 和其他媒体文案](cocolian/office-lab/docs/community/social-posts.md)
+
+Cocolian Office is an open source cloud document platform based on LibreOffice and Collabora Online. We focus on Chinese document rendering, aiming for the closest possible fidelity to Microsoft Word across online editing, preview and PDF conversion. The project can be used and integrated free of charge under the applicable component licenses. Contributions, integrations and donations are welcome.
+
+## 许可证与上游
+
+感谢 LibreOffice、Collabora Online 及其社区。相关源码保留上游许可证与版权声明；使用、修改和分发时，请遵守 [COPYING](COPYING) 及各组件的许可文件。上游介绍和贡献流程如下。
+
+## Collabora Online and Collabora Office 上游说明
 
 > [!IMPORTANT]
 > **The CollaboraOnline/online.mirror repository on GitHub is a read-only mirror.**
