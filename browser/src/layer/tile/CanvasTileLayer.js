@@ -3968,14 +3968,15 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 			let zoom;
 			const smartZoomEnabled = window.prefs.get('smartZoom') != 'false' || wantDynamicZoom;
 			const maxZoom = this._getMaxZoom();
-			const hasComments = app.activeDocument.partHasComments ?? this._partHasComments;
+			const hasComments = app.activeDocument.partHasComments !== undefined ?
+				app.activeDocument.partHasComments : this._partHasComments;
 
 			if (smartZoomEnabled) {
 				const documentWidth = (this._documentWidthTwips / app.tile.size.x) * (RenderManager.tileSize * app.dpiScale)
 				// The document anchor excludes open navigation/property panels. The
 				// outer container can still span them while the initial UI settles.
 				const frame = app.activeDocument.activeLayout.frameSize;
-				const containerSize = frame?.pX || this._getDocumentContainerSize()[0] * app.dpiScale;
+				const containerSize = (frame && frame.pX) || this._getDocumentContainerSize()[0] * app.dpiScale;
 				zoom = this._writerDynamicZoom(containerSize, documentWidth, hasComments);
 			} else {
 				zoom = this._getWriterDefaultZoom();
