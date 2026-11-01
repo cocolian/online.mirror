@@ -14,7 +14,8 @@ function setup() {
   toArray() {return [this.x,this.y];} vToArray() {return [this.vX,this.vY];}
  }
  const app = {definitions:{},dpiScale:2,pixelsToTwips:1,twipsToPixels:1,CSections:{},
-  map:{_docLayer:{_docType:'text'},_viewInfoByUserName:{}},
+  isCommentEditingAllowed:()=>true,
+  map:{_docLayer:{_docType:'text'},_viewInfoByUserName:{},wopi:{},isReadOnlyMode:()=>false,uiManager:{isCommandVisible:()=>true}},
   sectionContainer:{getCanvasBoundingClientRect:()=>({x:0})},
   activeDocument:{fileSize:{cX:1000},activeLayout:{type:'ViewLayoutWriter',viewedRectangle:{cX1:0,pX1:0,pY1:0,pY2:1080},
    ensureViewSizeCoversComments:()=>{},scrollTo:(x,y)=>{app.scrolls.push([x,y]);}}},
@@ -23,7 +24,9 @@ function setup() {
   ? {style:{width:'1512'}} : {getBoundingClientRect:()=>bounds}};
  const context = {app,document,console,CanvasSectionObject:class {},DOMRect:class {},DOMPurify:{addHook:()=>{}},_:s=>s,
   $:element=>({hasClass:name=>element.classList.contains(name),addClass:name=>element.classList.toggle(name,true)}),
-  window:{L:{Map:{include:()=>{}},DomUtil:{hasClass:(e,n)=>e.classList.contains(n),removeClass:(e,n)=>e.classList.toggle(n,false)}},mode:{isSmallScreenDevice:()=>false}},
+  window:{L:{Map:{include:()=>{}},DomEvent:{on:(el,name,fn,owner)=>{el[name]=fn.bind(owner);},stopPropagation:e=>e.stopPropagation()},DomUtil:{
+   create:(tag,classes,parent)=>{const names=new Set(classes.split(' ')),attrs={};const el={tagName:tag,dataset:{},classList:{toggle:(n,on)=>on?names.add(n):names.delete(n)},setAttribute:(n,v)=>{attrs[n]=v;}};parent.children.push(el);return el;},
+   hasClass:(e,n)=>e.classList.contains(n),removeClass:(e,n)=>e.classList.toggle(n,false)}},mode:{isSmallScreenDevice:()=>false}},
   cool:{CanvasSectionObject:class {},SimplePoint:Point}};
  vm.createContext(context);
  const source = ['CommentSection.ts','CommentListSection.ts'].map(file=>
@@ -44,10 +47,10 @@ function setup() {
  function card(id,y=0,height=86,extra={}) {
   const c=Object.create(Comment.prototype), classes=new Set();
   const style={left:'',top:'',display:'',visibility:''};
-  const container={style,classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name),contains:name=>classes.has(name)},
+  const container={style,classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name),contains:name=>classes.has(name),remove:name=>classes.delete(name)},
    getBoundingClientRect:()=>({left:parseFloat(style.left)||0,top:parseFloat(style.top)||0,
     right:(parseFloat(style.left)||0)+250,bottom:(parseFloat(style.top)||0)+height,height,width:250})};
-  Object.assign(c,{pendingInit:false,containerPosX:0,containerPosY:0,renderedPosY:0,positionedHeight:null,
+  Object.assign(c,{map:app.map,pendingInit:false,containerPosX:0,containerPosY:0,renderedPosY:0,positionedHeight:null,
    canvasContainerBounds:{},sectionProperties:{container,commentListSection:list,
     data:{id,parent:'0',anchorPos:[0,y],anchorSPoint:new Point(0,y),...extra}},
    isEdit:()=>false,getCommentHeight:()=>height,getCommentWidth:()=>500,show:()=>{},
@@ -133,4 +136,27 @@ test('rapid clicks cancel an older queued scroll target',()=>{
  a.setContainerPos(true,s.bounds,1000,200);b.setContainerPos(true,s.bounds,1000,700);
  s.list.scrollCommentIntoView(b);s.list.scrollCommentIntoView(a);
  s.tasks.forEach(fn=>fn());assert.equal(s.app.scrolls.length,0);
+});
+test('revision decisions use their own ID and do not bubble into card selection',()=>{
+ const s=setup(),c=s.card('change-27',0,86,{trackchange:true}),actions={children:[]},events=[];
+ s.app.map.fire=(name,args)=>events.push([name,args.id]);
+ c.createTrackChangeButtons(actions);let stopped=0;
+ c.sectionProperties.acceptButton.click({stopPropagation:()=>{stopped++;}});
+ c.sectionProperties.rejectButton.click({stopPropagation:()=>{stopped++;}});
+ assert.deepEqual(events,[['RedlineAccept','change-27'],['RedlineReject','change-27']]);
+ assert.equal(stopped,2);
+});
+test('revision controls follow permissions and recheck host command suppression at activation',()=>{
+ const s=setup(),c=s.card('change-9',0,86,{trackchange:true});c.createTrackChangeButtons({children:[]});
+ const events=[];s.app.map.fire=name=>events.push(name);
+ for(const block of ['readonly','host','permission','command']){
+  s.app.map.isReadOnlyMode=()=>block==='readonly';s.app.map.wopi.HideChangeTrackingControls=block==='host';
+  s.app.isCommentEditingAllowed=()=>block!=='permission';s.app.map.uiManager.isCommandVisible=()=>block!=='command';
+  c.updateEditability();c.sectionProperties.acceptButton.click({stopPropagation:()=>{}});
+  c.sectionProperties.rejectButton.click({stopPropagation:()=>{}});
+  assert.equal(events.length,0);
+ }
+ s.app.map.uiManager.isCommandVisible=()=>true;c.updateEditability();
+ assert.equal(c.sectionProperties.acceptButton.disabled,false);assert.equal(c.sectionProperties.acceptButton.hidden,false);
+ c.sectionProperties.acceptButton.click({stopPropagation:()=>{}});assert.deepEqual(events,['RedlineAccept']);
 });

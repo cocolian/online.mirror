@@ -248,7 +248,9 @@ export class Comment extends CanvasSectionObject {
 
 		this.createAuthorTable();
 
-		if (this.sectionProperties.data.trackchange && !this.map.isReadOnlyMode() && !app.map['wopi'].HideChangeTrackingControls) {
+		if (this.sectionProperties.data.trackchange
+			&& (app.map._docLayer._docType !== 'text' || this.sectionProperties.noMenu === true)
+			&& !this.map.isReadOnlyMode() && !app.map['wopi'].HideChangeTrackingControls) {
 			this.createTrackChangeButtons();
 		}
 
@@ -332,12 +334,13 @@ export class Comment extends CanvasSectionObject {
 	private updateEditability (): void {
 		this.makeEditable(app.isCommentEditingAllowed());
 		this.updateResolveButton();
+		this.updateTrackChangeButtons();
 	}
 
 	private createContainerAndWrapper (): void {
 		var isRTL = document.documentElement.dir === 'rtl';
 		this.sectionProperties.container = window.L.DomUtil.create('div', 'cool-annotation' + (isRTL ? ' rtl' : ''));
-		if (app.map._docLayer._docType === 'text' && !this.sectionProperties.data.trackchange)
+		if (app.map._docLayer._docType === 'text')
 			this.sectionProperties.container.classList.add('writer-comment');
 		this.sectionProperties.container.id = 'comment-container-' + this.sectionProperties.data.id;
 		window.L.DomEvent.on(this.sectionProperties.container, 'focusout', this.onLostFocus, this);
@@ -393,8 +396,10 @@ export class Comment extends CanvasSectionObject {
 	private createMenu (): void {
 		var tdMenu = window.L.DomUtil.create('td', 'cool-annotation-menubar', this.sectionProperties.authorRow);
 		this.sectionProperties.menuBarCell = tdMenu;
-		const writerComment = app.map._docLayer._docType === 'text' && !this.sectionProperties.data.trackchange;
-		if (writerComment) {
+		const writerComment = app.map._docLayer._docType === 'text';
+		if (writerComment && this.sectionProperties.data.trackchange)
+			this.createTrackChangeButtons(tdMenu);
+		if (writerComment && !this.sectionProperties.data.trackchange) {
 			const resolve = window.L.DomUtil.create('button', 'cool-annotation-resolve', tdMenu) as HTMLButtonElement;
 			resolve.type = 'button';
 			resolve.id = 'comment-annotation-resolve-' + this.sectionProperties.data.id;
@@ -652,26 +657,54 @@ export class Comment extends CanvasSectionObject {
 		}
 	}
 
-	private createTrackChangeButtons (): void {
-		var tdAccept = window.L.DomUtil.create('td', 'cool-annotation-menubar', this.sectionProperties.authorRow);
+	private canReviewChange(command?: string): boolean {
+		return app.isCommentEditingAllowed() && !this.map.isReadOnlyMode()
+			&& !app.map['wopi'].HideChangeTrackingControls
+			&& (!command || app.map.uiManager.isCommandVisible(command));
+	}
+
+	private updateTrackChangeButtons(): void {
+		for (const [button, command] of [
+			[this.sectionProperties.acceptButton, '.uno:AcceptTrackedChange'],
+			[this.sectionProperties.rejectButton, '.uno:RejectTrackedChange'],
+		]) {
+			if (!button) continue;
+			button.hidden = !this.canReviewChange();
+			button.disabled = !this.canReviewChange();
+			button.classList.toggle('hidden-by-command', !app.map.uiManager.isCommandVisible(command));
+		}
+	}
+
+	private createTrackChangeButtons (actions?: HTMLElement): void {
+		var tdAccept = actions || window.L.DomUtil.create('td', 'cool-annotation-menubar', this.sectionProperties.authorRow);
 		var acceptButton = this.sectionProperties.acceptButton = window.L.DomUtil.create('button', 'cool-redline-accept-button', tdAccept);
 
-		var tdReject = window.L.DomUtil.create('td', 'cool-annotation-menubar', this.sectionProperties.authorRow);
+		var tdReject = actions || window.L.DomUtil.create('td', 'cool-annotation-menubar', this.sectionProperties.authorRow);
 		var rejectButton = this.sectionProperties.rejectButton = window.L.DomUtil.create('button', 'cool-redline-reject-button', tdReject);
+		acceptButton.type = rejectButton.type = 'button';
+		if (app.map._docLayer._docType === 'text') {
+			acceptButton.textContent = '✓';
+			rejectButton.textContent = '×';
+		}
 
 		acceptButton.dataset.title = _('Accept change');
 		acceptButton.setAttribute('aria-label', _('Accept change'));
 
-		window.L.DomEvent.on(acceptButton, 'click', function() {
-			this.map.fire('RedlineAccept', {id: this.sectionProperties.data.id});
+		window.L.DomEvent.on(acceptButton, 'click', function(event: MouseEvent) {
+			window.L.DomEvent.stopPropagation(event);
+			if (this.canReviewChange('.uno:AcceptTrackedChange'))
+				this.map.fire('RedlineAccept', {id: this.sectionProperties.data.id});
 		}, this);
 
 		rejectButton.dataset.title = _('Reject change');
 		rejectButton.setAttribute('aria-label', _('Reject change'));
 
-		window.L.DomEvent.on(rejectButton, 'click', function() {
-			this.map.fire('RedlineReject', {id: this.sectionProperties.data.id});
+		window.L.DomEvent.on(rejectButton, 'click', function(event: MouseEvent) {
+			window.L.DomEvent.stopPropagation(event);
+			if (this.canReviewChange('.uno:RejectTrackedChange'))
+				this.map.fire('RedlineReject', {id: this.sectionProperties.data.id});
 		}, this);
+		this.updateTrackChangeButtons();
 	}
 
 	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -1348,7 +1381,8 @@ export class Comment extends CanvasSectionObject {
 			app.map.uiManager.isCommandVisible(uno);
 
 		if (data.trackchange) {
-			entries.push({ text: _('Comment'), type: 'action', id: 'modify', pos: String(pos++) });
+			if (this.isAuthor() && isShown('.uno:CommentChangeTracking'))
+				entries.push({ text: _('Comment'), type: 'action', id: 'modify', pos: String(pos++) });
 		} else {
 			const isAuthor = this.isAuthor();
 			const canRemove = this.canRemove();
@@ -1390,17 +1424,15 @@ export class Comment extends CanvasSectionObject {
 				&& isShown('.uno:PromoteComment'))
 				entries.push({ text: _('Promote to top comment'), type: 'action', id: 'promote', pos: String(pos++) });
 
-			if (docLayer._docType === 'text' && !window.mode.isSmallScreenDevice()) {
-				const isShownBig = listSection.isShownBig(this);
-				entries.push({
-					text: isShownBig ? _('Show on the side') : _('Open in full view'),
-					type: 'action', id: 'showBigger', pos: String(pos++),
-				});
-			}
-
 			if ((docLayer._docType === 'text' || docLayer._docType === 'spreadsheet')
 				&& !window.mode.isSmallScreenDevice())
 				entries.push({ text: _('Show in navigator'), type: 'action', id: 'showInNavigator', pos: String(pos++) });
+		}
+		if (docLayer._docType === 'text' && !window.mode.isSmallScreenDevice()) {
+			entries.push({
+				text: listSection.isShownBig(this) ? _('Show on the side') : _('Open in full view'),
+				type: 'action', id: 'showBigger', pos: String(pos++),
+			});
 		}
 
 		if (entries.length === 0)

@@ -789,7 +789,8 @@ input, button {
 }
 
 /* The content wrapper is all of the annotation pop-up, except the margins. */
-.cool-annotation.annotation-pop-up > .cool-annotation-content-wrapper {
+.cool-annotation.annotation-pop-up > .cool-annotation-content-wrapper,
+.cool-annotation.annotation-pop-up > .cool-annotation-redline-content-wrapper {
 	min-height: 0;
 	flex: 1;
 	overflow: hidden;
@@ -801,7 +802,8 @@ input, button {
 	flex: 1;
 	max-height: none;
 }
-.cool-annotation.annotation-pop-up:not(.annotation-active) > .cool-annotation-content-wrapper {
+.cool-annotation.annotation-pop-up:not(.annotation-active) > .cool-annotation-content-wrapper,
+.cool-annotation.annotation-pop-up:not(.annotation-active) > .cool-annotation-redline-content-wrapper {
 	margin-right: 8px;
 }
 .cool-annotation.annotation-pop-up.annotation-active {
@@ -834,7 +836,8 @@ input, button {
 	row-gap: var(--spacing-m);
 }
 
-.annotation-active.annotation-pop-up .cool-annotation-content-wrapper {
+.annotation-active.annotation-pop-up .cool-annotation-content-wrapper,
+.annotation-active.annotation-pop-up .cool-annotation-redline-content-wrapper {
 	font-size: var(--medium-font-size);
 }
 
@@ -1168,7 +1171,8 @@ input, button {
 
 /* Writer margin comments keep author and text prominent, like Word. The
  * metadata and action row keep their space so hovering never moves a thread. */
-.writer-comment .cool-annotation-content-wrapper {
+.writer-comment .cool-annotation-content-wrapper,
+.writer-comment .cool-annotation-redline-content-wrapper {
 	padding: 8px 10px;
 	row-gap: 4px;
 	border-inline-start: 3px solid var(--color-primary);
@@ -1231,7 +1235,10 @@ input, button {
 }
 
 .writer-comment .cool-annotation-resolve,
-.writer-comment .cool-annotation-menu {
+.writer-comment .cool-annotation-menu,
+.writer-comment .cool-annotation-menu-redline,
+.writer-comment .cool-redline-accept-button,
+.writer-comment .cool-redline-reject-button {
 	width: 28px !important;
 	height: 28px !important;
 	min-width: 28px !important;
@@ -1240,25 +1247,39 @@ input, button {
 	cursor: pointer;
 }
 
-.writer-comment .cool-annotation-resolve {
+.writer-comment .cool-annotation-resolve,
+.writer-comment .cool-redline-accept-button,
+.writer-comment .cool-redline-reject-button {
 	margin: 0;
 	padding: 0;
-	background: transparent;
+	background: transparent !important;
 	color: var(--color-primary);
 	font: 22px/28px system-ui, sans-serif;
 }
 
-.writer-comment .cool-annotation-resolve[hidden] {
+.writer-comment .cool-redline-reject-button {
+	color: var(--color-error);
+}
+
+.writer-comment .cool-annotation-resolve[hidden],
+.cool-redline-accept-button[hidden],
+.cool-redline-reject-button[hidden] {
 	display: none !important;
 }
 
 .writer-comment .cool-annotation-resolve:hover,
-.writer-comment .cool-annotation-menu:hover {
+.writer-comment .cool-annotation-menu:hover,
+.writer-comment .cool-annotation-menu-redline:hover,
+.writer-comment .cool-redline-accept-button:hover,
+.writer-comment .cool-redline-reject-button:hover {
 	background-color: var(--color-background-hover) !important;
 }
 
 .writer-comment .cool-annotation-resolve:focus-visible,
-.writer-comment .cool-annotation-menu:focus-visible {
+.writer-comment .cool-annotation-menu:focus-visible,
+.writer-comment .cool-annotation-menu-redline:focus-visible,
+.writer-comment .cool-redline-accept-button:focus-visible,
+.writer-comment .cool-redline-reject-button:focus-visible {
 	outline: 2px solid var(--color-primary);
 	outline-offset: 2px;
 }
@@ -1277,10 +1298,13 @@ input, button {
 }
 
 @media (forced-colors: active) {
-	.writer-comment .cool-annotation-content-wrapper {
+	.writer-comment .cool-annotation-content-wrapper,
+	.writer-comment .cool-annotation-redline-content-wrapper {
 		border-inline-start-color: Highlight;
 	}
-	.writer-comment .cool-annotation-resolve {
+	.writer-comment .cool-annotation-resolve,
+	.writer-comment .cool-redline-accept-button,
+	.writer-comment .cool-redline-reject-button {
 		color: ButtonText;
 	}
 }
