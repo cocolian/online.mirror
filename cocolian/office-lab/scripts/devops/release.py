@@ -88,7 +88,9 @@ def compile_source(repo,engine,online,office_config):
   check='grep -Fqx '+shlex.quote('#define COOLWSD_VERSION_HASH "'+version+'"')+' config_version.h'
   commands += ['cd /workspace/source',
    'if ! '+check+'; then ./config.status --recheck && ./config.status; fi',
-   f'make -j{jobs}',check,'DESTDIR=/workspace/stage make install']
+   f'make -j{jobs}',check,
+   'node --test cocolian/office-lab/scripts/devops/test_comment_navigation.cjs',
+   'DESTDIR=/workspace/stage make install']
  run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus',str(jobs),'--memory','12g','--user','1000:1000',
       '-v',str(CACHE)+':/workspace','-v',str(HOME/'projects/cocolian-office/artifacts/render-fidelity-20261019/qa-fonts')+':/usr/local/share/fonts/fidelity-test:ro',
       BUILDER,'bash','-lc','\n'.join(commands)],timeout=18000)

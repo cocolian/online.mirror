@@ -486,8 +486,14 @@ export class Comment extends CanvasSectionObject {
 		// ends up depends on how tall it is. Its text is capped after the layout places it,
 		// which changes that height while the layout asks for the same place. So the height
 		// is part of what makes a position out of date, along with the place and the bounds.
-		const clamped = this.isSelected() || this.isEdit();
-		const height = clamped ? this.getCommentHeight() : null;
+		// Writer's margin is one document-ordered stack. Clamping one selected
+		// card independently moves it on top of its neighbours. Scroll the stack
+		// into view instead; only new comments and full-view popups float.
+		const inlineWriter = app.map._docLayer._docType === 'text'
+			&& this.sectionProperties.data.id !== 'new'
+			&& !this.sectionProperties.commentListSection.isShownBig(this);
+		const clamped = !inlineWriter && (this.isSelected() || this.isEdit());
+		const height = this.getCommentHeight();
 
 		if (this.containerPosX === left
 				&& this.containerPosY === top
@@ -509,7 +515,7 @@ export class Comment extends CanvasSectionObject {
 		left += canvasContainerBounds.left;
 		top += canvasContainerBounds.top;
 
-		if (this.isSelected() || this.isEdit()) {
+		if (clamped) {
 			// Gap kept between the comment and the toolbar/canvas edges.
 			const margin = this.sectionProperties.commentListSection.sectionProperties.marginY / app.dpiScale;
 
@@ -557,6 +563,19 @@ export class Comment extends CanvasSectionObject {
 
 		this.sectionProperties.container.style.left = Math.round(left) + 'px';
 		this.sectionProperties.container.style.top = Math.round(top) + 'px';
+		// Cards use fixed positioning, so their parent cannot clip them. Keep
+		// off-screen cards out of the ribbon/status bar, including hit testing.
+		if (inlineWriter) {
+			const width = this.getCommentWidth() / app.dpiScale;
+			const insets = [canvasContainerBounds.top - top,
+				left + width - canvasContainerBounds.right,
+				top + height - canvasContainerBounds.bottom,
+				canvasContainerBounds.left - left];
+			this.sectionProperties.container.style.clipPath = 'inset('
+				+ insets.map(value => Math.max(0, value) + 'px').join(' ') + ')';
+		} else {
+			this.sectionProperties.container.style.clipPath = '';
+		}
 
 		this.renderedPosY = top - canvasContainerBounds.top;
 		return this.renderedPosY;

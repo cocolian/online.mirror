@@ -256,6 +256,7 @@ export class CommentSection extends CanvasSectionObject {
 		canvasContainerBounds: DOMRect;
 	};
 	disableLayoutAnimation: boolean = false;
+	private changesImportSignature: string | null = null;
 
 	mobileCommentId: string = 'new-annotation-dialog';
 	mobileCommentModalId: string;
@@ -1384,8 +1385,6 @@ export class CommentSection extends CanvasSectionObject {
 				this.setThreadPopup(this.sectionProperties.selectedComment, true);
 			}
 
-			this.scrollCommentIntoView(annotation);
-
 			const selectedComment = this.sectionProperties.selectedComment;
 			if (this.isCollapsed) {
 				this.showCollapsedReplies(idx);
@@ -1401,6 +1400,7 @@ export class CommentSection extends CanvasSectionObject {
 				this.listenForClickOutsideComment(true);
 
 			this.update();
+			this.scrollCommentIntoView(annotation);
 		}
 	}
 
@@ -1422,6 +1422,30 @@ export class CommentSection extends CanvasSectionObject {
 
 		if (!comment.sectionProperties || !comment.sectionProperties.data) {
 			app.console.error('scrollCommentIntoView: comment without valid data');
+			return;
+		}
+
+		if (app.map._docLayer._docType === 'text' && !this.sectionProperties.showSelectedBigger) {
+			// Run after layout: the clicked card may have been pushed below its
+			// anchor by other comments/revisions. Its rendered box is the target,
+			// not the anchor that would reshuffle the entire column on every click.
+			app.layoutingService.appendLayoutingTask(() => {
+				if (!this.sectionProperties.selectedComment || !comment.isContainerVisible())
+					return;
+				const bounds = document.getElementById('document-container').getBoundingClientRect();
+				const rect = comment.sectionProperties.container.getBoundingClientRect();
+				const margin = this.sectionProperties.marginY / app.dpiScale;
+				let delta = 0;
+				if (rect.top < bounds.top + margin)
+					delta = rect.top - bounds.top - margin;
+				else if (rect.bottom > bounds.bottom - margin)
+					delta = Math.min(rect.bottom - bounds.bottom + margin, rect.top - bounds.top - margin);
+				if (delta) {
+					const layout = app.activeDocument.activeLayout;
+					layout.scrollTo(layout.viewedRectangle.pX1,
+						Math.max(0, layout.viewedRectangle.pY1 + delta * app.dpiScale));
+				}
+			});
 			return;
 		}
 
@@ -2390,9 +2414,7 @@ export class CommentSection extends CanvasSectionObject {
 	}
 
 	public selectById (commentId: any): void {
-		const idx = this.getRootIndexOf(commentId);
-		const annotation = this.sectionProperties.commentList[idx];
-		this.select(annotation);
+		this.select(this.getComment(commentId));
 	}
 
 	public stringToRectangles (str: string): number[][] {
@@ -2616,7 +2638,8 @@ export class CommentSection extends CanvasSectionObject {
 				const commentWidth = (this.sectionProperties.showSelectedBigger ? this.sectionProperties.commentWidthBigger: this.sectionProperties.commentWidth) / app.dpiScale;
 								let posX = (this.sectionProperties.showSelectedBigger ?
 								Math.round((documentCanvasWidth - commentWidth)/2) :
-								Math.round(actualPosition[0] / app.dpiScale) - this.sectionProperties.deflectionOfSelectedComment * (isRTL ? -1 : 1));
+								Math.round(actualPosition[0] / app.dpiScale) -
+								(app.map._docLayer._docType === 'text' ? 0 : this.sectionProperties.deflectionOfSelectedComment) * (isRTL ? -1 : 1));
 				// if on selection full comment is not visible bring it fully inside view, helps in narrow windows and tablets
 				if (isRTL && posX < 0)
 					posX = 0;
@@ -2807,15 +2830,11 @@ export class CommentSection extends CanvasSectionObject {
 			if (relayout)
 				this.resizeLastComment();
 			var lastY = 0;
-			// In Writer a comment is anchored to a point in the text that flows
-			// down the page, so comments before the selected one belong above it
-			// and are laid out upwards from its anchor. In Impress and Draw every
-			// comment is an independent thread pinned to a marker, and new comments
-			// all land at the same viewport top-left point. Laying the earlier ones
-			// upwards from that shared top anchor pushes them above the slide into
-			// the toolbar. Keep them in a single top-down stack with the selected
-			// comment expanded in place instead.
+			// Keep the margin in document order when selection changes. Pivoting
+			// the stack around the selected anchor makes neighbouring cards jump
+			// under the pointer, especially when revisions share a text anchor.
 			var stackFromTop = selectedIndex === null
+				|| (app.map._docLayer._docType === 'text' && !this.sectionProperties.showSelectedBigger)
 				|| app.map._docLayer._docType === 'presentation'
 				|| app.map._docLayer._docType === 'drawing';
 			if (stackFromTop) {
@@ -2844,6 +2863,14 @@ export class CommentSection extends CanvasSectionObject {
 				// them against the pre-reposition positions).
 				this.updateChildLines();
 			}
+		}
+		if (app.map._docLayer._docType === 'text' && this.sectionProperties.selectedComment
+			&& !this.sectionProperties.showSelectedBigger && !this.commentsHiddenOrNotPresent()) {
+			const selected = this.sectionProperties.selectedComment;
+			const anchor = selected.sectionProperties.data.anchorSPoint.vToArray();
+			const endX = (selected.sectionProperties.container.getBoundingClientRect().left
+				- this.sectionProperties.canvasContainerBounds.left) * app.dpiScale;
+			this.showArrow(anchor, [endX, selected.renderedPosY * app.dpiScale]);
 		}
 
 		// Grow the scrollable area to cover the comments. The layout owns viewSize
@@ -3287,15 +3314,8 @@ export class CommentSection extends CanvasSectionObject {
 			return;
 		}
 
-		// If a navigation (e.g. Action_GoToComment) just selected a comment
-		// and set the doNotHideCommentTimer guard, remember the id so we can
-		// re-select the rebuilt comment at the end of the import. Without
-		// this, a status-msg-triggered annotations refresh arriving right
-		// after the navigation would silently drop the selection.
-		const preserveSelectedId = this.sectionProperties.doNotHideCommentTimer
-				&& this.sectionProperties.selectedComment
-			? this.sectionProperties.selectedComment.sectionProperties.data.id
-			: null;
+		const selected = this.sectionProperties.selectedComment;
+		const expanded = this.sectionProperties.expandedComment;
 
 		CommentSection.importingComments = true;
 		let drawPaused = false;
@@ -3358,15 +3378,49 @@ export class CommentSection extends CanvasSectionObject {
 		if (drawPaused) {
 			this.containerObject.resumeDrawing();
 		}
-		if (preserveSelectedId !== null)
-			this.selectById(preserveSelectedId);
+		this.restoreSelectionAfterImport(selected, expanded);
+	}
+
+	// Refreshing core metadata must not behave like another user click. Restore
+	// the same ID without scrolling, and reject a reused revision index whose
+	// identity no longer matches the selected change.
+	private restoreSelectionAfterImport(selected: Comment, expanded: Comment): void {
+		const find = (previous: Comment): Comment => {
+			if (!previous) return null;
+			const data = previous.sectionProperties.data;
+			const current = this.getComment(data.id);
+			if (!current) return null;
+			const next = current.sectionProperties.data;
+			if (data.trackchange && ['author', 'dateTime', 'type', 'description'].some(key => data[key] !== next[key]))
+				return null;
+			return current;
+		};
+		this.sectionProperties.selectedComment = find(selected);
+		this.sectionProperties.expandedComment = find(expanded);
+		for (const comment of this.sectionProperties.commentList) {
+			comment.sectionProperties.container.classList.toggle('annotation-active',
+				comment === this.sectionProperties.selectedComment);
+		}
+		if (this.sectionProperties.selectedComment && this.sectionProperties.showSelectedBigger)
+			this.setThreadPopup(this.sectionProperties.selectedComment, true);
+		if (!this.sectionProperties.selectedComment)
+			this.sectionProperties.showSelectedBigger = false;
+		this.listenForClickOutsideComment(!!this.sectionProperties.selectedComment);
+		this.update();
 	}
 
 	// Accepts redlines/changes comments.
 	public importChanges (changesList: any): void {
+		changesList = this.turnIntoAList(changesList);
+		const signature = JSON.stringify(changesList);
+		// AI review reads this table periodically. An unchanged response is not
+		// a layout update and must not recreate cards or steal their selection.
+		if (signature === this.changesImportSignature || Comment.isAnyEdit())
+			return;
+		const selected = this.sectionProperties.selectedComment;
+		const expanded = this.sectionProperties.expandedComment;
 		var changeComment;
 		this.clearChanges();
-		changesList = this.turnIntoAList(changesList);
 
 		if (changesList.length > 0) {
 			for (let i = 0; i < changesList.length; i++) {
@@ -3392,6 +3446,8 @@ export class CommentSection extends CanvasSectionObject {
 
 		if (app.map._docLayer._docType === 'spreadsheet')
 			this.hideAllComments(); // Apply drawing orders.
+		this.changesImportSignature = signature;
+		this.restoreSelectionAfterImport(selected, expanded);
 	}
 
 	// Remove redline comments.
