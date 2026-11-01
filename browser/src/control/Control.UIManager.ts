@@ -1847,6 +1847,11 @@ class UIManager extends window.L.Control {
 				.forEach(el => { el.classList.toggle('hidden-by-command', !show); });
 			found = true;
 		}
+		if (command === '.uno:ResolveComment') {
+			document.querySelectorAll<HTMLElement>('.cool-annotation-resolve')
+				.forEach(el => { el.classList.toggle('hidden-by-command', !show); });
+			found = true;
+		}
 
 		if (this.getCurrentMode() === 'classic') {
 			if (this.showCommandInClassicToolbar(command, show)) {

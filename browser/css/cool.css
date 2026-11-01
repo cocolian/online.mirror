@@ -1166,6 +1166,125 @@ input, button {
 	padding: 0 !important;
 }
 
+/* Writer margin comments keep author and text prominent, like Word. The
+ * metadata and action row keep their space so hovering never moves a thread. */
+.writer-comment .cool-annotation-content-wrapper {
+	padding: 8px 10px;
+	row-gap: 4px;
+	border-inline-start: 3px solid var(--color-primary);
+	border-radius: 0;
+	box-shadow: none;
+	background-color: var(--color-background-lighter);
+}
+
+.writer-comment .cool-annotation-img {
+	display: inline-flex;
+	width: auto;
+	height: auto;
+	max-width: none;
+	border: 0;
+}
+
+.writer-comment .avatar-img {
+	display: none;
+}
+
+.writer-comment .cool-annotation-info-collapsed {
+	position: static;
+	width: 20px;
+	height: 20px;
+	margin-inline-end: 6px;
+}
+
+.writer-comment .cool-annotation-author {
+	padding-inline: 0 8px;
+	font-weight: 600;
+}
+
+.writer-comment .cool-annotation-author-header {
+	min-height: 28px;
+}
+
+.writer-comment .cool-annotation-content {
+	line-height: 1.5;
+}
+
+.writer-comment .cool-annotation-date,
+.writer-comment .cool-annotation-menubar {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.writer-comment:hover .cool-annotation-date,
+.writer-comment:hover .cool-annotation-menubar,
+.writer-comment:focus-within .cool-annotation-date,
+.writer-comment:focus-within .cool-annotation-menubar,
+.writer-comment.comment-menu-open .cool-annotation-date,
+.writer-comment.comment-menu-open .cool-annotation-menubar {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.writer-comment .cool-annotation-date {
+	font-size: 11px;
+	line-height: 16px;
+}
+
+.writer-comment .cool-annotation-resolve,
+.writer-comment .cool-annotation-menu {
+	width: 28px !important;
+	height: 28px !important;
+	min-width: 28px !important;
+	border: 0 !important;
+	border-radius: 50%;
+	cursor: pointer;
+}
+
+.writer-comment .cool-annotation-resolve {
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	color: var(--color-primary);
+	font: 22px/28px system-ui, sans-serif;
+}
+
+.writer-comment .cool-annotation-resolve[hidden] {
+	display: none !important;
+}
+
+.writer-comment .cool-annotation-resolve:hover,
+.writer-comment .cool-annotation-menu:hover {
+	background-color: var(--color-background-hover) !important;
+}
+
+.writer-comment .cool-annotation-resolve:focus-visible,
+.writer-comment .cool-annotation-menu:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+}
+
+.writer-comment .cool-annotation-resolve.is-resolved {
+	color: var(--color-success);
+}
+
+/* Touch has no hover; keep the same actions available without a mouse. */
+@media (hover: none), (pointer: coarse) {
+	.writer-comment .cool-annotation-date,
+	.writer-comment .cool-annotation-menubar {
+		opacity: 1;
+		pointer-events: auto;
+	}
+}
+
+@media (forced-colors: active) {
+	.writer-comment .cool-annotation-content-wrapper {
+		border-inline-start-color: Highlight;
+	}
+	.writer-comment .cool-annotation-resolve {
+		color: ButtonText;
+	}
+}
+
 .cool-annotation-child-line {
 	border-style: none none dashed dashed;
 	border-width: thin;

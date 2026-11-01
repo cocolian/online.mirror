@@ -1404,12 +1404,12 @@ export class CommentSection extends CanvasSectionObject {
 		}
 	}
 
-	// Focus the edit icon of the given comment
+	// Writer keeps editing in the menu; other components retain their edit icon.
 	private focusEditIcon(comment: Comment): void {
 		var container = comment.sectionProperties.container;
 		app.layoutingService.appendLayoutingTask(() => {
 			var editIcon = container?.querySelector(
-				'.cool-annotation-menu-edit',
+				'.cool-annotation-menu-edit, .cool-annotation-menu',
 			) as HTMLElement;
 			if (editIcon) editIcon.focus();
 		});

@@ -137,6 +137,7 @@ export class Comment extends CanvasSectionObject {
 		this.sectionProperties.rejectButton = null;
 		this.sectionProperties.menu = null;
 		this.sectionProperties.menuBarCell = null;
+		this.sectionProperties.resolveButton = null;
 		this.sectionProperties.captionNode = null;
 		this.sectionProperties.captionText = null;
 
@@ -330,11 +331,14 @@ export class Comment extends CanvasSectionObject {
 	// per-comment controls.
 	private updateEditability (): void {
 		this.makeEditable(app.isCommentEditingAllowed());
+		this.updateResolveButton();
 	}
 
 	private createContainerAndWrapper (): void {
 		var isRTL = document.documentElement.dir === 'rtl';
 		this.sectionProperties.container = window.L.DomUtil.create('div', 'cool-annotation' + (isRTL ? ' rtl' : ''));
+		if (app.map._docLayer._docType === 'text' && !this.sectionProperties.data.trackchange)
+			this.sectionProperties.container.classList.add('writer-comment');
 		this.sectionProperties.container.id = 'comment-container-' + this.sectionProperties.data.id;
 		window.L.DomEvent.on(this.sectionProperties.container, 'focusout', this.onLostFocus, this);
 
@@ -389,7 +393,22 @@ export class Comment extends CanvasSectionObject {
 	private createMenu (): void {
 		var tdMenu = window.L.DomUtil.create('td', 'cool-annotation-menubar', this.sectionProperties.authorRow);
 		this.sectionProperties.menuBarCell = tdMenu;
-		if (this.isAuthor()) {
+		const writerComment = app.map._docLayer._docType === 'text' && !this.sectionProperties.data.trackchange;
+		if (writerComment) {
+			const resolve = window.L.DomUtil.create('button', 'cool-annotation-resolve', tdMenu) as HTMLButtonElement;
+			resolve.type = 'button';
+			resolve.id = 'comment-annotation-resolve-' + this.sectionProperties.data.id;
+			resolve.textContent = '✓';
+			resolve.onclick = (event: MouseEvent) => {
+				window.L.DomEvent.stopPropagation(event);
+				if (app.isCommentEditingAllowed() && this.canModerate()
+					&& app.map.uiManager.isCommandVisible('.uno:ResolveComment'))
+					this.sectionProperties.commentListSection.resolve(this);
+			};
+			this.sectionProperties.resolveButton = resolve;
+			this.updateResolveButton();
+		}
+		if (!writerComment && this.isAuthor()) {
 			const edit = window.L.DomUtil.create('div', 'cool-annotation-menu-edit', tdMenu);
 			edit.id = 'comment-annotation-menu-edit-' + this.sectionProperties.data.id;
 			// Honor an earlier Hide_Command for .uno:EditAnnotation; the class
@@ -406,10 +425,27 @@ export class Comment extends CanvasSectionObject {
 		this.sectionProperties.menu = window.L.DomUtil.create('div', this.sectionProperties.data.trackchange ? 'cool-annotation-menu-redline' : 'cool-annotation-menu', tdMenu);
 		this.sectionProperties.menu.id = 'comment-annotation-menu-' + this.sectionProperties.data.id;
 		this.sectionProperties.menu.tabIndex = 0;
+		this.sectionProperties.menu.setAttribute('role', 'button');
+		this.sectionProperties.menu.setAttribute('aria-haspopup', 'menu');
+		this.sectionProperties.menu.setAttribute('aria-expanded', 'false');
 		this.sectionProperties.menu.onclick = this.menuOnMouseClick.bind(this);
-		this.sectionProperties.menu.onkeypress = this.menuOnKeyPress.bind(this);
+		this.sectionProperties.menu.onkeydown = this.menuOnKeyPress.bind(this);
 		this.sectionProperties.menu.dataset.title = Comment.openMenuLabel;
 		this.sectionProperties.menu.setAttribute('aria-label', Comment.openMenuLabel);
+	}
+
+	private updateResolveButton (): void {
+		const button = this.sectionProperties.resolveButton as HTMLButtonElement;
+		if (!button) return;
+		const resolved = this.sectionProperties.data.resolved === 'true';
+		const label = resolved ? _('Unresolve') : _('Resolve');
+		button.hidden = this.sectionProperties.data.id === 'new' || !this.canModerate();
+		button.disabled = !app.isCommentEditingAllowed();
+		button.classList.toggle('hidden-by-command', !app.map.uiManager.isCommandVisible('.uno:ResolveComment'));
+		button.classList.toggle('is-resolved', resolved);
+		button.setAttribute('aria-label', label);
+		button.setAttribute('aria-pressed', String(resolved));
+		button.dataset.title = label;
 	}
 
 	// Returns the final (post-clamp) top in canvas-relative CSS px, so a thread's
@@ -637,6 +673,7 @@ export class Comment extends CanvasSectionObject {
 
 	public updateResolvedField (state: string): void {
 		this.sectionProperties.resolvedTextElement.innerText = state === 'true' ? _('Resolved') : '';
+		this.updateResolveButton();
 	}
 
 	public updateRemovedField (): void {
@@ -1272,9 +1309,11 @@ export class Comment extends CanvasSectionObject {
 
 	// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 	private menuOnKeyPress (e: any): void {
-		if (e.code === 'Space' || e.code === 'Enter')
+		if (e.code === 'Space' || e.code === 'Enter') {
+			window.L.DomEvent.preventDefault(e);
 			this.openContextMenu();
-		window.L.DomEvent.stopPropagation(e);
+			window.L.DomEvent.stopPropagation(e);
+		}
 	}
 
 	private openContextMenu (): void {
@@ -1351,6 +1390,8 @@ export class Comment extends CanvasSectionObject {
 		const menuEl = this.sectionProperties.menu;
 		menuEl._onDropDown = function (open: boolean) {
 			this.sectionProperties.contextMenu = open;
+			this.sectionProperties.container.classList.toggle('comment-menu-open', open);
+			this.sectionProperties.menu.setAttribute('aria-expanded', String(open));
 		}.bind(this);
 
 		if (window.mode.isSmallScreenDevice()) {
