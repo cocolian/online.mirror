@@ -257,6 +257,7 @@ export class CommentSection extends CanvasSectionObject {
 	};
 	disableLayoutAnimation: boolean = false;
 	private changesImportSignature: string | null = null;
+	private scrollRequest: number = 0;
 
 	mobileCommentId: string = 'new-annotation-dialog';
 	mobileCommentModalId: string;
@@ -1427,11 +1428,13 @@ export class CommentSection extends CanvasSectionObject {
 		}
 
 		if (app.map._docLayer._docType === 'text' && !this.sectionProperties.showSelectedBigger) {
+			const request = ++this.scrollRequest;
 			// Run after layout: the clicked card may have been pushed below its
 			// anchor by other comments/revisions. Its rendered box is the target,
 			// not the anchor that would reshuffle the entire column on every click.
 			app.layoutingService.appendLayoutingTask(() => {
-				if (!this.sectionProperties.selectedComment || !comment.isContainerVisible())
+				if (request !== this.scrollRequest || this.getComment(comment.sectionProperties.data.id) !== comment
+					|| !comment.isContainerVisible())
 					return;
 				const bounds = document.getElementById('document-container').getBoundingClientRect();
 				const rect = comment.sectionProperties.container.getBoundingClientRect();

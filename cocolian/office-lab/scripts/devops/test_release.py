@@ -104,9 +104,10 @@ class ReleaseTests(unittest.TestCase):
 
  def test_compile_reserves_cpu_and_applies_limit_to_both_test_profiles(self):
   for cpus,expected in [(1,1),(4,3),(6,5),(16,5)]:
-   commands=[]
+   commands=[];test_environments=[]
    def command(args,**kwargs):
     commands.append(args)
+    if args[:2]==['node','--test']:test_environments.append(kwargs['env'])
     return ''
    with patch.object(r.os,'cpu_count',return_value=cpus),patch.object(r,'sync_source'),patch.object(r,'run',side_effect=command),patch.object(r,'stamp_online_version',return_value='0123456789'):
     r.compile_source(Path('/source'),True,True,Path('/office'))
@@ -120,6 +121,9 @@ class ReleaseTests(unittest.TestCase):
     self.assertIn('LOADLIMIT='+str(expected+1),args[-1])
    self.assertIn('./config.status --recheck',builds[0][-1])
    self.assertIn('COOLWSD_VERSION_HASH "0123456789"',builds[0][-1])
+   self.assertNotIn('test_comment_navigation.cjs',builds[0][-1])
+   self.assertIn(['node','--test',Path('/source/cocolian/office-lab/scripts/devops/test_comment_navigation.cjs')],commands)
+   self.assertEqual(test_environments[0]['NODE_PATH'],str(r.CACHE/'source/browser/node_modules'))
 
  def test_reuse_requires_identical_layers_and_config(self):
   source={'rootfs':{'diff_ids':['sha256:layer']},'config':{'User':'1001'},'os':'linux','architecture':'amd64'}

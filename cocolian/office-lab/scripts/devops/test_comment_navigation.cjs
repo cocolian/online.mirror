@@ -31,7 +31,7 @@ function setup() {
  vm.runInContext(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context);
  const Comment = context.cool.Comment, List = context.cool.CommentSection;
  const list = Object.create(List.prototype);
- Object.assign(list,{myTopLeft:[2000,20],isCollapsed:false,changesImportSignature:null,idIndexMap:new Map(),
+ Object.assign(list,{myTopLeft:[2000,20],isCollapsed:false,changesImportSignature:null,scrollRequest:0,idIndexMap:new Map(),
   sectionProperties:{commentList:[],show:true,showResolved:false,selectedComment:null,expandedComment:null,
    marginY:40,commentWidth:500,canvasContainerBounds:bounds,deflectionOfSelectedComment:160},
   getComment:id=>list.sectionProperties.commentList.find(c=>c.sectionProperties.data.id===id),
@@ -127,4 +127,10 @@ test('clicking a visible stacked card does not scroll back to its earlier text a
  const s=setup(),c=s.card('change-7',-500,100,{trackchange:true});s.list.sectionProperties.commentList=[c];
  s.list.sectionProperties.selectedComment=c;c.setContainerPos(true,s.bounds,1000,200);
  s.list.scrollCommentIntoView(c);s.tasks.forEach(fn=>fn());assert.equal(s.app.scrolls.length,0);
+});
+test('rapid clicks cancel an older queued scroll target',()=>{
+ const s=setup(),a=s.card('a'),b=s.card('b');s.list.sectionProperties.commentList=[a,b];
+ a.setContainerPos(true,s.bounds,1000,200);b.setContainerPos(true,s.bounds,1000,700);
+ s.list.scrollCommentIntoView(b);s.list.scrollCommentIntoView(a);
+ s.tasks.forEach(fn=>fn());assert.equal(s.app.scrolls.length,0);
 });
