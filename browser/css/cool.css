@@ -1128,7 +1128,7 @@ input, button {
 	background: url('images/lc_more.svg') no-repeat center/contain !important;
 }
 
-[data-theme='dark'] .cool-annotation-menu, .cool-annotation-menu-redline {
+[data-theme='dark'] .cool-annotation-menu, [data-theme='dark'] .cool-annotation-menu-redline {
 	background: url('images/dark/lc_more.svg') no-repeat center/contain !important;
 }
 
