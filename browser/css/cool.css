@@ -1175,10 +1175,15 @@ input, button {
 .writer-comment .cool-annotation-redline-content-wrapper {
 	padding: 8px 10px;
 	row-gap: 4px;
-	border-inline-start: 3px solid var(--color-primary);
+	border-inline-start: 3px solid transparent;
 	border-radius: 0;
 	box-shadow: none;
 	background-color: var(--color-background-lighter);
+}
+
+.writer-comment.annotation-active > .cool-annotation-content-wrapper,
+.writer-comment.annotation-active > .cool-annotation-redline-content-wrapper {
+	border-inline-start-color: var(--color-primary);
 }
 
 .writer-comment .cool-annotation-img {
@@ -1298,8 +1303,8 @@ input, button {
 }
 
 @media (forced-colors: active) {
-	.writer-comment .cool-annotation-content-wrapper,
-	.writer-comment .cool-annotation-redline-content-wrapper {
+	.writer-comment.annotation-active > .cool-annotation-content-wrapper,
+	.writer-comment.annotation-active > .cool-annotation-redline-content-wrapper {
 		border-inline-start-color: Highlight;
 	}
 	.writer-comment .cool-annotation-resolve,
