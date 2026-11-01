@@ -1361,13 +1361,11 @@ export class CommentSection extends CanvasSectionObject {
 			// Select the root comment
 			var idx = this.getRootIndexOf(annotation.sectionProperties.data.id);
 
-			// Selection covers a whole thread, so clicking a reply selects its root.
-			// This is the card the click landed on, and the one shown in full.
-			this.sectionProperties.expandedComment = annotation;
-
 			// no need to reselect comment, it will cause to scroll to root comment unnecessarily
 			if (this.sectionProperties.selectedComment === this.sectionProperties.commentList[idx]) {
+				this.sectionProperties.expandedComment = annotation;
 				this.update();
+				this.scrollCommentIntoView(annotation);
 				return;
 			}
 
@@ -1375,6 +1373,9 @@ export class CommentSection extends CanvasSectionObject {
 			if (this.sectionProperties.selectedComment)
 				this.unselect();
 
+			// unselect clears the expansion too, so keep the exact clicked card
+			// only after leaving the previous thread.
+			this.sectionProperties.expandedComment = annotation;
 			this.sectionProperties.selectedComment = this.sectionProperties.commentList[idx];
 
 			if (this.sectionProperties.selectedComment && !$(this.sectionProperties.selectedComment.sectionProperties.container).hasClass('annotation-active')) {

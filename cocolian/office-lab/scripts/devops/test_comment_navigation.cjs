@@ -22,7 +22,8 @@ function setup() {
  const document = {documentElement:{dir:'ltr'},getElementById:id=>id==='document-canvas'
   ? {style:{width:'1512'}} : {getBoundingClientRect:()=>bounds}};
  const context = {app,document,console,CanvasSectionObject:class {},DOMRect:class {},DOMPurify:{addHook:()=>{}},_:s=>s,
-  window:{L:{Map:{include:()=>{}}},mode:{isSmallScreenDevice:()=>false}},
+  $:element=>({hasClass:name=>element.classList.contains(name),addClass:name=>element.classList.toggle(name,true)}),
+  window:{L:{Map:{include:()=>{}},DomUtil:{hasClass:(e,n)=>e.classList.contains(n),removeClass:(e,n)=>e.classList.toggle(n,false)}},mode:{isSmallScreenDevice:()=>false}},
   cool:{CanvasSectionObject:class {},SimplePoint:Point}};
  vm.createContext(context);
  const source = ['CommentSection.ts','CommentListSection.ts'].map(file=>
@@ -95,6 +96,17 @@ test('background metadata cannot destroy an edit in progress',()=>{
 test('selectById retains the exact reply as the expanded target',()=>{
  const s=setup(),reply=s.card('reply');s.list.sectionProperties.commentList=[reply];
  let chosen;s.list.select=c=>{chosen=c;};s.list.selectById('reply');assert.equal(chosen,reply);
+});
+test('switching threads clears the old selection before expanding the clicked card',()=>{
+ const s=setup(),a=s.card('a'),b=s.card('b'),reply=s.card('reply',0,86,{parent:'b'});
+ s.list.sectionProperties.commentList=[a,b,reply];
+ s.list.sectionProperties.selectedComment=a;s.list.sectionProperties.expandedComment=a;
+ a.sectionProperties.container.classList.toggle('annotation-active',true);
+ s.list.select(b);
+ assert.equal(s.list.sectionProperties.selectedComment,b);assert.equal(s.list.sectionProperties.expandedComment,b);
+ assert.equal(a.sectionProperties.container.classList.contains('annotation-active'),false);
+ s.list.selectById('reply');
+ assert.equal(s.list.sectionProperties.selectedComment,b);assert.equal(s.list.sectionProperties.expandedComment,reply);
 });
 test('mixed Writer comments and revisions keep their positions across every selection',()=>{
  const s=setup();s.list.sectionProperties.commentList=[s.card('1',0),s.card('change-7',0,123,{trackchange:true}),s.card('2',20)];
