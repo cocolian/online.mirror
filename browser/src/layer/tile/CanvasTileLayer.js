@@ -3376,7 +3376,7 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 		if (this.isImpress())
 			return 13; /* 170% */
 		if (this.isWriter())
-			return 13; /* 170% */
+			return 10; /* Auto-fit caps Writer at 100%; explicit zoom remains available. */
 
 		if (!window.mode.isInteractivePreview()) {
 			// In the interactive preview it is called to set the proper size for Draw
@@ -3408,8 +3408,9 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 
 	_writerDynamicZoom: function(containerWidth, documentWidth, bringCommentsIntoView) {
 		const commentSection = app.sectionContainer.getSectionWithName(app.CSections.CommentList.name);
-		if (bringCommentsIntoView && commentSection)
-			containerWidth -= commentSection.sectionProperties.commentWidth;
+		if (bringCommentsIntoView && commentSection && !window.mode.isSmallScreenDevice())
+			containerWidth -= commentSection.sectionProperties.commentWidth + 16 * app.dpiScale;
+		containerWidth = Math.max(1, containerWidth);
 		const ratio = containerWidth / documentWidth;
 		return app.activeDocument.getScaleZoom(ratio);
 	},
@@ -3967,11 +3968,15 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 			let zoom;
 			const smartZoomEnabled = window.prefs.get('smartZoom') != 'false' || wantDynamicZoom;
 			const maxZoom = this._getMaxZoom();
+			const hasComments = app.activeDocument.partHasComments ?? this._partHasComments;
 
 			if (smartZoomEnabled) {
 				const documentWidth = (this._documentWidthTwips / app.tile.size.x) * (RenderManager.tileSize * app.dpiScale)
-				const containerSize = this._getDocumentContainerSize()[0] * app.dpiScale;
-				zoom = this._writerDynamicZoom(containerSize, documentWidth, this._partHasComments);
+				// The document anchor excludes open navigation/property panels. The
+				// outer container can still span them while the initial UI settles.
+				const frame = app.activeDocument.activeLayout.frameSize;
+				const containerSize = frame?.pX || this._getDocumentContainerSize()[0] * app.dpiScale;
+				zoom = this._writerDynamicZoom(containerSize, documentWidth, hasComments);
 			} else {
 				zoom = this._getWriterDefaultZoom();
 			}
@@ -3982,7 +3987,7 @@ window.L.CanvasTileLayer = window.L.Layer.extend({
 				zoom = Math.floor(zoom);
 
 			this._firstFitDone = true;
-			if (this._partHasComments)
+			if (hasComments)
 				this._includedCommentsInFirstFit = true;
 			app.activeDocument.activeLayout.applyZoom(zoom);
 		} else  {

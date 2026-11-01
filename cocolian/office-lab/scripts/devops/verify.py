@@ -41,8 +41,14 @@ def main():
   assert 'action="'+prefix in html
   # Check the actual browser entry through the gateway, not just discovery.
   action=__import__('html').unescape(re.search(r'action="([^"]+cool.html[^\"]*)"',html).group(1))
+  expected=os.environ.get('EXPECTED_BROWSER_VERSION','')
+  if expected:
+   assert action.startswith(prefix+expected+'/'),'Browser asset version did not advance: '+prefix
+   asset=client.open('http://127.0.0.1:8080'+prefix+expected+'/bundle.css',timeout=20)
+   assert asset.status==200 and len(asset.read())>1000
   assert client.open('http://127.0.0.1:8080'+action,timeout=20).status==200
  checks['editor_entry_and_profile_routes']=True
+ if os.environ.get('EXPECTED_BROWSER_VERSION'):checks['browser_asset_version']=os.environ['EXPECTED_BROWSER_VERSION']
  for name,url,route,field in [('editor','http://collabora:9980','/cool/convert-to/pdf','data'),('wordmac','http://collabora-wordmac:9980','/word-mac/cool/convert-to/pdf','data'),('converter','http://libreoffice:3000','/forms/libreoffice/convert','files')]:checks[name]=convert(url,route,field,raw)
  def request(path,data=None,headers=None):return U.urlopen(U.Request(base+path,data=data,headers=headers or {}),timeout=20)
  fid=None;name='devops-smoke-'+uuid.uuid4().hex+'.docx'

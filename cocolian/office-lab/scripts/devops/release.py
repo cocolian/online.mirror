@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Image-only, immutable office-lab release. Run only through the serialized watcher."""
-import base64,copy,fcntl,hashlib,json,os,re,shutil,subprocess,sys,tempfile,time
+import base64,copy,fcntl,hashlib,json,os,re,shlex,shutil,subprocess,sys,tempfile,time
 from pathlib import Path
 HOME=Path.home();CACHE=HOME/'projects/cocolian-office/build/source-19b4efae7fb8'
 AUTH=HOME/'.config/cocolian-devops/registry-auth.json'
@@ -59,6 +59,16 @@ def sync_source(repo):
   copied+=1
  dump(manifest,names);print('Tracked source files synchronized:',copied,flush=True)
 
+def stamp_online_version(repo):
+ # The incremental cache is an exported tree, not a Git checkout. configure
+ # otherwise keeps its original hash, giving changed JS/CSS the same URL and
+ # ETag for 128 days. Stamp the real source revision for every online build.
+ revision=git(repo,'rev-parse','HEAD')
+ if not re.fullmatch(r'[0-9a-f]{40}',revision):raise RuntimeError('Invalid online source revision')
+ version=revision[:10];path=CACHE/'source/dist_git_hash'
+ if not path.exists() or path.read_text().strip()!=version:path.write_text(version+'\n')
+ return version
+
 def compile_source(repo,engine,online,office_config):
  # This cache is shared with manual builds: never run two make processes in it.
  processes=run(['ps','-eo','comm,args'])
@@ -73,7 +83,12 @@ def compile_source(repo,engine,online,office_config):
   commands += ['cd /workspace/engine',f'make -j{jobs} build',
    f'make -j{jobs} CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallBodyGridProportional testWordMacAutoFitPageWidth testWordMacUrlBreakUnits testWordMacRowCellSpacing testWordMacWordWrap testWordMacInlineImageGridLeading testWordMacFirstCharacterIndentFont testWordMacGridOverflowSetting testWordMacLegacyPercentTablePadding testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacFixedLayoutNoAutoFit testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
    'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log']
- if online:commands += ['cd /workspace/source',f'make -j{jobs}','DESTDIR=/workspace/stage make install']
+ if online:
+  version=stamp_online_version(repo)
+  check='grep -Fqx '+shlex.quote('#define COOLWSD_VERSION_HASH "'+version+'"')+' config_version.h'
+  commands += ['cd /workspace/source',
+   'if ! '+check+'; then ./config.status --recheck && ./config.status; fi',
+   f'make -j{jobs}',check,'DESTDIR=/workspace/stage make install']
  run(['docker','run','--rm','--name','cocolian-devops-build','--network','host','--cpus',str(jobs),'--memory','12g','--user','1000:1000',
       '-v',str(CACHE)+':/workspace','-v',str(HOME/'projects/cocolian-office/artifacts/render-fidelity-20261019/qa-fonts')+':/usr/local/share/fonts/fidelity-test:ro',
       BUILDER,'bash','-lc','\n'.join(commands)],timeout=18000)
@@ -303,6 +318,7 @@ def deploy(old,images,out,verify):
 def main():
  assert AUTH.is_file() and AUTH.stat().st_mode & 0o077==0,'Registry auth missing or insecure permissions'
  for test in ('test_release.py','test_registry_proxy.py'):run([sys.executable,Path(__file__).with_name(test)])
+ run(['node','--test',Path(__file__).with_name('test_writer_zoom.cjs')])
  out=Path(os.environ['DEVOPS_RUN']);paths={n:Path(p) for n,p in json.loads(os.environ['DEVOPS_CHECKOUTS']).items()};heads=json.loads(os.environ['DEVOPS_COMMITS'])
  # Reject unexpected namespace overrides; this pipeline never applies arbitrary manifests.
  assert os.environ.get('RELEASE_NAMESPACE','office-lab')=='office-lab'
@@ -330,7 +346,9 @@ def main():
  dump(out/'images.json',images)
  def verify():
   script=Path(__file__).with_name('verify.py').read_bytes()
-  result=k('-n','office-lab','exec','-i','deployment/wopi','-c','wopi','--','python3','-',input=script,timeout=240)
+  expected_version=heads['online.mirror'][:10] if online else ''
+  result=k('-n','office-lab','exec','-i','deployment/wopi','-c','wopi','--','env',
+   'EXPECTED_BROWSER_VERSION='+expected_version,'python3','-',input=script,timeout=240)
   dump(out/'checks.json',json.loads(result))
   after=json.loads(k('get','pods','-A','-o','json'));dump(out/'pods-after.json',after)
   assert stable_pods(before['items'],targets)==stable_pods(after['items'],targets),'Unselected modules or other namespace pods changed during release'

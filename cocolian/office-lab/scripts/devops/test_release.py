@@ -3,6 +3,19 @@ from pathlib import Path
 from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('release',Path(__file__).with_name('release.py'));r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
 class ReleaseTests(unittest.TestCase):
+ def test_exported_build_tree_gets_a_revision_specific_browser_version(self):
+  with tempfile.TemporaryDirectory() as directory:
+   cache=Path(directory);(cache/'source').mkdir()
+   stamp=cache/'source/dist_git_hash';stamp.write_text('958ee9f134\n')
+   revision='0123456789abcdef0123456789abcdef01234567'
+   with patch.object(r,'CACHE',cache),patch.object(r,'git',return_value=revision):
+    self.assertEqual(r.stamp_online_version(Path('/repo')),revision[:10])
+    self.assertEqual(stamp.read_text(),revision[:10]+'\n')
+    old_time=stamp.stat().st_mtime_ns
+    r.stamp_online_version(Path('/repo'));self.assertEqual(stamp.stat().st_mtime_ns,old_time)
+   with patch.object(r,'CACHE',cache),patch.object(r,'git',return_value='bad revision'):
+    with self.assertRaises(RuntimeError):r.stamp_online_version(Path('/repo'))
+
  def test_runtime_copy_permissions_and_symlink_isolation(self):
   with tempfile.TemporaryDirectory() as directory:
    root=Path(directory);source=root/'source';source.mkdir(mode=0o700)
@@ -95,7 +108,7 @@ class ReleaseTests(unittest.TestCase):
    def command(args,**kwargs):
     commands.append(args)
     return ''
-   with patch.object(r.os,'cpu_count',return_value=cpus),patch.object(r,'sync_source'),patch.object(r,'run',side_effect=command):
+   with patch.object(r.os,'cpu_count',return_value=cpus),patch.object(r,'sync_source'),patch.object(r,'run',side_effect=command),patch.object(r,'stamp_online_version',return_value='0123456789'):
     r.compile_source(Path('/source'),True,True,Path('/office'))
    builds=[a for a in commands if a[:2]==['docker','run']]
    self.assertEqual(len(builds),2)
@@ -105,6 +118,8 @@ class ReleaseTests(unittest.TestCase):
     self.assertIn('make -j'+str(expected),args[-1])
     self.assertIn('PARALLELISM='+str(expected),args[-1])
     self.assertIn('LOADLIMIT='+str(expected+1),args[-1])
+   self.assertIn('./config.status --recheck',builds[0][-1])
+   self.assertIn('COOLWSD_VERSION_HASH "0123456789"',builds[0][-1])
 
  def test_reuse_requires_identical_layers_and_config(self):
   source={'rootfs':{'diff_ids':['sha256:layer']},'config':{'User':'1001'},'os':'linux','architecture':'amd64'}
