@@ -52,6 +52,7 @@ with sync_playwright() as p:
  date=card.locator('.cool-annotation-date');actions=card.locator('.cool-annotation-menubar')
  tick=card.locator('.cool-annotation-resolve');menu=card.locator('.cool-annotation-menu')
  assert card.locator('.cool-annotation-menu-edit').count()==0
+ expect(card.locator('.avatar-img')).to_be_hidden()
  assert tick.count()==1 and menu.count()==1
  frame.evaluate('document.activeElement?.blur()');page.mouse.move(200,200)
  expect(date).to_have_css('opacity','0');expect(actions).to_have_css('opacity','0')

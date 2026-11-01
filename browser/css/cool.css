@@ -1186,7 +1186,7 @@ input, button {
 }
 
 .writer-comment .avatar-img {
-	display: none;
+	display: none !important;
 }
 
 .writer-comment .cool-annotation-info-collapsed {
