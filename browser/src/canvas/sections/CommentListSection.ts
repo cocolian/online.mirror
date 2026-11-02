@@ -2188,6 +2188,11 @@ export class CommentSection extends CanvasSectionObject {
 	}
 
 	public onACKComment (obj: any): void {
+		// Writer renders tracked insertions/deletions in the document. Revision
+		// callbacks must not turn them into comments in the page margin.
+		if (obj.redline && app.map._docLayer._docType === 'text')
+			return;
+
 		var id;
 
 		if (!obj.redline && obj.comment.id !== undefined && obj.comment.id !== 'new')
@@ -3413,8 +3418,12 @@ export class CommentSection extends CanvasSectionObject {
 		this.update();
 	}
 
-	// Accepts redlines/changes comments.
+	// Writer keeps revisions inline; the right margin contains comments only.
+	// The raw revision table remains available to native/host review consumers.
 	public importChanges (changesList: any): void {
+		if (app.map._docLayer._docType === 'text')
+			return;
+
 		changesList = this.turnIntoAList(changesList);
 		const signature = JSON.stringify(changesList);
 		// AI review reads this table periodically. An unchanged response is not

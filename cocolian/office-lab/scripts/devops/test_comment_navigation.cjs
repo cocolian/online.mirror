@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '../../../..');
 const ts = require(require.resolve('typescript', {paths: [path.join(root, 'browser'), ...module.paths]}));
 
-function setup() {
+function setup({docType='text'}={}) {
  const tasks = [], bounds = {left:250, right:1512, top:135, bottom:675, height:540};
  class Point {
   constructor(x,y) {this.x=x;this.y=y;this.vX=x;this.vY=y;}
@@ -15,7 +15,7 @@ function setup() {
  }
  const app = {definitions:{},dpiScale:2,pixelsToTwips:1,twipsToPixels:1,CSections:{},
   isCommentEditingAllowed:()=>true,
-  map:{_docLayer:{_docType:'text'},_viewInfoByUserName:{},wopi:{},isReadOnlyMode:()=>false,uiManager:{isCommandVisible:()=>true}},
+  map:{_docLayer:{_docType:docType},_viewInfoByUserName:{},wopi:{},isReadOnlyMode:()=>false,uiManager:{isCommandVisible:()=>true}},
   sectionContainer:{getCanvasBoundingClientRect:()=>({x:0})},
   activeDocument:{fileSize:{cX:1000},activeLayout:{type:'ViewLayoutWriter',viewedRectangle:{cX1:0,pX1:0,pY1:0,pY2:1080},
    ensureViewSizeCoversComments:()=>{},scrollTo:(x,y)=>{app.scrolls.push([x,y]);}}},
@@ -42,7 +42,7 @@ function setup() {
   update:()=>{},orderCommentList:()=>{},checkSize:()=>{},listenForClickOutsideComment:()=>{},
   setThreadPopup:()=>{},resetCommentsSize:()=>{},resizeLastComment:()=>{},resizeComments:()=>{},
   updateChildLines:()=>{},calculateAvailableSpace:()=>500,showArrow:()=>{},hideArrow:()=>{}});
- app.map.getDocType=()=> 'text';list.map=app.map;
+ app.map.getDocType=()=> docType;list.map=app.map;
  list.containerObject={pauseDrawing:()=>{},resumeDrawing:()=>{},addSection:()=>true,removeSection:()=>{}};
  function card(id,y=0,height=86,extra={}) {
   const c=Object.create(Comment.prototype), classes=new Set();
@@ -66,8 +66,33 @@ function setup() {
 }
 const redline=(index,description='删除 A')=>({index,description,author:'Alice',dateTime:'2026-11-01T08:00:00Z',type:'Delete',textRange:'100,200,50,20',comment:''});
 
-test('periodic unchanged revision reads retain card identity and selection',()=>{
- const s=setup();s.list.importChanges([redline(7)]);
+test('Writer revision table reads never create margin cards or disturb selected comments',()=>{
+ const s=setup(),normal=s.card('1');s.list.sectionProperties.commentList=[normal];
+ s.list.sectionProperties.selectedComment=normal;s.list.sectionProperties.expandedComment=normal;
+ normal.sectionProperties.container.classList.toggle('annotation-active',true);
+ const rows=[redline(7),redline(8,'插入 B')],raw=JSON.stringify(rows);
+ for(const next of [rows,rows,[redline(9)],[],rows])s.list.importChanges(next);
+ assert.equal(s.created,0);assert.deepEqual(s.list.sectionProperties.commentList,[normal]);
+ assert.equal(s.list.sectionProperties.selectedComment,normal);assert.equal(s.list.sectionProperties.expandedComment,normal);
+ assert.equal(normal.sectionProperties.container.classList.contains('annotation-active'),true);
+ assert.equal(JSON.stringify(rows),raw,'host review consumers retain the unmodified core revision table');
+ assert.equal(s.app.scrolls.length,0);
+});
+test('Writer revision callbacks never enter comment editing or allocate margin cards',()=>{
+ const s=setup(),normal=s.card('1');s.list.sectionProperties.commentList=[normal];s.edit(true);
+ for(const action of ['Add','Modify','Remove','Focus','Resolve','SearchHighlight']) {
+  const payload={redline:{...redline(7),action}},raw=JSON.stringify(payload);
+  s.list.onACKComment(payload);assert.equal(JSON.stringify(payload),raw);
+ }
+ assert.equal(s.created,0);assert.deepEqual(s.list.sectionProperties.commentList,[normal]);
+});
+test('ordinary comment focus callbacks still select the native comment control',()=>{
+ const s=setup(),normal=s.card('1');s.list.sectionProperties.commentList=[normal];
+ let focused;s.list.focusEditIcon=c=>{focused=c;};
+ s.list.onACKComment({comment:{id:1,action:'Focus'}});assert.equal(focused,normal);
+});
+test('legacy non-Writer revision reads retain card identity and selection',()=>{
+ const s=setup({docType:'presentation'});s.list.importChanges([redline(7)]);
  const card=s.list.getComment('change-7');s.list.sectionProperties.selectedComment=card;
  s.list.sectionProperties.expandedComment=card;
  for(let i=0;i<4;i++)s.list.importChanges([redline(7)]);
@@ -75,7 +100,7 @@ test('periodic unchanged revision reads retain card identity and selection',()=>
  assert.equal(s.app.scrolls.length,0);
 });
 test('changed revision refresh preserves a selected normal comment without stale active cards',()=>{
- const s=setup(),normal=s.card('1');s.list.sectionProperties.commentList.push(normal);
+ const s=setup({docType:'presentation'}),normal=s.card('1');s.list.sectionProperties.commentList.push(normal);
  s.list.sectionProperties.selectedComment=normal;s.list.sectionProperties.expandedComment=normal;
  s.list.importChanges([redline(7)]);s.list.importChanges([redline(7),redline(8,'插入 B')]);
  assert.equal(s.list.sectionProperties.selectedComment,normal);
@@ -83,7 +108,7 @@ test('changed revision refresh preserves a selected normal comment without stale
  assert.equal(s.app.scrolls.length,0);
 });
 test('a changed table restores the same revision but never a reused index with different content',()=>{
- const s=setup();s.list.importChanges([redline(7)]);
+ const s=setup({docType:'presentation'});s.list.importChanges([redline(7)]);
  const old=s.list.getComment('change-7');s.list.sectionProperties.selectedComment=old;s.list.sectionProperties.expandedComment=old;
  s.list.importChanges([redline(7),redline(8)]);
  assert.equal(s.list.sectionProperties.selectedComment,s.list.getComment('change-7'));
@@ -92,7 +117,7 @@ test('a changed table restores the same revision but never a reused index with d
  assert.equal(s.list.sectionProperties.selectedComment,null);
 });
 test('background metadata cannot destroy an edit in progress',()=>{
- const s=setup();s.list.importChanges([redline(7)]);s.edit(true);
+ const s=setup({docType:'presentation'});s.list.importChanges([redline(7)]);s.edit(true);
  s.list.importChanges([redline(8)]);assert.equal(s.created,1);
  assert.ok(s.list.getComment('change-7'));
 });
@@ -111,8 +136,8 @@ test('switching threads clears the old selection before expanding the clicked ca
  s.list.selectById('reply');
  assert.equal(s.list.sectionProperties.selectedComment,b);assert.equal(s.list.sectionProperties.expandedComment,reply);
 });
-test('mixed Writer comments and revisions keep their positions across every selection',()=>{
- const s=setup();s.list.sectionProperties.commentList=[s.card('1',0),s.card('change-7',0,123,{trackchange:true}),s.card('2',20)];
+test('Writer comments keep their positions across every selection',()=>{
+ const s=setup();s.list.sectionProperties.commentList=[s.card('1',0),s.card('2',0,123),s.card('3',20)];
  s.list.layout();const positions=s.list.sectionProperties.commentList.map(c=>[c.containerPosX,c.containerPosY]);
  for(const selected of s.list.sectionProperties.commentList){
   s.list.sectionProperties.selectedComment=selected;s.list.layout();
@@ -127,7 +152,7 @@ test('selected Writer cards stay in their stack and are clipped below the ribbon
  assert.equal(c.sectionProperties.container.style.clipPath,'inset(60px 0px 0px 0px)');
 });
 test('clicking a visible stacked card does not scroll back to its earlier text anchor',()=>{
- const s=setup(),c=s.card('change-7',-500,100,{trackchange:true});s.list.sectionProperties.commentList=[c];
+ const s=setup(),c=s.card('1',-500,100);s.list.sectionProperties.commentList=[c];
  s.list.sectionProperties.selectedComment=c;c.setContainerPos(true,s.bounds,1000,200);
  s.list.scrollCommentIntoView(c);s.tasks.forEach(fn=>fn());assert.equal(s.app.scrolls.length,0);
 });
