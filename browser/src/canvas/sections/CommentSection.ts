@@ -412,6 +412,7 @@ export class Comment extends CanvasSectionObject {
 			};
 			this.sectionProperties.resolveButton = resolve;
 			this.updateResolveButton();
+			window.L.control.attachTooltipEventListener(resolve, this.map);
 		}
 		if (!writerComment && this.isAuthor()) {
 			const edit = window.L.DomUtil.create('div', 'cool-annotation-menu-edit', tdMenu);
@@ -435,7 +436,12 @@ export class Comment extends CanvasSectionObject {
 		this.sectionProperties.menu.setAttribute('aria-expanded', 'false');
 		this.sectionProperties.menu.onclick = this.menuOnMouseClick.bind(this);
 		this.sectionProperties.menu.onkeydown = this.menuOnKeyPress.bind(this);
-		this.sectionProperties.menu.dataset.title = Comment.openMenuLabel;
+		if (writerComment) {
+			this.sectionProperties.menu.dataset.cooltip = Comment.openMenuLabel;
+			window.L.control.attachTooltipEventListener(this.sectionProperties.menu, this.map);
+		} else {
+			this.sectionProperties.menu.dataset.title = Comment.openMenuLabel;
+		}
 		this.sectionProperties.menu.setAttribute('aria-label', Comment.openMenuLabel);
 	}
 
@@ -450,7 +456,9 @@ export class Comment extends CanvasSectionObject {
 		button.classList.toggle('is-resolved', resolved);
 		button.setAttribute('aria-label', label);
 		button.setAttribute('aria-pressed', String(resolved));
-		button.dataset.title = label;
+		// Use the page-level tooltip: a pseudo-element inherits the 22px
+		// checkmark font and is clipped by the scrolling comment card.
+		button.dataset.cooltip = label;
 	}
 
 	// Returns the final (post-clamp) top in canvas-relative CSS px, so a thread's
