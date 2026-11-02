@@ -9619,3 +9619,19 @@ msgstr "有波动"
 #: src/app/Socket.ts
 msgid "Check network, VPN or proxy settings. Delays can affect typing."
 msgstr "请检查网络、VPN 或代理设置，响应延迟可能影响输入。"
+
+#: src/canvas/sections/CommentSection.ts
+msgid "Confirm deletion"
+msgstr "确认删除"
+
+#: src/canvas/sections/CommentSection.ts
+msgid "Restore comment"
+msgstr "恢复评论"
+
+#: src/canvas/sections/CommentSection.ts
+msgid "Pending deletion"
+msgstr "待确认删除"
+
+#: src/canvas/sections/CommentSection.ts
+msgid "Review the associated deletion in Review > Manage changes."
+msgstr "该评论的删除与正文修订关联，请在“审阅 → 管理”中处理。"

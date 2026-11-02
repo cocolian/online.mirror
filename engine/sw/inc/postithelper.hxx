@@ -22,6 +22,7 @@
 #include "swrect.hxx"
 #include "fmtfld.hxx"
 #include <cstddef>
+#include <optional>
 #include <vcl/vclptr.hxx>
 #include "SidebarWindowsTypes.hxx"
 #include "nodeoffset.hxx"
@@ -33,6 +34,7 @@ class SwPostItMgr;
 class SwEditWin;
 class SwFrame;
 class IDocumentRedlineAccess;
+class SwAnnotationItem;
 namespace sw::annotation { class SwAnnotationWin; }
 namespace sw::mark { class MarkBase; }
 
@@ -77,6 +79,10 @@ struct SwLayoutInfo
 
 namespace SwPostItHelper
 {
+    // Only a standalone deletion of this comment's marker may be reviewed
+    // from the comment card. A deletion containing body text needs full review.
+    std::optional<sal_uInt32> getCommentDeletionRedlineId(const SwAnnotationItem& rItem);
+
     enum SwLayoutStatus
     {
         INVISIBLE, VISIBLE, INSERTED, DELETED, NONE, HIDDEN

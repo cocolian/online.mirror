@@ -1855,7 +1855,8 @@ class UIManager extends window.L.Control {
 		}
 		if (command === '.uno:AcceptTrackedChange' || command === '.uno:RejectTrackedChange') {
 			const selector = command === '.uno:AcceptTrackedChange'
-				? '.cool-redline-accept-button' : '.cool-redline-reject-button';
+				? '.cool-redline-accept-button, .cool-comment-delete-accept'
+				: '.cool-redline-reject-button, .cool-comment-delete-restore';
 			document.querySelectorAll<HTMLElement>(selector)
 				.forEach(el => { el.classList.toggle('hidden-by-command', !show); });
 			found = true;

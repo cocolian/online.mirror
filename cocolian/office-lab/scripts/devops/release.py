@@ -82,7 +82,9 @@ def compile_source(repo,engine,online,office_config):
  if engine:
   commands += ['cd /workspace/engine',f'make -j{jobs} build',
    f'make -j{jobs} CppunitTest_sw_layoutwriter5 CPPUNIT_TEST_NAME="testWordMacSmallBodyGridProportional testWordMacAutoFitPageWidth testWordMacUrlBreakUnits testWordMacRowCellSpacing testWordMacWordWrap testWordMacInlineImageGridLeading testWordMacFirstCharacterIndentFont testWordMacGridOverflowSetting testWordMacLegacyPercentTablePadding testWordMacNumberingStyleIndent testWordMacAutoFitLongUrl testWordMacAutoFitAsciiToken testWordMacAutoFitDefaultFont testWordMacAutoFitNoWrap testWordMacCellNoWrap testWordMacFixedLayoutNoAutoFit testWordMacScriptSpacingSettings testWordMacFixedGridBaseline testWordMacFractionalTableWidth testWordMacMissingNumberingLevelIndex testWordMacContinuousFirstSectionGrid testWordMacLegacyTableBorders testWordMacPunctuationCompression testWordMacEmptyParagraphStyle testWordMacSmallTableGridProportional testWordManualPageBreakOverridesParagraphDefault testWordImportTypography testWordTableGridProportional testWordBodyGridProportional testWordMacMissingParagraphDefaults testTdf144450 testTdf167583"',
-   'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log']
+   'cp workdir/CppunitTest/sw_layoutwriter5.test.log /workspace/devops-layout-tests.log',
+   f'make -j{jobs} CppunitTest_sw_tiledrendering CPPUNIT_TEST_NAME="testTrackedCommentDeletionReview"',
+   'cp workdir/CppunitTest/sw_tiledrendering.test.log /workspace/devops-comment-review-tests.log']
  if online:
   version=stamp_online_version(repo)
   check='grep -Fqx '+shlex.quote('#define COOLWSD_VERSION_HASH "'+version+'"')+' config_version.h'

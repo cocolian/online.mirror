@@ -897,7 +897,7 @@ input, button {
 	top: -15px;
 }
 
-.tracked-deleted-comment-show .cool-annotation-menubar {
+.tracked-deleted-comment-show:not(.writer-comment) .cool-annotation-menubar {
 	display: none;
 }
 
@@ -1242,6 +1242,8 @@ input, button {
 .writer-comment .cool-annotation-resolve,
 .writer-comment .cool-annotation-menu,
 .writer-comment .cool-annotation-menu-redline,
+.writer-comment .cool-comment-delete-accept,
+.writer-comment .cool-comment-delete-restore,
 .writer-comment .cool-redline-accept-button,
 .writer-comment .cool-redline-reject-button {
 	width: 28px !important;
@@ -1253,6 +1255,8 @@ input, button {
 }
 
 .writer-comment .cool-annotation-resolve,
+.writer-comment .cool-comment-delete-accept,
+.writer-comment .cool-comment-delete-restore,
 .writer-comment .cool-redline-accept-button,
 .writer-comment .cool-redline-reject-button {
 	margin: 0;
@@ -1267,6 +1271,8 @@ input, button {
 }
 
 .writer-comment .cool-annotation-resolve[hidden],
+.cool-comment-delete-accept[hidden],
+.cool-comment-delete-restore[hidden],
 .cool-redline-accept-button[hidden],
 .cool-redline-reject-button[hidden] {
 	display: none !important;
@@ -1275,6 +1281,8 @@ input, button {
 .writer-comment .cool-annotation-resolve:hover,
 .writer-comment .cool-annotation-menu:hover,
 .writer-comment .cool-annotation-menu-redline:hover,
+.writer-comment .cool-comment-delete-accept:hover,
+.writer-comment .cool-comment-delete-restore:hover,
 .writer-comment .cool-redline-accept-button:hover,
 .writer-comment .cool-redline-reject-button:hover {
 	background-color: var(--color-background-hover) !important;
@@ -1283,6 +1291,8 @@ input, button {
 .writer-comment .cool-annotation-resolve:focus-visible,
 .writer-comment .cool-annotation-menu:focus-visible,
 .writer-comment .cool-annotation-menu-redline:focus-visible,
+.writer-comment .cool-comment-delete-accept:focus-visible,
+.writer-comment .cool-comment-delete-restore:focus-visible,
 .writer-comment .cool-redline-accept-button:focus-visible,
 .writer-comment .cool-redline-reject-button:focus-visible {
 	outline: 2px solid var(--color-primary);
@@ -1308,6 +1318,8 @@ input, button {
 		border-inline-start-color: Highlight;
 	}
 	.writer-comment .cool-annotation-resolve,
+	.writer-comment .cool-comment-delete-accept,
+	.writer-comment .cool-comment-delete-restore,
 	.writer-comment .cool-redline-accept-button,
 	.writer-comment .cool-redline-reject-button {
 		color: ButtonText;

@@ -66,6 +66,42 @@ function setup({docType='text'}={}) {
 }
 const redline=(index,description='删除 A')=>({index,description,author:'Alice',dateTime:'2026-11-01T08:00:00Z',type:'Delete',textRange:'100,200,50,20',comment:''});
 
+test('deleted comment actions use the explicit 32-bit revision ID, independent of the cursor',()=>{
+ const s=setup(),c=s.card('2',0,86,{layoutStatus:3,deletionRedlineId:'70000'}),commands=[];
+ s.list.sectionProperties.commentList=[c];s.list.unselect=()=>{};s.app.map.focus=()=>{};
+ s.app.map.sendUnoCommand=(name,args)=>commands.push([name,args]);
+ s.list.reviewDeletedComment(c,true);s.list.reviewDeletedComment(c,false);
+ assert.equal(JSON.stringify(commands),JSON.stringify([
+  ['.uno:AcceptTrackedChange',{AcceptTrackedChange:{type:'unsigned long',value:70000}}],
+  ['.uno:RejectTrackedChange',{RejectTrackedChange:{type:'unsigned long',value:70000}}],
+ ]));
+ assert.equal(s.list.sectionProperties.commentList[0],c,'wait for the native acknowledgement before changing the card');
+});
+test('stale, unlinked and restored comments cannot dispatch a deletion decision',()=>{
+ const s=setup(),c=s.card('2',0,86,{layoutStatus:3,deletionRedlineId:0}),commands=[];
+ s.list.unselect=()=>{};s.app.map.focus=()=>{};s.app.map.sendUnoCommand=(...a)=>commands.push(a);
+ s.list.reviewDeletedComment(c,true);assert.equal(commands.length,0);
+ s.list.sectionProperties.commentList=[c];
+ for(const value of [undefined,null,'',true,false,{},[],NaN,Infinity,-1,1.2,'1e2','garbage',0x100000000]){
+  c.sectionProperties.data.deletionRedlineId=value;s.list.reviewDeletedComment(c,true);
+ }
+ c.sectionProperties.data.deletionRedlineId=27;c.sectionProperties.data.layoutStatus=1;s.list.reviewDeletedComment(c,false);
+ assert.equal(commands.length,0);
+ c.sectionProperties.data.layoutStatus=3;c.sectionProperties.data.deletionRedlineId=0;
+ s.list.reviewDeletedComment(c,true);assert.equal(commands.length,1,'ID zero is valid');
+});
+test('deleted comment decisions recheck permissions and host command visibility',()=>{
+ const s=setup(),c=s.card('2',0,86,{layoutStatus:3,deletionRedlineId:9}),commands=[];
+ s.list.sectionProperties.commentList=[c];s.list.unselect=()=>{};s.app.map.focus=()=>{};
+ s.app.map.sendUnoCommand=(...a)=>commands.push(a);
+ for(const block of ['readonly','host','permission','command']){
+  s.app.map.isReadOnlyMode=()=>block==='readonly';s.app.map.wopi.HideChangeTrackingControls=block==='host';
+  s.app.isCommentEditingAllowed=()=>block!=='permission';s.app.map.uiManager.isCommandVisible=()=>block!=='command';
+  s.list.reviewDeletedComment(c,true);s.list.reviewDeletedComment(c,false);
+ }
+ assert.equal(commands.length,0);
+});
+
 test('Writer revision table reads never create margin cards or disturb selected comments',()=>{
  const s=setup(),normal=s.card('1');s.list.sectionProperties.commentList=[normal];
  s.list.sectionProperties.selectedComment=normal;s.list.sectionProperties.expandedComment=normal;

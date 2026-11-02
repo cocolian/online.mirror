@@ -968,6 +968,13 @@ void SwView::Execute(SfxRequest &rReq)
                     if (nChangeId == rRedlineTable[i]->GetId())
                         nRedline = i;
                 }
+                // An explicitly requested change may have been reviewed in
+                // another view. Never fall back to the current selection.
+                if (nRedline == SwRedlineTable::npos)
+                {
+                    rReq.Ignore();
+                    break;
+                }
             }
 
             if( pCursor->HasMark() && nRedline == SwRedlineTable::npos)

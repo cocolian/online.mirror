@@ -198,6 +198,8 @@ namespace {
             aAnnotation.put("anchorPos", aSVRect.toString());
             aAnnotation.put("textRange", sRects.getStr());
             aAnnotation.put("layoutStatus", pItem->mLayoutStatus);
+            if (const auto oId = SwPostItHelper::getCommentDeletionRedlineId(*pItem))
+                aAnnotation.put("deletionRedlineId", *oId);
             if (nType == CommentNotificationType::SearchHighlight)
             {
                 ESelection aSel = pWin->GetOutlinerView()->GetSelection();

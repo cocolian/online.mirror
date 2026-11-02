@@ -3679,6 +3679,8 @@ void SwXTextDocument::getPostIts(tools::JsonWriter& rJsonWriter)
         rJsonWriter.put("anchorPos", aSVRect.toString());
         rJsonWriter.put("textRange", sRects);
         rJsonWriter.put("layoutStatus", static_cast< sal_Int16 >(pWin->GetLayoutStatus()));
+        if (const auto oId = SwPostItHelper::getCommentDeletionRedlineId(*sidebarItem))
+            rJsonWriter.put("deletionRedlineId", *oId);
     }
 }
 

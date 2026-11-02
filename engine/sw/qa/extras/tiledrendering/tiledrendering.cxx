@@ -1889,6 +1889,81 @@ CPPUNIT_TEST_FIXTURE(SwTiledRenderingTest, testCommentEndTextEdit)
     CPPUNIT_ASSERT(aView1.m_bTilesInvalidated);
 }
 
+CPPUNIT_TEST_FIXTURE(SwTiledRenderingTest, testTrackedCommentDeletionReview)
+{
+    for (const bool bAccept : { true, false })
+    {
+        SwXTextDocument* pDocument = createDoc();
+        SwTestViewCallback aCallback;
+        dispatchCommand(mxComponent, u".uno:InsertAnnotation"_ustr,
+                        comphelper::InitPropertySequence({
+                            { u"Text"_ustr, cpo::uno::Any(u"Review this comment"_ustr) },
+                            { u"Author"_ustr, cpo::uno::Any(u"Alice"_ustr) },
+                        }));
+        Scheduler::ProcessEventsToIdle();
+        auto readComments = [&]() {
+            tools::JsonWriter aWriter;
+            pDocument->getPostIts(aWriter);
+            std::stringstream aStream(std::string(aWriter.finishAndGetAsOString()));
+            boost::property_tree::ptree aTree;
+            boost::property_tree::read_json(aStream, aTree);
+            return aTree.get_child("comments");
+        };
+        auto aComments = readComments();
+        CPPUNIT_ASSERT_EQUAL(size_t(1), aComments.size());
+        const auto nCommentId = aComments.front().second.get<sal_uInt32>("id");
+        SwWrtShell* pShell = getSwDocShell()->GetWrtShell();
+        pShell->SetRedlineFlagsAndCheckInsMode(RedlineFlags::On | RedlineFlags::ShowMask);
+        dispatchCommand(mxComponent, u".uno:DeleteComment"_ustr,
+                        comphelper::InitPropertySequence({
+                            { u"Id"_ustr, cpo::uno::Any(OUString::number(nCommentId)) },
+                        }));
+        Scheduler::ProcessEventsToIdle();
+        aComments = readComments();
+        CPPUNIT_ASSERT_EQUAL(size_t(1), aComments.size());
+        CPPUNIT_ASSERT_EQUAL(3, aComments.front().second.get<int>("layoutStatus"));
+        const auto nDeletionId = aComments.front().second.get<sal_uInt32>("deletionRedlineId");
+        CPPUNIT_ASSERT_EQUAL(nDeletionId, aCallback.m_aComment.get<sal_uInt32>("deletionRedlineId"));
+
+        // Keep an unrelated body insertion present and selected. The card's
+        // explicit ID must never review this insertion, including a stale ID.
+        pShell->Insert(u"untouched body"_ustr);
+        const auto& rTable = pShell->GetDoc()->getIDocumentRedlineAccess().GetRedlineTable();
+        CPPUNIT_ASSERT_EQUAL(size_t(2), rTable.size());
+        sal_uInt32 nBodyId = 0;
+        for (const auto* pRedline : rTable)
+            if (pRedline->GetId() != nDeletionId) nBodyId = pRedline->GetId();
+        dispatchCommand(mxComponent,
+                        bAccept ? u".uno:AcceptTrackedChange"_ustr : u".uno:RejectTrackedChange"_ustr,
+                        comphelper::InitPropertySequence({
+                            { bAccept ? u"AcceptTrackedChange"_ustr : u"RejectTrackedChange"_ustr,
+                              cpo::uno::Any(nDeletionId) },
+                        }));
+        Scheduler::ProcessEventsToIdle();
+        CPPUNIT_ASSERT_EQUAL(size_t(1), rTable.size());
+        CPPUNIT_ASSERT_EQUAL(nBodyId, rTable[0]->GetId());
+        aComments = readComments();
+        CPPUNIT_ASSERT_EQUAL(bAccept ? size_t(0) : size_t(1), aComments.size());
+        if (!bAccept)
+        {
+            CPPUNIT_ASSERT_EQUAL(nCommentId, aComments.front().second.get<sal_uInt32>("id"));
+            CPPUNIT_ASSERT(!aComments.front().second.get_optional<sal_uInt32>("deletionRedlineId"));
+        }
+        dispatchCommand(mxComponent, u".uno:NextTrackedChange"_ustr,
+                        comphelper::InitPropertySequence({
+                            { u"NextTrackedChange"_ustr, cpo::uno::Any(nBodyId) },
+                        }));
+        dispatchCommand(mxComponent, u".uno:AcceptTrackedChange"_ustr,
+                        comphelper::InitPropertySequence({
+                            { u"AcceptTrackedChange"_ustr, cpo::uno::Any(nDeletionId) },
+                        }));
+        CPPUNIT_ASSERT_EQUAL(size_t(1), rTable.size());
+        CPPUNIT_ASSERT_EQUAL(nBodyId, rTable[0]->GetId());
+        dispatchCommand(mxComponent, u".uno:AcceptTrackedChange"_ustr, {});
+        CPPUNIT_ASSERT(rTable.empty());
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(SwTiledRenderingTest, testCommentInsert)
 {
     // Load a document with an as-char image in it.

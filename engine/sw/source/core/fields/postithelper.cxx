@@ -222,6 +222,21 @@ SwPostItHelper::SwLayoutStatus SwPostItHelper::getLayoutInfos(
              : aRet;
 }
 
+std::optional<sal_uInt32>
+SwPostItHelper::getCommentDeletionRedlineId(const SwAnnotationItem& rItem)
+{
+    const SwPosition aAnchor = rItem.GetAnchorPosition();
+    const auto& rAccess = aAnchor.GetNode().GetDoc().getIDocumentRedlineAccess();
+    const SwRangeRedline* pRedline = rAccess.GetRedline(aAnchor, nullptr);
+    if (!pRedline || pRedline->GetTypeIgnoringAdditonalFormat() != RedlineType::Delete
+        || *pRedline->Start() != aAnchor
+        || pRedline->End()->GetNodeIndex() != aAnchor.GetNodeIndex()
+        || pRedline->End()->GetContentIndex() != aAnchor.GetContentIndex() + 1)
+        return std::nullopt;
+
+    return pRedline->GetId();
+}
+
 tools::Long SwPostItHelper::getLayoutHeight( const SwRootFrame* pRoot )
 {
     tools::Long nRet = pRoot ? pRoot->getFrameArea().Height() : 0;

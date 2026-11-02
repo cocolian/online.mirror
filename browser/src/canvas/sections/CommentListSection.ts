@@ -1754,6 +1754,19 @@ export class CommentSection extends CanvasSectionObject {
 		this.map.focus();
 	}
 
+	public reviewDeletedComment(annotation: Comment, accept: boolean): void {
+		const name = accept ? 'AcceptTrackedChange' : 'RejectTrackedChange';
+		const command = '.uno:' + name;
+		if (this.getComment(annotation.sectionProperties.data.id) !== annotation
+			|| !annotation.canReviewCommentDeletion(command)) return;
+		const id = annotation.getCommentDeletionRedlineId();
+		if (id === null) return;
+		this.map.sendUnoCommand(command, { [name]: { type: 'unsigned long', value: id } });
+		// Let the core acknowledge the review; never remove/restore a card locally.
+		this.unselect();
+		this.map.focus();
+	}
+
 	public onRedlineAccept (e: any): void {
 		const command = {
 			AcceptTrackedChange: {
@@ -2148,6 +2161,7 @@ export class CommentSection extends CanvasSectionObject {
 		|| newComment.layoutStatus !== editCommentData.layoutStatus?.toString()
 		|| newComment.parentId !== editCommentData.parentId
 		|| newComment.resolved !== editCommentData.resolved
+		|| newComment.deletionRedlineId !== editCommentData.deletionRedlineId
 		|| newComment.textRange !== editCommentData.textRange)
 			return false;
 
@@ -2253,6 +2267,7 @@ export class CommentSection extends CanvasSectionObject {
 				if (currentComment !== null) {
 					if (obj[dataroot].layoutStatus !== undefined) {
 						currentComment.sectionProperties.data.layoutStatus = parseInt(obj[dataroot].layoutStatus);
+						currentComment.sectionProperties.data.deletionRedlineId = obj[dataroot].deletionRedlineId;
 						currentComment.setLayoutClass();
 					}
 					return;
@@ -2325,7 +2340,10 @@ export class CommentSection extends CanvasSectionObject {
 			}
 			if (_redlined) {
 				_redlined.sectionProperties.data.layoutStatus = CommentLayoutStatus.DELETED;
+				_redlined.sectionProperties.data.deletionRedlineId = obj[dataroot].deletionRedlineId;
 				_redlined.setLayoutClass();
+				if (_redlined.getCommentDeletionRedlineId() === null)
+					app.socket.sendMessage('commandvalues command=.uno:ViewAnnotations');
 			}
 		} else if (action === 'Modify') {
 			id = obj[dataroot].id;

@@ -135,6 +135,8 @@ export class Comment extends CanvasSectionObject {
 		this.sectionProperties.contentDate = null;
 		this.sectionProperties.acceptButton = null;
 		this.sectionProperties.rejectButton = null;
+		this.sectionProperties.deletedAcceptButton = null;
+		this.sectionProperties.deletedRestoreButton = null;
 		this.sectionProperties.menu = null;
 		this.sectionProperties.menuBarCell = null;
 		this.sectionProperties.resolveButton = null;
@@ -335,6 +337,7 @@ export class Comment extends CanvasSectionObject {
 		this.makeEditable(app.isCommentEditingAllowed());
 		this.updateResolveButton();
 		this.updateTrackChangeButtons();
+		this.updateDeletedCommentButtons();
 	}
 
 	private createContainerAndWrapper (): void {
@@ -400,6 +403,7 @@ export class Comment extends CanvasSectionObject {
 		if (writerComment && this.sectionProperties.data.trackchange)
 			this.createTrackChangeButtons(tdMenu);
 		if (writerComment && !this.sectionProperties.data.trackchange) {
+			this.createDeletedCommentButtons(tdMenu);
 			const resolve = window.L.DomUtil.create('button', 'cool-annotation-resolve', tdMenu) as HTMLButtonElement;
 			resolve.type = 'button';
 			resolve.id = 'comment-annotation-resolve-' + this.sectionProperties.data.id;
@@ -450,7 +454,7 @@ export class Comment extends CanvasSectionObject {
 		if (!button) return;
 		const resolved = this.sectionProperties.data.resolved === 'true';
 		const label = resolved ? _('Unresolve') : _('Resolve');
-		button.hidden = this.sectionProperties.data.id === 'new' || !this.canModerate();
+		button.hidden = this.isDeletedComment() || this.sectionProperties.data.id === 'new' || !this.canModerate();
 		button.disabled = !app.isCommentEditingAllowed();
 		button.classList.toggle('hidden-by-command', !app.map.uiManager.isCommandVisible('.uno:ResolveComment'));
 		button.classList.toggle('is-resolved', resolved);
@@ -459,6 +463,58 @@ export class Comment extends CanvasSectionObject {
 		// Use the page-level tooltip: a pseudo-element inherits the 22px
 		// checkmark font and is clipped by the scrolling comment card.
 		button.dataset.cooltip = label;
+	}
+
+	private isDeletedComment(): boolean {
+		return app.map._docLayer._docType === 'text' && !this.sectionProperties.data.trackchange
+			&& this.sectionProperties.data.layoutStatus === CommentLayoutStatus.DELETED;
+	}
+
+	public getCommentDeletionRedlineId(): number | null {
+		if (!this.isDeletedComment()) return null;
+		const raw = this.sectionProperties.data.deletionRedlineId;
+		if (raw === undefined || raw === null || raw === ''
+			|| (typeof raw !== 'number' && typeof raw !== 'string')
+			|| (typeof raw === 'string' && !/^\d+$/.test(raw))) return null;
+		const id = Number(raw);
+		return Number.isInteger(id) && id >= 0 && id <= 0xffffffff ? id : null;
+	}
+
+	public canReviewCommentDeletion(command: string): boolean {
+		return this.getCommentDeletionRedlineId() !== null && this.canReviewChange(command);
+	}
+
+	private createDeletedCommentButtons(actions: HTMLElement): void {
+		for (const [property, className, glyph, accept] of [
+			['deletedAcceptButton', 'cool-comment-delete-accept', '✓', true],
+			['deletedRestoreButton', 'cool-comment-delete-restore', '↶', false],
+		] as const) {
+			const button = window.L.DomUtil.create('button', className, actions) as HTMLButtonElement;
+			button.type = 'button';
+			button.textContent = glyph;
+			this.sectionProperties[property] = button;
+			button.onclick = (event: MouseEvent) => {
+				window.L.DomEvent.stopPropagation(event);
+				this.sectionProperties.commentListSection.reviewDeletedComment(this, accept);
+			};
+			window.L.control.attachTooltipEventListener(button, this.map);
+		}
+		this.updateDeletedCommentButtons();
+	}
+
+	private updateDeletedCommentButtons(): void {
+		for (const [button, command, label] of [
+			[this.sectionProperties.deletedAcceptButton, '.uno:AcceptTrackedChange', _('Confirm deletion')],
+			[this.sectionProperties.deletedRestoreButton, '.uno:RejectTrackedChange', _('Restore comment')],
+		]) {
+			if (!button) continue;
+			button.hidden = !this.isDeletedComment() || !this.canReviewChange();
+			button.disabled = !this.canReviewCommentDeletion(command);
+			button.classList.toggle('hidden-by-command', !app.map.uiManager.isCommandVisible(command));
+			button.setAttribute('aria-label', label);
+			button.dataset.cooltip = this.getCommentDeletionRedlineId() === null
+				? _('Review the associated deletion in Review > Manage changes.') : label;
+		}
 	}
 
 	// Returns the final (post-clamp) top in canvas-relative CSS px, so a thread's
@@ -743,13 +799,16 @@ export class Comment extends CanvasSectionObject {
 			this.sectionProperties.removedTextElement = window.L.DomUtil.create('div', 'cool-annotation-content-removed', commentFooter);
 		}
 		if (this.sectionProperties.removedTextElement) {
-			this.sectionProperties.removedTextElement.innerText = isDeleted ? _('Removed') : '';
+			this.sectionProperties.removedTextElement.innerText = isDeleted
+				? (app.map._docLayer._docType === 'text' ? _('Pending deletion') : _('Removed')) : '';
 		}
 		if (isDeleted) {
 			this.sectionProperties.resolvedTextElement.innerText = '';
 		} else {
 			this.updateResolvedField(this.sectionProperties.data.resolved);
 		}
+		this.updateResolveButton();
+		this.updateDeletedCommentButtons();
 	}
 
 	private isNewPara(): boolean {
@@ -1388,7 +1447,14 @@ export class Comment extends CanvasSectionObject {
 		const isShown = (uno: string): boolean =>
 			app.map.uiManager.isCommandVisible(uno);
 
-		if (data.trackchange) {
+		if (this.isDeletedComment()) {
+			if (this.canReviewCommentDeletion('.uno:AcceptTrackedChange'))
+				entries.push({ text: _('Confirm deletion'), type: 'action', id: 'acceptDeletion', pos: String(pos++) });
+			if (this.canReviewCommentDeletion('.uno:RejectTrackedChange'))
+				entries.push({ text: _('Restore comment'), type: 'action', id: 'restoreDeletion', pos: String(pos++) });
+			if (this.canReviewChange('.uno:AcceptTrackedChanges'))
+				entries.push({ text: _UNO('.uno:AcceptTrackedChanges', 'text'), type: 'action', id: 'manageChanges', pos: String(pos++) });
+		} else if (data.trackchange) {
 			if (this.isAuthor() && isShown('.uno:CommentChangeTracking'))
 				entries.push({ text: _('Comment'), type: 'action', id: 'modify', pos: String(pos++) });
 		} else {
@@ -1503,6 +1569,11 @@ export class Comment extends CanvasSectionObject {
 	private handleMenuAction (id: string): void {
 		const listSection = this.sectionProperties.commentListSection;
 		switch (id) {
+		case 'acceptDeletion': listSection.reviewDeletedComment(this, true); break;
+		case 'restoreDeletion': listSection.reviewDeletedComment(this, false); break;
+		case 'manageChanges':
+			if (this.canReviewChange('.uno:AcceptTrackedChanges')) this.map.sendUnoCommand('.uno:AcceptTrackedChanges');
+			break;
 		case 'modify': listSection.modify(this); break;
 		case 'reply': listSection.reply(this); break;
 		case 'remove': listSection.remove(this.sectionProperties.data.id); break;
