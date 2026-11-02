@@ -96,7 +96,8 @@ def compile_source(repo,engine,online,office_config):
  if online:
   # Operational scripts are deliberately excluded from the exported build
   # tree. Run the checked-out test against the cache's installed compiler.
-  run(['node','--test',repo/'cocolian/office-lab/scripts/devops/test_comment_navigation.cjs'],
+  run(['node','--test',repo/'cocolian/office-lab/scripts/devops/test_comment_navigation.cjs',
+       repo/'cocolian/office-lab/scripts/devops/test_writer_layout.cjs'],
       env=dict(os.environ,NODE_PATH=str(CACHE/'source/browser/node_modules')))
 
  if engine:

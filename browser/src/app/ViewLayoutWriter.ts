@@ -65,15 +65,12 @@ class ViewLayoutWriter extends ViewLayoutBase {
 	}
 
 	// Writer places one continuous page column with the inherited single-window
-	// machinery, centred horizontally when the page is narrower than the viewport.
+	// machinery. Desktop pages start beside the navigation pane.
 	protected override usesSingleWindowView(): boolean {
 		return true;
 	}
 
-	// Horizontal placement of the page: centre it using the stable page width,
-	// then shift it left by the comment margin so the comment column fits on the
-	// right. Vertical centring stays a no-op (the document is taller than the
-	// viewport). Folded into the viewed rectangle on rebuild, so drawing
+	// Placement is folded into the viewed rectangle on rebuild, so drawing
 	// (documentToViewX) and hit-testing stay consistent from that one source.
 	protected override getCenteringOffset(): number[] {
 		Util.ensureValue(app.activeDocument);
@@ -113,6 +110,26 @@ class ViewLayoutWriter extends ViewLayoutBase {
 			pageWidth = pages[low][2] * app.twipsToPixels;
 			pageLeft = pages[low][0] * app.twipsToPixels;
 		}
+
+		const centerY = Math.max(0, Math.round((frame.pY - content.pY) / 2));
+		if (
+			!window.mode.isSmallScreenDevice() &&
+			!window.mode.isInteractivePreview()
+		) {
+			// Keep a small, zoom-independent gutter beside the navigation/ruler
+			// instead of distributing spare width on both sides of the page.
+			// Use the shared view transform so tiles, hit testing, rulers and
+			// comments all move together. Wide pages retain horizontal panning.
+			const gutter = Math.min(
+				16 * app.dpiScale,
+				Math.max(0, frame.pX - pageWidth),
+			);
+			let offsetX = gutter - pageLeft;
+			if (centerVisiblePage && pageWidth <= frame.pX)
+				offsetX += this.scrollProperties.viewX;
+			return [offsetX, centerY];
+		}
+
 		let centerX = Math.max(0, Math.round((frame.pX - pageWidth) / 2)) - pageLeft;
 		// Discard a landscape page's residual horizontal pan when the visible
 		// portrait page fits; keep panning available for wide pages and comments.
@@ -126,7 +143,6 @@ class ViewLayoutWriter extends ViewLayoutBase {
 		}
 		centerX -= this.commentMarginShift;
 
-		const centerY = Math.max(0, Math.round((frame.pY - content.pY) / 2));
 		return [centerX, centerY];
 	}
 

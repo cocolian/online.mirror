@@ -1197,18 +1197,19 @@ class UIManager extends window.L.Control {
 	}
 
 	/**
-	 * Reopens the navigator panel on start when the saved state asks for it.
+	 * Opens Writer's navigation panel on every document load. Other document
+	 * types restore their saved preference.
 	 * The navigator is the panel on the left of the document and is separate
 	 * from the sidebar on the right, so its restore does not depend on
 	 * whether the sidebar is shown.
 	 */
 	initializeNavigator(): void {
-		if (!window.mode.isDesktop()) return;
+		if (!window.mode.isDesktop() || window.mode.isInteractivePreview()) return;
 
-		// The panel starts closed, so open it only when the saved state wants
-		// the navigator open. The argument opens it, and leaves an open panel
-		// open when this runs again for the same view.
-		if (this.getBooleanDocTypePref('ShowNavigator', false))
+		// Writer keeps outline, search and session history available even when
+		// an older saved preference had the navigation closed. The explicit
+		// true argument leaves an already-open panel open on repeated setup.
+		if (this.map.isText() || this.getBooleanDocTypePref('ShowNavigator', false))
 			app.socket.sendMessage('uno .uno:Navigator?Navigator:bool=true');
 	}
 
