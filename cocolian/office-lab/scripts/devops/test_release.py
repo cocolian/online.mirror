@@ -122,7 +122,7 @@ class ReleaseTests(unittest.TestCase):
    self.assertIn('./config.status --recheck',builds[0][-1])
    self.assertIn('COOLWSD_VERSION_HASH "0123456789"',builds[0][-1])
    self.assertNotIn('test_comment_navigation.cjs',builds[0][-1])
-  self.assertIn(['node','--test',Path('/source/cocolian/office-lab/scripts/devops/test_comment_navigation.cjs'),
+   self.assertIn(['node','--test',Path('/source/cocolian/office-lab/scripts/devops/test_comment_navigation.cjs'),
                  Path('/source/cocolian/office-lab/scripts/devops/test_writer_layout.cjs')],commands)
    self.assertEqual(test_environments[0]['NODE_PATH'],str(r.CACHE/'source/browser/node_modules'))
 
