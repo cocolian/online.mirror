@@ -411,8 +411,12 @@ export class Comment extends CanvasSectionObject {
 			resolve.onclick = (event: MouseEvent) => {
 				window.L.DomEvent.stopPropagation(event);
 				if (app.isCommentEditingAllowed() && this.canModerate()
-					&& app.map.uiManager.isCommandVisible('.uno:ResolveComment'))
-					this.sectionProperties.commentListSection.resolve(this);
+					&& app.map.uiManager.isCommandVisible('.uno:ResolveComment')) {
+					if (this.sectionProperties.data.resolved === 'true')
+						this.sectionProperties.commentListSection.closeResolvedComments();
+					else
+						this.sectionProperties.commentListSection.resolve(this);
+				}
 			};
 			this.sectionProperties.resolveButton = resolve;
 			this.updateResolveButton();
@@ -453,13 +457,12 @@ export class Comment extends CanvasSectionObject {
 		const button = this.sectionProperties.resolveButton as HTMLButtonElement;
 		if (!button) return;
 		const resolved = this.sectionProperties.data.resolved === 'true';
-		const label = resolved ? _('Unresolve') : _('Resolve');
+		const label = resolved ? _('Close') : _('Resolve and close');
 		button.hidden = this.isDeletedComment() || this.sectionProperties.data.id === 'new' || !this.canModerate();
 		button.disabled = !app.isCommentEditingAllowed();
 		button.classList.toggle('hidden-by-command', !app.map.uiManager.isCommandVisible('.uno:ResolveComment'));
 		button.classList.toggle('is-resolved', resolved);
 		button.setAttribute('aria-label', label);
-		button.setAttribute('aria-pressed', String(resolved));
 		// Use the page-level tooltip: a pseudo-element inherits the 22px
 		// checkmark font and is clipped by the scrolling comment card.
 		button.dataset.cooltip = label;

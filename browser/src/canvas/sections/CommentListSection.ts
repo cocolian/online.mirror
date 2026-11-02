@@ -1839,9 +1839,20 @@ export class CommentSection extends CanvasSectionObject {
 		this.map.focus();
 	}
 
+	public closeResolvedComments(): void {
+		if (this.sectionProperties.showResolved)
+			this.map.showResolvedComments(false);
+		this.unselect();
+		this.map.focus();
+	}
+
 	public resolve (annotation: any): void {
 		if (!annotation.canModerate())
 			return;
+		// Resolving dismisses the card after the native acknowledgement.
+		// Reopening a resolved comment remains available in the menu.
+		if (this.map.getDocType() === 'text' && annotation.sectionProperties.data.resolved !== 'true')
+			this.closeResolvedComments();
 		const comment = {
 			Id: {
 				type: 'string',

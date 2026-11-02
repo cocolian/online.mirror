@@ -963,7 +963,7 @@ class UIManager extends window.L.Control {
 			this.initializeRuler();
 			this.initializeFormattingMarks();
 
-			var showResolved = this.getBooleanDocTypePref('ShowResolved', true);
+			var showResolved = this.getBooleanDocTypePref('ShowResolved', false);
 			if (showResolved === false)
 				this.map.sendUnoCommand('.uno:ShowResolvedAnnotations');
 			this.map.mention = new Mention(this.map);

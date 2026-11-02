@@ -9621,6 +9621,9 @@ msgid "Check network, VPN or proxy settings. Delays can affect typing."
 msgstr "请检查网络、VPN 或代理设置，响应延迟可能影响输入。"
 
 #: src/canvas/sections/CommentSection.ts
+msgid "Resolve and close"
+msgstr "解决并关闭"
+
 msgid "Confirm deletion"
 msgstr "确认删除"
 

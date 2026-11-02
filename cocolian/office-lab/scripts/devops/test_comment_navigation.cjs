@@ -24,8 +24,8 @@ function setup({docType='text'}={}) {
   ? {style:{width:'1512'}} : {getBoundingClientRect:()=>bounds}};
  const context = {app,document,console,CanvasSectionObject:class {},DOMRect:class {},DOMPurify:{addHook:()=>{}},_:s=>s,
   $:element=>({hasClass:name=>element.classList.contains(name),addClass:name=>element.classList.toggle(name,true)}),
-  window:{L:{Map:{include:()=>{}},DomEvent:{on:(el,name,fn,owner)=>{el[name]=fn.bind(owner);},stopPropagation:e=>e.stopPropagation()},DomUtil:{
-   create:(tag,classes,parent)=>{const names=new Set(classes.split(' ')),attrs={};const el={tagName:tag,dataset:{},classList:{toggle:(n,on)=>on?names.add(n):names.delete(n)},setAttribute:(n,v)=>{attrs[n]=v;}};parent.children.push(el);return el;},
+  window:{L:{Map:{include:()=>{}},control:{attachTooltipEventListener:()=>{}},DomEvent:{on:(el,name,fn,owner)=>{el[name]=fn.bind(owner);},stopPropagation:e=>e.stopPropagation()},DomUtil:{
+   create:(tag,classes,parent)=>{const names=new Set(classes.split(' ')),attrs={};const el={tagName:tag,children:[],dataset:{},classList:{toggle:(n,on)=>on?names.add(n):names.delete(n)},setAttribute:(n,v)=>{attrs[n]=v;}};parent.children.push(el);return el;},
    hasClass:(e,n)=>e.classList.contains(n),removeClass:(e,n)=>e.classList.toggle(n,false)}},mode:{isSmallScreenDevice:()=>false}},
   cool:{CanvasSectionObject:class {},SimplePoint:Point}};
  vm.createContext(context);
@@ -65,6 +65,35 @@ function setup({docType='text'}={}) {
  return {app,list,card,Comment,List,tasks,bounds,get created(){return created;},edit:value=>{editing=value;}};
 }
 const redline=(index,description='删除 A')=>({index,description,author:'Alice',dateTime:'2026-11-01T08:00:00Z',type:'Delete',textRange:'100,200,50,20',comment:''});
+
+test('Writer checkmark resolves and dismisses even when resolved history is open',()=>{
+ const s=setup(),c=s.card('5',0,86,{resolved:'false'}),commands=[],views=[];
+ c.canModerate=()=>true;c.sectionProperties.authorRow={children:[]};c.createMenu();
+ s.list.sectionProperties.showResolved=true;
+ s.app.map.showResolvedComments=on=>{views.push(on);s.list.sectionProperties.showResolved=on;};
+ let focused=0,unselected=0;s.list.unselect=()=>unselected++;s.app.map.focus=()=>focused++;
+ s.app.map.sendUnoCommand=(name,args)=>commands.push([name,args]);
+ c.sectionProperties.resolveButton.onclick({stopPropagation:()=>{}});
+ assert.deepEqual(views,[false]);assert.equal(focused,1);assert.equal(unselected,1);
+ assert.equal(JSON.stringify(commands),JSON.stringify([['.uno:ResolveComment',{Id:{type:'string',value:'5'}}]]));
+ assert.equal(c.sectionProperties.data.resolved,'false','the native acknowledgement owns the resolved state');
+ let visible=true;c.isContainerVisible=()=>visible;c.hide=()=>{visible=false;};c.update=()=>{};
+ c.sectionProperties.data.resolved='true';s.list.showHideComment(c);
+ assert.equal(visible,false,'the resolved acknowledgement closes the card');
+});
+test('a resolved Writer checkmark only closes; reopening remains a menu operation',()=>{
+ const s=setup(),c=s.card('5',0,86,{resolved:'true'}),commands=[],views=[];
+ c.canModerate=()=>true;c.sectionProperties.authorRow={children:[]};c.createMenu();
+ s.list.sectionProperties.showResolved=true;
+ s.app.map.showResolvedComments=on=>{views.push(on);s.list.sectionProperties.showResolved=on;};
+ s.list.unselect=()=>{};s.app.map.focus=()=>{};s.app.map.sendUnoCommand=(...args)=>commands.push(args);
+ assert.equal(c.sectionProperties.resolveButton.dataset.cooltip,'Close');
+ c.sectionProperties.resolveButton.onclick({stopPropagation:()=>{}});
+ assert.deepEqual(views,[false]);assert.equal(commands.length,0);
+ assert.equal(c.sectionProperties.data.resolved,'true');
+ s.list.resolve(c);
+ assert.equal(commands[0][0],'.uno:ResolveComment','the menu can still reopen the comment');
+});
 
 test('deleted comment actions use the explicit 32-bit revision ID, independent of the cursor',()=>{
  const s=setup(),c=s.card('2',0,86,{layoutStatus:3,deletionRedlineId:'70000'}),commands=[];
